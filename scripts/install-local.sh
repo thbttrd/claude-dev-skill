@@ -7,8 +7,12 @@
 #
 # - For each plugin: symlink plugins/<name>/skills/<name>/ → ~/.claude/skills/<name>/
 # - For each agent under plugins/<name>/agents/: symlink → ~/.claude/agents/<file>
-# - Anything currently at the destination is moved to <path>.backup-<timestamp> first.
-#   Symlinks already pointing into this repo are left untouched (idempotent).
+# - Anything currently at the destination is archived to a sibling tree:
+#       ~/.claude/skills/<name>     →  ~/.claude/skills-archive/<ts>/<name>/
+#       ~/.claude/agents/<file>     →  ~/.claude/agents-archive/<ts>/<file>
+#   IMPORTANT — the archive lives OUTSIDE skills/ and agents/ so Claude Code
+#   does not pick up backup copies as duplicate skills/agents.
+# - Symlinks already pointing into this repo are left untouched (idempotent).
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -42,9 +46,19 @@ link_into() {
     fi
     rm "$link"
   elif [ -e "$link" ]; then
-    local backup="${link}.backup-${TS}"
-    mv "$link" "$backup"
-    warn "  backed up existing: $link → $backup"
+    # Pick the archive root that is a sibling of skills/ or agents/, so the
+    # backup is NOT inside the skill/agent tree (Claude Code would otherwise
+    # load the backup as a duplicate skill).
+    local archive_root
+    case "$link" in
+      "$HOME/.claude/skills/"*) archive_root="$HOME/.claude/skills-archive/$TS" ;;
+      "$HOME/.claude/agents/"*) archive_root="$HOME/.claude/agents-archive/$TS" ;;
+      *) archive_root="$(dirname "$link")-archive/$TS" ;;
+    esac
+    mkdir -p "$archive_root"
+    local archive_path="$archive_root/$(basename "$link")"
+    mv "$link" "$archive_path"
+    warn "  archived existing: $link → $archive_path"
   fi
   ln -s "$target" "$link"
   ok "  $link → $target"

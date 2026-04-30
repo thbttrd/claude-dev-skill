@@ -67,6 +67,8 @@ scripts/uninstall-local.sh            # restore from backup
 
 This symlinks each `plugins/<name>/skills/<name>/` into `~/.claude/skills/<name>/` and any bundled agents into `~/.claude/agents/`. Edits in this repo are reflected immediately on the next Claude Code session.
 
+If `~/.claude/skills/<name>/` already exists, the original is moved to `~/.claude/skills-archive/<timestamp>/<name>/` (sibling tree, **outside** `skills/` so Claude Code does not load it as a duplicate). Same convention for agents at `~/.claude/agents-archive/<timestamp>/`. Restore manually if needed.
+
 ## Repo layout
 
 ```

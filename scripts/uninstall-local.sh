@@ -6,8 +6,9 @@
 #   scripts/uninstall-local.sh --all
 #
 # Only removes a destination path if it is a symlink pointing into this repo.
-# Real files / directories are left untouched. Backups (*.backup-*) are not restored —
-# delete or rename them yourself if you want them back.
+# Real files / directories are left untouched. Archived originals live under
+# ~/.claude/skills-archive/<ts>/ and ~/.claude/agents-archive/<ts>/ — restore
+# manually if you want the pre-install state back (mv them back into ~/.claude/skills/).
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
