@@ -70,7 +70,7 @@ aws: AWS Cloud {
 ```d2
 # Attach an icon to a labeled shape — appears as a badge
 lambda: Auth {
-  icon: /Users/thibauttroude/.claude/skills/d2-architect/assets/icons/aws/lambda.svg
+  icon: ${CLAUDE_PLUGIN_ROOT}/skills/d2-architect/assets/icons/aws/lambda.svg
 }
 
 # Icon as the entire shape (no label)

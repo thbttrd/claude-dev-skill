@@ -2,7 +2,7 @@
 
 Curated icons bundled with the skill. **Always prefer these local paths over remote URLs** — d2 aborts the whole compile if any remote icon fetch returns non-200, and terrastruct's CDN has patchy coverage.
 
-All paths are absolute. Base: `/Users/thibauttroude/.claude/skills/d2-architect/assets/icons/`
+All paths are absolute. Base: `${CLAUDE_PLUGIN_ROOT}/skills/d2-architect/assets/icons/`
 
 ## When to use an icon vs a shape hint
 
@@ -61,11 +61,11 @@ Within a group of similar modules, stay consistent — don't mix icon-styled and
 
 ```d2
 auth_lambda: Auth {
-  icon: /Users/thibauttroude/.claude/skills/d2-architect/assets/icons/aws/lambda.svg
+  icon: ${CLAUDE_PLUGIN_ROOT}/skills/d2-architect/assets/icons/aws/lambda.svg
 }
 
 user_db: Users DB {
-  icon: /Users/thibauttroude/.claude/skills/d2-architect/assets/icons/aws/rds.svg
+  icon: ${CLAUDE_PLUGIN_ROOT}/skills/d2-architect/assets/icons/aws/rds.svg
 }
 ```
 

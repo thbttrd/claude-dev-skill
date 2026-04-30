@@ -2,7 +2,7 @@
 
 Four templates tuned for the kinds of architecture diagrams this skill produces. **Adapt one — don't build from scratch.** All patterns implement the four composition principles from `SKILL.md` (title, legend, hub-central, vertical-leaning).
 
-All absolute icon paths assume the skill is installed at `/Users/thibauttroude/.claude/skills/d2-architect/`.
+All absolute icon paths assume the skill is installed at `${CLAUDE_PLUGIN_ROOT}/skills/d2-architect/`.
 
 ---
 
@@ -245,7 +245,7 @@ direction: down
 
 client: UI Layer {
   web: Web App {
-    icon: /Users/thibauttroude/.claude/skills/d2-architect/assets/icons/dev/react.svg
+    icon: ${CLAUDE_PLUGIN_ROOT}/skills/d2-architect/assets/icons/dev/react.svg
   }
 }
 
@@ -254,7 +254,7 @@ auth: Auth BM {
   domain: Domain
   infra: Infrastructure {
     db: Auth DB {
-      icon: /Users/thibauttroude/.claude/skills/d2-architect/assets/icons/aws/rds.svg
+      icon: ${CLAUDE_PLUGIN_ROOT}/skills/d2-architect/assets/icons/aws/rds.svg
     }
   }
   app -> domain
@@ -266,10 +266,10 @@ planning: Meal Planning BM {
   domain: Domain
   infra: Infrastructure {
     db: Plans DB {
-      icon: /Users/thibauttroude/.claude/skills/d2-architect/assets/icons/aws/rds.svg
+      icon: ${CLAUDE_PLUGIN_ROOT}/skills/d2-architect/assets/icons/aws/rds.svg
     }
     cache: Plans Cache {
-      icon: /Users/thibauttroude/.claude/skills/d2-architect/assets/icons/aws/elasticache.svg
+      icon: ${CLAUDE_PLUGIN_ROOT}/skills/d2-architect/assets/icons/aws/elasticache.svg
     }
   }
   app -> domain
@@ -281,10 +281,10 @@ shopping: Shopping List BM {
   domain: Domain
   infra: Infrastructure {
     db: Lists DB {
-      icon: /Users/thibauttroude/.claude/skills/d2-architect/assets/icons/aws/rds.svg
+      icon: ${CLAUDE_PLUGIN_ROOT}/skills/d2-architect/assets/icons/aws/rds.svg
     }
     queue: Order Queue {
-      icon: /Users/thibauttroude/.claude/skills/d2-architect/assets/icons/aws/sqs.svg
+      icon: ${CLAUDE_PLUGIN_ROOT}/skills/d2-architect/assets/icons/aws/sqs.svg
     }
   }
   app -> domain
