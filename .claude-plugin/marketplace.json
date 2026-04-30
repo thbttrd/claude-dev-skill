@@ -8,5 +8,12 @@
     "description": "Custom Claude Code dev skills for spec-driven development — high-level scoping, spec writing, architecture, planning, test setup, implementation, verification, plus diagram tooling.",
     "version": "0.1.0"
   },
-  "plugins": []
+  "plugins": [
+    {
+      "name": "d2-architect",
+      "source": "./plugins/d2-architect",
+      "description": "Generate architecture diagrams via a four-phase pipeline — view planning (decide whether the architecture wants a single overview or an overview + zoom-ins), TALA auto-layout for a whiteboard-quality first pass, hand-coded HTML + SVG for…",
+      "version": "2.5.0"
+    }
+  ]
 }

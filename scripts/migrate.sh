@@ -53,8 +53,18 @@ fi
 DESCRIPTION="$(skill_field "$SRC_SKILL/SKILL.md" description)"
 [ -n "$DESCRIPTION" ] || die "no description: in $SRC_SKILL/SKILL.md frontmatter"
 
-# Take a short tagline (first sentence, capped at 200 chars) for marketplace.json
-TAGLINE="$(printf '%s' "$DESCRIPTION" | awk -v RS='. ' 'NR==1{print; exit}' | cut -c1-200)"
+# Take a short tagline (first sentence, capped at 250 chars) for marketplace.json.
+# Uses python because shell sentence-splitting on ". " is fragile (awk RS / FS treat
+# "." as regex any-char and produce wrong cuts).
+TAGLINE="$(python3 -c '
+import sys
+t = sys.argv[1]
+i = t.find(". ")
+out = (t[:i] + ".") if i > 0 else t
+if len(out) > 280:
+    out = out[:250].rsplit(" ", 1)[0].rstrip(",;:—-") + "…"
+print(out)
+' "$DESCRIPTION")"
 
 info "migrating $NAME @ $VERSION"
 info "  src: $SRC_SKILL"

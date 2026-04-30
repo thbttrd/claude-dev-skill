@@ -1,0 +1,10 @@
+{
+  "name": "d2-architect",
+  "version": "2.5.0",
+  "description": "Generate architecture diagrams via a four-phase pipeline — view planning (decide whether the architecture wants a single overview or an overview + zoom-ins), TALA auto-layout for a whiteboard-quality first pass, hand-coded HTML + SVG for pixel-perfect final polish (no watermark, no label collisions, every module color-coded by category — never white), and an agent-driven readability review. Use this skill whenever creating or regenerating a high-level or detailed architecture diagram — whether invoked from /high-level-scoping, /research-and-architecture, or any request to visualize modules, services, dependencies, or system topology. Always prefer this skill over Excalidraw or Mermaid for architecture work. Ships with a curated catalog of AWS and dev-stack icons, four canonical layout patterns, a standard view catalog (overview / cross-module-flow / presentation / infrastructure / per-BM zoom-ins), and a TALA-aware polish template.",
+  "author": {
+    "name": "thbttrd"
+  },
+  "homepage": "https://github.com/thbttrd/claude-dev-skill",
+  "license": "MIT"
+}

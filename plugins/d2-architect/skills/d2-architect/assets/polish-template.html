@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TITLE</title>
+<style>
+  :root {
+    /* ─── 3-tier tint per category (Phase B rule §15-bis: no-white modules) ───
+       container = lightest tint, used for layer / group wrappers.
+       fill-light = default module fill — non-hub modules carry the category color.
+       fill-medium = hub module fill — visibly more saturated than its peers.
+       stroke = dark variant, used for borders + matching arrows.
+       The three tints come from the same hue so a layer reads as one cluster
+       even before the eye picks up the borders. */
+    --purple-container: #FAF5FF; --purple-fill-light: #F3E8FF; --purple-fill-medium: #E9D5FF; --purple-stroke: #9333EA;
+    --blue-container:   #EFF6FF; --blue-fill-light:   #DBEAFE; --blue-fill-medium:   #BFDBFE; --blue-stroke:   #2563EB;
+    --grey-container:   #F9FAFB; --grey-fill-light:   #E5E7EB; --grey-fill-medium:   #D1D5DB; --grey-stroke:   #6B7280;
+    --green-container:  #ECFDF5; --green-fill-light:  #D1FAE5; --green-fill-medium:  #A7F3D0; --green-stroke:  #16A34A;
+    --orange-container: #FFF7ED; --orange-fill-light: #FED7AA; --orange-fill-medium: #FDBA74; --orange-stroke: #EA580C;
+    --teal-container:   #F0FDFA; --teal-fill-light:   #CCFBF1; --teal-fill-medium:   #99F6E4; --teal-stroke:   #0F766E;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 0 48px;
+    background: white;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    color: #111827;
+  }
+  h1 {
+    text-align: center;
+    font-size: 26px;
+    font-weight: 700;
+    margin: 0 auto 28px;
+    letter-spacing: -0.01em;
+  }
+
+  .diagram {
+    position: relative;
+    margin: 0 auto;
+  }
+
+  .box {
+    position: absolute;
+    border-radius: 6px;
+    border: 2px solid var(--stroke);
+    background: var(--fill);
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    line-height: 1.35;
+  }
+  .box .title { font-weight: 700; font-size: 15px; color: #111827; }
+  .box .sub   { font-size: 12.5px; color: #374151; margin-top: 2px; }
+  .box .id    { font-size: 12.5px; color: #374151; margin-top: 1px; font-weight: 600; }
+
+  /* Default (non-hub) module: light tint — never pure white. */
+  .box.purple { --fill: var(--purple-fill-light); --stroke: var(--purple-stroke); }
+  .box.blue   { --fill: var(--blue-fill-light);   --stroke: var(--blue-stroke); }
+  .box.grey   { --fill: var(--grey-fill-light);   --stroke: var(--grey-stroke); border-radius: 10px; }
+  .box.green  { --fill: var(--green-fill-light);  --stroke: var(--green-stroke); }
+  .box.orange { --fill: var(--orange-fill-light); --stroke: var(--orange-stroke); }
+  .box.teal   { --fill: var(--teal-fill-light);   --stroke: var(--teal-stroke); }
+  /* Hub: medium tint of the same category + thicker stroke.
+     `.box.hub.<color>` has higher specificity than `.box.<color>`, so the
+     more-saturated fill wins on hub modules. */
+  .box.hub             { border-width: 3px; }
+  .box.hub.purple      { --fill: var(--purple-fill-medium); }
+  .box.hub.blue        { --fill: var(--blue-fill-medium); }
+  .box.hub.grey        { --fill: var(--grey-fill-medium); }
+  .box.hub.green       { --fill: var(--green-fill-medium); }
+  .box.hub.orange      { --fill: var(--orange-fill-medium); }
+  .box.hub.teal        { --fill: var(--teal-fill-medium); }
+  /* Layer / group wrapper: lightest tint, drawn behind the modules. */
+  .layer { position: absolute; border-radius: 10px; border: 2px solid var(--stroke); background: var(--fill); }
+  .layer.purple { --fill: var(--purple-container); --stroke: var(--purple-stroke); }
+  .layer.blue   { --fill: var(--blue-container);   --stroke: var(--blue-stroke); }
+  .layer.grey   { --fill: var(--grey-container);   --stroke: var(--grey-stroke); }
+  .layer.green  { --fill: var(--green-container);  --stroke: var(--green-stroke); }
+  .layer.orange { --fill: var(--orange-container); --stroke: var(--orange-stroke); }
+  .layer.teal   { --fill: var(--teal-container);   --stroke: var(--teal-stroke); }
+  .layer-title { position: absolute; top: 8px; left: 0; width: 100%; text-align: center; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: var(--stroke); pointer-events: none; }
+
+  svg.arrows {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  .arrow-label {
+    font-size: 12px;
+    font-style: italic;
+    fill: #6B7280;
+    /* ─── White halo (Phase C rule §26): every arrow label reads clearly even when it sits
+       on a box border or near an arrow. paint-order renders the stroke FIRST (3 px white)
+       then the fill, isolating each character from whatever is underneath. ─── */
+    paint-order: stroke fill;
+    stroke: white;
+    stroke-width: 3px;
+    stroke-linejoin: round;
+  }
+  .arrow-label.purple { fill: var(--purple-stroke); }
+  .arrow-label.blue   { fill: var(--blue-stroke); }
+  .arrow-label.green  { fill: var(--green-stroke); }
+  .arrow-label.orange { fill: var(--orange-stroke); }
+  .arrow-label.teal   { fill: var(--teal-stroke); }
+
+  .legend {
+    width: 720px;
+    margin: 40px auto 0;
+    border: 1.5px solid #9CA3AF;
+    border-radius: 8px;
+    padding: 20px 28px 28px;
+    position: relative;
+  }
+  .legend h2 {
+    text-align: center;
+    margin: 0 0 20px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #374151;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ REPLACE: page title ═══ -->
+<h1>PROJECT — SCOPE (Vn)</h1>
+
+<!-- ═══ REPLACE: diagram canvas dimensions ═══ -->
+<div class="diagram" style="width: 900px; height: 800px;">
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- REPLACE: layer / group wrappers, then absolute-positioned -->
+  <!-- box divs (one per module).                                -->
+  <!--                                                           -->
+  <!-- Color classes: purple, blue, grey, green, orange, teal.   -->
+  <!--   .layer.<color>      — lightest tint, draws the wrapper. -->
+  <!--   .box.<color>        — light tint   — non-hub modules.   -->
+  <!--   .box.hub.<color>    — medium tint  + 3px stroke (hub).  -->
+  <!--                                                           -->
+  <!-- NEVER use a white module fill: every box carries the      -->
+  <!-- category color via one of the .box.<color> classes.       -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+
+  <!-- Example layer wrapper (drawn first so it sits behind boxes). -->
+  <div class="layer purple" style="left:30px; top:50px; width:840px; height:140px;">
+    <div class="layer-title">PRESENTATION — example layer</div>
+  </div>
+
+  <!-- Non-hub module: light purple fill + colored border. -->
+  <div class="box purple" style="left:60px; top:90px; width:200px; height:80px;">
+    <div class="title">example</div>
+    <div class="sub">(composition root)</div>
+  </div>
+  <!-- Hub module: medium purple fill + thicker border. -->
+  <div class="box hub purple" style="left:300px; top:90px; width:200px; height:80px;">
+    <div class="title">example-hub</div>
+    <div class="sub">(most-connected)</div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- REPLACE: SVG arrow overlay. Markers are stable; paths    -->
+  <!-- and labels are per-diagram.                              -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <svg class="arrows" viewBox="0 0 900 800">
+    <defs>
+      <marker id="h-grey"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6B7280"/></marker>
+      <marker id="h-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#9333EA"/></marker>
+      <marker id="h-blue"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2563EB"/></marker>
+      <marker id="h-green"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#16A34A"/></marker>
+      <marker id="h-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#EA580C"/></marker>
+      <marker id="h-teal"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#0F766E"/></marker>
+    </defs>
+
+    <!--
+      Arrow path examples — orthogonal (elbow) routing is the DEFAULT.
+      Every path uses horizontal + vertical segments with 90° bends, and every
+      final segment is perpendicular to the box edge it touches. See
+      references/polish-rules.md §16–25 and references/html-template.md.
+
+      Straight (aligned boxes, zero bends):
+        <path d="M x1 y1 L x2 y2" stroke="..." stroke-width="1.8" fill="none" marker-end="url(#h-grey)"/>
+
+      L-shape (two 90° bends — routes around intervening content):
+        <path d="M x1 y1  L xBend y1  L xBend y2  L x2 y2" stroke="..." ... marker-end="url(#h-teal)"/>
+        (exit source perpendicular, turn once, enter target perpendicular)
+
+      Bracket / manifold (1 source → 2+ targets: backbone + drops):
+        <path d="M src srcY  L src busY  L lastTgt busY" stroke="..." .../>                          (backbone, no arrowhead)
+        <path d="M tgt1 busY L tgt1 tgt1TopY" stroke="..." ... marker-end="url(#h-grey)"/>           (drop 1)
+        <path d="M tgt2 busY L tgt2 tgt2TopY" stroke="..." ... marker-end="url(#h-grey)"/>           (drop 2)
+
+      Dashed DI:  <path d="..." stroke="#16A34A" stroke-dasharray="6 4" ... marker-end="url(#h-green)"/>
+      Async:      <path d="..." stroke="#6B7280" stroke-dasharray="5 3" ... />
+
+      Curved (fallback — use only when orthogonal would cross a label that cannot be moved):
+        <path d="M x1 y1 C cx1 cy1 cx2 cy2 x2 y2" stroke="..." ... />
+
+      Arrow label:
+        <text x="..." y="..." class="arrow-label">label text</text>
+          Add .purple / .blue / .green / .orange / .teal to color the label.
+      Side-margin label alongside a vertical L-shape segment (rotated 90° CCW):
+        <text x="..." y="..." class="arrow-label teal"
+              transform="rotate(-90 x y)" text-anchor="middle">label text</text>
+    -->
+
+  </svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- REPLACE: legend entries — one per arrow semantic used above. -->
+<!-- Typical layout: 2 columns × 3 rows.                          -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="legend">
+  <h2>Legend</h2>
+  <svg viewBox="0 0 640 310" style="width: 100%; height: 310px;">
+    <defs>
+      <marker id="l-grey"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6B7280"/></marker>
+      <marker id="l-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#9333EA"/></marker>
+      <marker id="l-blue"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2563EB"/></marker>
+      <marker id="l-green"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#16A34A"/></marker>
+      <marker id="l-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#EA580C"/></marker>
+      <marker id="l-teal"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#0F766E"/></marker>
+    </defs>
+
+    <!--
+      Each legend entry:
+        <rect ... width="28" height="28" />  (source box mini-shape)
+        <path ... marker-end="url(#l-...)" /> (arrow style demo)
+        <rect ... width="200" height="34" /> + <text ...>Label</text> (target label)
+
+      See references/html-template.md for the coordinate pattern.
+    -->
+
+  </svg>
+</div>
+
+</body>
+</html>
