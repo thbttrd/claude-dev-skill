@@ -1,0 +1,10 @@
+{
+  "name": "test-setup",
+  "version": "1.0.0",
+  "description": "Writes all BDD step definitions and unit tests for every plan in the DAG for a **specific version** (V0, V1, ...) BEFORE any implementation code exists. Tests are real — they call actual API endpoints, service methods, and functions — but those implementations are empty stubs, so the tests fail at assertion time, not because tests are placeholder. Creates minimal source stubs (files exist, exports exist, function bodies are empty) so tests compile and run but produce meaningful failures. Operates after /plan-writing completes and before /spec-implementation. Use this skill when you need to scaffold all tests upfront, when plans are written and you want to enter the RED state for the entire version before writing any production code. Triggers on: \"write the tests\", \"scaffold the tests\", \"set up the test suite\", \"create failing tests\", \"RED phase for all plans\", \"test setup\", \"test setup for V0\", or any request to write tests before implementation. Also use when the state file shows phase \"test_setup\" (resuming interrupted test scaffolding). Make sure to use this skill after /plan-writing-verification passes and before starting /spec-implementation.",
+  "author": {
+    "name": "thbttrd"
+  },
+  "homepage": "https://github.com/thbttrd/claude-dev-skill",
+  "license": "MIT"
+}

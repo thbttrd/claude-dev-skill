@@ -1,0 +1,10 @@
+{
+  "name": "verification-and-validation",
+  "version": "1.0.0",
+  "description": "Full end-to-end verification of a completed implementation for a **specific version** (V0, V1, ...) against specs, feature files, wireframes, and UI specs. Starts the application, tests every API endpoint with curl, exercises every UI scenario via Playwright MCP, and fixes any deviation found. Use this skill after /implementation has completed for the target version (all waves done, all quality gates passed). Triggers on: \"verify the app\", \"validate the implementation\", \"verify V0\", \"run E2E verification\", \"test the running app\", \"check everything works\", or any request to verify a completed implementation against its specs. Also use when resuming an interrupted verification — the state file tells you where you left off.",
+  "author": {
+    "name": "thbttrd"
+  },
+  "homepage": "https://github.com/thbttrd/claude-dev-skill",
+  "license": "MIT"
+}

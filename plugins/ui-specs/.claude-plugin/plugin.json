@@ -1,0 +1,10 @@
+{
+  "name": "ui-specs",
+  "version": "1.0.0",
+  "description": "Produces a project's design system + UI mockups for a specific version V{N}. Outputs (a) docs/V{N}/specs/DESIGN.md following the Google-Stitch / VoltAgent awesome-design-md 9-section standard (Visual Theme & Atmosphere → Color Palette & Roles → Typography Rules → Component Stylings → Layout Principles → Depth & Elevation → Do's and Don'ts → Responsive Behavior → Agent Prompt Guide), (b) one fully-styled, self-contained HTML mockup per UI screen at docs/V{N}/specs/mockups/UI-F-NNN-screen-slug.html (plus mobile variant) showing default/loading/empty/error states stacked as labeled panels, and (c) a per-screen markdown spec at docs/V{N}/specs/UI-F-NNN-screen-slug.md referencing the HTML mockup. Drives the design system through three branches the user picks from — copy a brand DESIGN.md from the VoltAgent awesome-design-md catalog (via `npx getdesign@latest add <brand>`), start from one and tweak it, or build from scratch via realtimecolors.com aesthetic discovery. For each UI feature, proposes 2-3 HTML mockup variants side-by-side (rendered + screenshotted via Playwright MCP for in-terminal review), the user picks one, then iterates to acceptance. Use this skill whenever the user wants to define a design system, write UI specs, generate mockups, pick brand colors/fonts, draw screen layouts, or says \"design system\", \"DESIGN.md\", \"ui specs\", \"mockups\", \"wireframes\", \"/ui-specs\". Auto-invoked by /spec-writing whenever a project has a user-facing interface (web app, dashboard, mobile app); replaces the older Excalidraw-based wireframe flow. Also triggers when the user wants to update an existing design system, swap brand inspiration, redo screen mockups, or add UI for a new feature in an already-specified version.",
+  "author": {
+    "name": "thbttrd"
+  },
+  "homepage": "https://github.com/thbttrd/claude-dev-skill",
+  "license": "MIT"
+}

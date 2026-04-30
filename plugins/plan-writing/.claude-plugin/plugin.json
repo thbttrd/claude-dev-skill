@@ -1,0 +1,10 @@
+{
+  "name": "plan-writing",
+  "version": "1.0.0",
+  "description": "Plans the implementation of a **specific version** (V0, V1, ...) from project-tracking.json, producing a DAG of implementation plans organized into waves — where each wave delivers a vertical, testable, end-to-end slice of the app. Each plan prescribes steps-first TDD (BDD step definitions and unit tests BEFORE implementation code) and respects MIM AA module boundaries. Plans are dry (zero code). Use this skill after specs and architecture are ready for a version, before starting implementation or /spec-implementation. Also triggers on: \"plan V0\", \"plan this version\", \"write the plans\", \"create implementation plans\", \"plan the implementation\", \"build the DAG\", \"what order should we implement\", or any request to break a version into implementable work packages.",
+  "author": {
+    "name": "thbttrd"
+  },
+  "homepage": "https://github.com/thbttrd/claude-dev-skill",
+  "license": "MIT"
+}

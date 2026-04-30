@@ -28,27 +28,27 @@ The skills form a coherent **spec-driven-development pipeline** (top → bottom)
 
 | Stage | Skill | Version | What it does |
 |---|---|---|---|
-| 1 | `high-level-scoping` | _(pending migration)_ | Personas, epics, prioritized user stories, V0…Vn roadmap — produces `docs/project-tracking.json` |
-| 2 | `spec-writing` | _(pending migration)_ | `SPECS.md` + Cucumber-compatible `.feature` files for a version |
-| 2.5 | `spec-writing-verification` | _(pending migration)_ | Audits step 2 |
-| 2.6 | `ui-specs` | _(pending migration)_ | `DESIGN.md` + per-screen HTML mockups (auto-invoked by `spec-writing` for UI projects) |
-| 3 | `research-and-architecture` | _(pending migration)_ | `ARCHITECTURE.md` following MIM AA, with embedded diagrams |
-| 3.5 | `research-and-architecture-verification` | _(pending migration)_ | Audits step 3 |
-| 4 | `repo-initialization` | _(pending migration)_ | Scaffolds the repo from SPECS + ARCHITECTURE — tooling, hooks, CLAUDE.md |
-| 4.5 | `repo-initialization-verification` | _(pending migration)_ | Audits step 4 |
-| 5 | `plan-writing` | _(pending migration)_ | Wave-by-wave DAG of implementation plans for a version |
-| 5.5 | `plan-writing-verification` | _(pending migration)_ | Audits step 5 |
-| 6 | `test-setup` | _(pending migration)_ | Writes failing BDD step defs + unit tests + source stubs (RED state) |
-| 6.5 | `test-setup-verification` | _(pending migration)_ | Audits step 6 |
-| 7 | `spec-implementation` | _(pending migration)_ | GREEN-phase autonomous implementation, wave by wave |
-| 8 | `verification-and-validation` | _(pending migration)_ | Final E2E verification of the running app vs. specs |
+| 1 | `high-level-scoping` | 1.0.0 | Personas, epics, prioritized user stories, V0…Vn roadmap — produces `docs/project-tracking.json` |
+| 2 | `spec-writing` | 1.0.0 | `SPECS.md` + Cucumber-compatible `.feature` files for a version |
+| 2.5 | `spec-writing-verification` | 1.0.0 | Audits step 2 |
+| 2.6 | `ui-specs` | 1.0.0 | `DESIGN.md` + per-screen HTML mockups (auto-invoked by `spec-writing` for UI projects) |
+| 3 | `research-and-architecture` | 1.0.0 | `ARCHITECTURE.md` following MIM AA, with embedded diagrams |
+| 3.5 | `research-and-architecture-verification` | 1.0.0 | Audits step 3 |
+| 4 | `repo-initialization` | 1.0.0 | Scaffolds the repo from SPECS + ARCHITECTURE — tooling, hooks, CLAUDE.md |
+| 4.5 | `repo-initialization-verification` | 1.0.0 | Audits step 4 |
+| 5 | `plan-writing` | 1.0.0 | Wave-by-wave DAG of implementation plans for a version |
+| 5.5 | `plan-writing-verification` | 1.0.0 | Audits step 5 |
+| 6 | `test-setup` | 1.0.0 | Writes failing BDD step defs + unit tests + source stubs (RED state) |
+| 6.5 | `test-setup-verification` | 1.0.0 | Audits step 6 |
+| 7 | `spec-implementation` | 1.0.0 | GREEN-phase autonomous implementation, wave by wave |
+| 8 | `verification-and-validation` | 1.0.0 | Final E2E verification of the running app vs. specs |
 
 ### Orthogonal tooling
 
 | Skill | Version | What it does |
 |---|---|---|
-| `d2-architect` | _(pending migration)_ | Architecture diagrams via TALA + hand-coded HTML/SVG polish + agent-driven readability review |
-| `html-architect` | _(pending migration)_ | Hand-coded HTML/SVG diagrams for layouts where auto-layout struggles |
+| `d2-architect` | 2.5.0 | Architecture diagrams via TALA + hand-coded HTML/SVG polish + agent-driven readability review |
+| `html-architect` | 1.3.0 | Hand-coded HTML/SVG diagrams for layouts where auto-layout struggles |
 
 ## Versioning
 

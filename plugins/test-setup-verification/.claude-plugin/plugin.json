@@ -1,0 +1,10 @@
+{
+  "name": "test-setup-verification",
+  "version": "1.0.0",
+  "description": "Verifies the output of /test-setup for completeness, correctness, and RED-state compliance for a specific version (V0, V1, ...). Spawns a fresh agent to audit all BDD step definition files, unit test files, and source stubs against the wave plan files, .feature files, and ARCHITECTURE.md. Confirms that every test is real (calls actual functions/APIs), that no tests are placeholder (empty bodies, test.todo, tautological assertions), that all tests fail because implementations are empty stubs (not because of import errors or missing files), that step definition coverage is complete, **and that the project uses a real BDD runner (playwright-bdd or @cucumber/cucumber) wired so .feature files actually drive the test suite — not Gherkin pasted as comments inside *.spec.ts files**. Produces a structured compliance report with pass/fail verdicts and actionable recommendations. Use this skill after running /test-setup, before starting /spec-implementation. Also triggers on: \"verify the tests\", \"check the test setup\", \"audit the failing tests\", \"are the tests ready\", \"validate test setup before implementation\", or any request to review test scaffolding quality. Make sure to use this skill after /test-setup completes and before starting /spec-implementation.",
+  "author": {
+    "name": "thbttrd"
+  },
+  "homepage": "https://github.com/thbttrd/claude-dev-skill",
+  "license": "MIT"
+}

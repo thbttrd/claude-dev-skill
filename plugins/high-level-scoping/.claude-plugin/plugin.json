@@ -1,0 +1,10 @@
+{
+  "name": "high-level-scoping",
+  "version": "1.0.0",
+  "description": "Agile project scoping skill that produces personas, epics, prioritized user stories, a high-level architecture diagram (via the d2-architect skill), and a versioned roadmap starting from a V0 walking skeleton. Outputs a structured JSON file for project tracking and a lightweight ARCHITECTURE.md with the diagram embedded (later enriched by /research-and-architecture). Use this skill when the user wants to scope a new project, define epics and user stories, plan a product roadmap, do agile discovery, create a product backlog, or says things like \"let's scope this out\", \"plan this project\", \"what should we build first\", \"create a backlog\", \"/high-level-scoping\". Also trigger when the user mentions Kanban, Scrum, sprints, epics, user stories in the context of starting a new project.",
+  "author": {
+    "name": "thbttrd"
+  },
+  "homepage": "https://github.com/thbttrd/claude-dev-skill",
+  "license": "MIT"
+}

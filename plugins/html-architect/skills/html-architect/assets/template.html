@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TITLE — REPLACE</title>
+<style>
+  :root {
+    --purple-fill: #F3E8FF;  --purple-stroke: #9333EA;
+    --blue-fill:   #DBEAFE;  --blue-stroke:   #2563EB;
+    --grey-fill:   #E5E7EB;  --grey-stroke:   #6B7280;
+    --green-fill:  #D1FAE5;  --green-stroke:  #16A34A;
+    --orange-fill: #FED7AA;  --orange-stroke: #EA580C;
+    --teal-fill:   #CCFBF1;  --teal-stroke:   #0F766E;
+
+    /* slightly darker container background tints for tier/group blocks */
+    --purple-bg: #FAF5FF;
+    --blue-bg:   #EFF6FF;
+    --green-bg:  #F0FDF4;
+    --orange-bg: #FFF7ED;
+    --teal-bg:   #F0FDFA;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 0 48px;
+    background: white;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    color: #111827;
+  }
+  h1 {
+    text-align: center;
+    font-size: 26px;
+    font-weight: 700;
+    margin: 0 auto 28px;
+    letter-spacing: -0.01em;
+  }
+
+  .diagram {
+    position: relative;
+    margin: 0 auto;
+  }
+
+  /* Tier / group container — pale tinted rectangle, holds boxes */
+  .container {
+    position: absolute;
+    border-radius: 10px;
+    border: 1.5px solid;
+    background: transparent;
+  }
+  .container.purple { background: var(--purple-bg); border-color: #D8B4FE; }
+  .container.blue   { background: var(--blue-bg);   border-color: #93C5FD; }
+  .container.green  { background: var(--green-bg);  border-color: #86EFAC; }
+  .container.orange { background: var(--orange-bg); border-color: #FDBA74; }
+  .container.teal   { background: var(--teal-bg);   border-color: #5EEAD4; }
+  .container-title {
+    position: absolute;
+    top: 8px;
+    left: 14px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  .container.purple .container-title { color: var(--purple-stroke); }
+  .container.blue   .container-title { color: var(--blue-stroke); }
+  .container.green  .container-title { color: var(--green-stroke); }
+  .container.orange .container-title { color: var(--orange-stroke); }
+  .container.teal   .container-title { color: var(--teal-stroke); }
+
+  /* Individual box (module) */
+  .box {
+    position: absolute;
+    border-radius: 6px;
+    border: 2px solid var(--stroke);
+    background: var(--fill);
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    line-height: 1.35;
+  }
+  .box .title { font-weight: 700; font-size: 14.5px; color: #111827; }
+  .box .sub   { font-size: 12px; color: #374151; margin-top: 3px; font-weight: 400; }
+  .box .id    { font-size: 12px; color: #374151; margin-top: 1px; font-weight: 600; }
+
+  .box.purple { --fill: var(--purple-fill); --stroke: var(--purple-stroke); }
+  .box.blue   { --fill: var(--blue-fill);   --stroke: var(--blue-stroke); }
+  .box.grey   { --fill: var(--grey-fill);   --stroke: var(--grey-stroke); border-radius: 10px; }
+  .box.green  { --fill: var(--green-fill);  --stroke: var(--green-stroke); }
+  .box.orange { --fill: var(--orange-fill); --stroke: var(--orange-stroke); }
+  .box.teal   { --fill: var(--teal-fill);   --stroke: var(--teal-stroke); }
+  .box.hub    { border-width: 3px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+  svg.arrows {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: visible;
+  }
+  /* Arrow labels: white halo via `paint-order: stroke fill` so the label
+     visually "breaks" any arrow line or container border it sits on top of.
+     Stroke paints first (behind the fill), producing a readable mask. */
+  .arrow-label        {
+    font-size: 12px;
+    font-style: italic;
+    fill: #6B7280;
+    font-family: inherit;
+    paint-order: stroke fill;
+    stroke: white;
+    stroke-width: 3px;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+  .arrow-label.purple { fill: var(--purple-stroke); }
+  .arrow-label.blue   { fill: var(--blue-stroke); }
+  .arrow-label.green  { fill: var(--green-stroke); }
+  .arrow-label.orange { fill: var(--orange-stroke); }
+  .arrow-label.teal   { fill: var(--teal-stroke); }
+
+  /* Inter-tier hint labels (e.g. "subscribes to ↓") */
+  .tier-hint {
+    position: absolute;
+    font-size: 12.5px;
+    font-style: italic;
+    color: #6B7280;
+    text-align: center;
+  }
+
+  .legend {
+    width: 820px;
+    margin: 36px auto 0;
+    border: 1.5px solid #9CA3AF;
+    border-radius: 8px;
+    padding: 18px 28px 26px;
+    position: relative;
+  }
+  .legend h2 {
+    text-align: center;
+    margin: 0 0 16px;
+    font-size: 17px;
+    font-weight: 700;
+    color: #374151;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ REPLACE: page title ═══ -->
+<h1>PROJECT — SCOPE (Vn)</h1>
+
+<!-- ═══ REPLACE: diagram canvas dimensions — aim height ≥ width ═══ -->
+<div class="diagram" style="width: 1000px; height: 1000px;">
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- REPLACE: tier/group containers (optional).                -->
+  <!-- Use for Pattern 3 (Layered MIM AA) or Pattern 1 columns.  -->
+  <!-- Classes: container.purple/blue/green/orange/teal         -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+
+  <div class="container purple" style="left:40px; top:40px; width:920px; height:140px;">
+    <div class="container-title">LAYER NAME — descriptor</div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- REPLACE: absolute-positioned box divs, one per module.    -->
+  <!-- Color classes: purple, blue, grey, green, orange, teal.   -->
+  <!-- Add `hub` class to the central / most-connected node.     -->
+  <!-- Default sizes: 180×70 normal, 200×80 bigger, 220×90 hub.  -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+
+  <div class="box purple" style="left:80px; top:85px; width:180px; height:70px;">
+    <div class="title">example module</div>
+    <div class="sub">what it does</div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- REPLACE: SVG arrow overlay.                               -->
+  <!-- The viewBox must match the .diagram width/height above.   -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+
+  <svg class="arrows" viewBox="0 0 1000 1000">
+    <defs>
+      <marker id="h-grey"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6B7280"/></marker>
+      <marker id="h-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#9333EA"/></marker>
+      <marker id="h-blue"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2563EB"/></marker>
+      <marker id="h-green"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#16A34A"/></marker>
+      <marker id="h-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#EA580C"/></marker>
+      <marker id="h-teal"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#0F766E"/></marker>
+    </defs>
+
+    <!--
+      IMPORTANT ORDERING: render ALL <path> arrows FIRST, then ALL <text>
+      arrow-labels LAST. SVG paints in document order, so putting labels
+      after every path guarantees labels sit on top of every arrow — not
+      just their own. Combined with the white-halo CSS (`paint-order:
+      stroke fill`), labels remain readable even when they visually cross
+      an arrow or a container border.
+
+      Arrow path forms:
+
+      Straight:   <path d="M x1 y1 L x2 y2" stroke="#6B7280" stroke-width="1.8" fill="none" marker-end="url(#h-grey)"/>
+      Curved:     <path d="M x1 y1 C cx1 cy1 cx2 cy2 x2 y2" stroke="..." stroke-width="1.8" fill="none" marker-end="url(#h-...)"/>
+      DI/impl:    stroke-dasharray="6 4" with stroke="#16A34A" marker-end="url(#h-green)"
+      Async:      stroke-dasharray="5 3" with stroke="#6B7280" marker-end="url(#h-grey)"
+
+      Arrow label:  <text x="..." y="..." class="arrow-label">label</text>
+                    Add .purple / .blue / .green / .orange / .teal to match color.
+                    Offset the label 10–15px into clear whitespace from arrow midpoint.
+                    The white halo masks any arrow/border beneath — but STILL
+                    position labels in whitespace first; the halo is a fallback,
+                    not a substitute for good placement.
+
+      Multi-arrow spacing: for n arrows sharing an edge, land endpoints at
+      (edge_start + k * edge_length / (n+1)) for k = 1..n.
+    -->
+
+    <!-- ─── ARROWS (paths) ─── -->
+
+    <!-- ─── LABELS (text) — render AFTER every path ─── -->
+
+  </svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- REPLACE: legend entries — one per arrow semantic used above. -->
+<!-- Typical: 2 columns × 3 rows.                                 -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="legend">
+  <h2>Legend</h2>
+  <svg viewBox="0 0 800 220" style="width: 100%; height: 220px;">
+    <defs>
+      <marker id="l-grey"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6B7280"/></marker>
+      <marker id="l-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#9333EA"/></marker>
+      <marker id="l-blue"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2563EB"/></marker>
+      <marker id="l-green"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#16A34A"/></marker>
+      <marker id="l-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#EA580C"/></marker>
+      <marker id="l-teal"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#0F766E"/></marker>
+    </defs>
+
+    <!--
+      Each legend entry (one per arrow semantic used):
+        <path d="M x1 y L x2 y" stroke="..." stroke-width="1.8" fill="none" marker-end="url(#l-...)"/>
+        <text x="..." y="..." class="arrow-label">Semantic label</text>
+
+      Typical layout: 2 columns × 3 rows, 50px row gap, arrow ~80px long.
+    -->
+
+  </svg>
+</div>
+
+</body>
+</html>
