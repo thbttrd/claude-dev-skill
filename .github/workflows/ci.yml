@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: validate marketplace + plugins
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yq (mikefarah)
+        run: |
+          sudo wget -qO /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Run validate.sh
+        run: ./scripts/validate.sh
+
+  changelog-bump-guard:
+    name: every plugin change has a CHANGELOG entry
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check that touched plugins have a bumped CHANGELOG
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          touched=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" \
+            | grep '^plugins/' \
+            | awk -F/ '{print $2}' \
+            | sort -u)
+
+          fail=0
+          for plugin in $touched; do
+            if ! git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -qx "plugins/$plugin/CHANGELOG.md"; then
+              echo "::error file=plugins/$plugin/CHANGELOG.md::plugins/$plugin/ was modified but plugins/$plugin/CHANGELOG.md was not. Run scripts/bump.sh $plugin <patch|minor|major>."
+              fail=1
+            fi
+          done
+          exit $fail
