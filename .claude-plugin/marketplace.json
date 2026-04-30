@@ -1,0 +1,12 @@
+{
+  "name": "claude-dev-skill",
+  "owner": {
+    "name": "thbttrd",
+    "url": "https://github.com/thbttrd"
+  },
+  "metadata": {
+    "description": "Custom Claude Code dev skills for spec-driven development — high-level scoping, spec writing, architecture, planning, test setup, implementation, verification, plus diagram tooling.",
+    "version": "0.1.0"
+  },
+  "plugins": []
+}
