@@ -6,6 +6,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-05-03
+
 ### Changed
 
 - **BREAKING:** Audits the scaffolded repo against `specs/ARCHITECTURE.md` + `specs/PROJECT.md` (not `docs/V{N}/`).

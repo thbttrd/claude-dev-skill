@@ -6,6 +6,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-05-03
+
 ### Changed
 
 - **BREAKING:** Output moves from `docs/V{N}/architecture/ARCHITECTURE.md` to project-wide `specs/ARCHITECTURE.md`. The document is additive — when new stories require new modules, the file is enriched in place rather than duplicated per version.

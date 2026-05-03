@@ -5,105 +5,105 @@
     "url": "https://github.com/thbttrd"
   },
   "metadata": {
-    "description": "Custom Claude Code dev skills for spec-driven development — high-level scoping, spec writing, architecture, planning, test setup, implementation, verification, plus diagram tooling.",
+    "description": "Custom Claude Code dev skills for spec-driven development \u2014 high-level scoping, spec writing, architecture, planning, test setup, implementation, verification, plus diagram tooling.",
     "version": "0.1.0"
   },
   "plugins": [
     {
       "name": "d2-architect",
       "source": "./plugins/d2-architect",
-      "description": "Generate architecture diagrams via a four-phase pipeline — view planning (decide whether the architecture wants a single overview or an overview + zoom-ins), TALA auto-layout for a whiteboard-quality first pass, hand-coded HTML + SVG for…",
+      "description": "Generate architecture diagrams via a four-phase pipeline \u2014 view planning (decide whether the architecture wants a single overview or an overview + zoom-ins), TALA auto-layout for a whiteboard-quality first pass, hand-coded HTML + SVG for\u2026",
       "version": "2.5.0"
     },
     {
       "name": "high-level-scoping",
       "source": "./plugins/high-level-scoping",
       "description": "Agile project scoping skill that produces personas, epics, prioritized user stories, a high-level architecture diagram (via the d2-architect skill), and a versioned roadmap starting from a V0 walking skeleton.",
-      "version": "1.0.0"
+      "version": "2.0.0"
     },
     {
       "name": "html-architect",
       "source": "./plugins/html-architect",
-      "description": "Generate architecture diagrams as hand-coded HTML + CSS + inline SVG — no D2, no TALA, no auto-layout engine — by applying TALA's software-architecture layout principles manually (symmetry, clusters, hierarchy, balanced ports, hub-centrality, square-ish aspect ratio).",
+      "description": "Generate architecture diagrams as hand-coded HTML + CSS + inline SVG \u2014 no D2, no TALA, no auto-layout engine \u2014 by applying TALA's software-architecture layout principles manually (symmetry, clusters, hierarchy, balanced ports, hub-centrality, square-ish aspect ratio).",
       "version": "1.3.0"
     },
     {
       "name": "plan-writing",
       "source": "./plugins/plan-writing",
-      "description": "Plans the implementation of a **specific version** (V0, V1, ...) from project-tracking.json, producing a DAG of implementation plans organized into waves — where each wave delivers a vertical, testable, end-to-end slice of the app.",
-      "version": "1.0.0"
+      "description": "Plans the implementation of a **specific version** (V0, V1, ...) from project-tracking.json, producing a DAG of implementation plans organized into waves \u2014 where each wave delivers a vertical, testable, end-to-end slice of the app.",
+      "version": "2.0.0"
     },
     {
       "name": "plan-writing-verification",
       "source": "./plugins/plan-writing-verification",
       "description": "Verifies the output of /plan-writing for a specific version (V0, V1, ...) for completeness, DAG correctness, TDD prescription compliance, and architecture alignment.",
-      "version": "1.0.0"
+      "version": "2.0.0"
     },
     {
       "name": "repo-initialization",
       "source": "./plugins/repo-initialization",
       "description": "Scaffolds a new project repository from SPECS.md and ARCHITECTURE.md produced by /spec-writing and /research-and-architecture.",
-      "version": "1.0.0"
+      "version": "2.0.0"
     },
     {
       "name": "repo-initialization-verification",
       "source": "./plugins/repo-initialization-verification",
       "description": "Verifies the output of /repo-initialization for completeness and correctness.",
-      "version": "1.0.0"
+      "version": "2.0.0"
     },
     {
       "name": "research-and-architecture",
       "source": "./plugins/research-and-architecture",
       "description": "Research tech stacks and produce an ARCHITECTURE.md following MIM AA (Module Infrastructure-Module) architecture.",
-      "version": "1.0.0"
+      "version": "2.0.0"
     },
     {
       "name": "research-and-architecture-verification",
       "source": "./plugins/research-and-architecture-verification",
       "description": "Verifies the output of /research-and-architecture for MIM AA compliance, template completeness, and consistency with SPECS.md.",
-      "version": "1.0.0"
+      "version": "2.0.0"
     },
     {
       "name": "spec-implementation",
       "source": "./plugins/spec-implementation",
       "description": "Autonomous GREEN-phase execution of pre-existing implementation plans for a **specific version** (V0, V1, ...) against pre-written failing tests, Gherkin .feature files, UI wireframes, and ARCHITECTURE.md.",
-      "version": "1.0.0"
+      "version": "2.0.0"
     },
     {
       "name": "spec-writing",
       "source": "./plugins/spec-writing",
       "description": "Spec-driven development skill that produces a high-level SPECS.md overview plus executable Cucumber-compatible .feature files (one per feature) with full Gherkin scenarios.",
-      "version": "1.0.0"
+      "version": "2.0.0"
     },
     {
       "name": "spec-writing-verification",
       "source": "./plugins/spec-writing-verification",
       "description": "Verifies the output of /spec-writing for completeness, coherence, and template compliance.",
-      "version": "1.0.0"
+      "version": "2.0.0"
     },
     {
       "name": "test-setup",
       "source": "./plugins/test-setup",
       "description": "Writes all BDD step definitions and unit tests for every plan in the DAG for a **specific version** (V0, V1, ...) BEFORE any implementation code exists.",
-      "version": "1.0.0"
+      "version": "2.0.0"
     },
     {
       "name": "test-setup-verification",
       "source": "./plugins/test-setup-verification",
       "description": "Verifies the output of /test-setup for completeness, correctness, and RED-state compliance for a specific version (V0, V1, ...).",
-      "version": "1.0.0"
+      "version": "2.0.0"
     },
     {
       "name": "ui-specs",
       "source": "./plugins/ui-specs",
       "description": "Produces a project's design system + UI mockups for a specific version V{N}.",
-      "version": "1.0.0"
+      "version": "2.0.0"
     },
     {
       "name": "verification-and-validation",
       "source": "./plugins/verification-and-validation",
       "description": "Full end-to-end verification of a completed implementation for a **specific version** (V0, V1, ...) against specs, feature files, wireframes, and UI specs.",
-      "version": "1.0.0"
+      "version": "2.0.0"
     }
   ]
 }

@@ -6,6 +6,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-05-03
+
 ### Changed
 
 - **BREAKING:** Audits per-story `specs/story-NNN-slug/STORY.md` + `specs/story-NNN-slug/features/*.feature` instead of project-wide `docs/V{N}/specs/SPECS.md`.

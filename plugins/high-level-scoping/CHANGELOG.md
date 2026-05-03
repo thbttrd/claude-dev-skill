@@ -6,6 +6,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-05-03
+
 ### Added
 
 - New reference `references/stories-json-schema.md` describing the story-based `specs/stories.json` shape. Documents per-skill ownership, the `phase` enum (`backlog → scoped → specced → planned → red → green → verified`), INVEST flags, and ID conventions.

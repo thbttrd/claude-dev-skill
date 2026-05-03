@@ -6,6 +6,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-05-03
+
 ### Changed
 
 - **BREAKING:** Driven by the Foundation Story (`specs/story-000-foundation/STORY.md`) and project-wide architecture (`specs/ARCHITECTURE.md` + `specs/PROJECT.md`) instead of `docs/V{N}/specs/SPECS.md` + `docs/V{N}/architecture/ARCHITECTURE.md`.

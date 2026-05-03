@@ -6,6 +6,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-05-03
+
 ### Added
 
 - New `references/story-md-template.md` for the per-story `STORY.md` (User Story + INVEST table + AC + Rules + feature-file map).

@@ -6,6 +6,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-05-03
+
 ### Changed
 
 - **BREAKING:** Operates on **one story at a time** (`/spec-implementation US-NNN`) instead of one version. Reads the story's REASONS-canvas `PLAN.md` and executes Operations sequentially (no waves).

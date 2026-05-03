@@ -6,6 +6,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-05-03
+
 ### Added
 
 - **REASONS canvas** plan template (`references/plan-template.md`) — Requirements / Entities / Approach / Structure / Operations / Norms / Safeguards plus explicit Test Strategy and Test Plan sections. Inspired by Martin Fowler's "Structured Prompt-Driven Development" article. Plans are dry (zero code) and read like an executable structured prompt.

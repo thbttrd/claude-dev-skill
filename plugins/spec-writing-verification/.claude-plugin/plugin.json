@@ -1,6 +1,6 @@
 {
   "name": "spec-writing-verification",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Verifies the output of /spec-writing for completeness, coherence, and template compliance. Spawns a fresh agent to audit SPECS.md and all docs/V{N}/specs/features/*.feature files against the spec-writing skill's rules, templates, and quality checklist. Produces a structured compliance report with pass/fail verdicts, specific findings, and actionable recommendations (fix or proceed to next phase). Use this skill after running /spec-writing, before running /research-and-architecture. Also triggers on: \"verify the specs\", \"check the spec quality\", \"audit SPECS.md\", \"are the specs ready\", \"validate specs before architecture\", or any request to review specification quality.",
   "author": {
     "name": "thbttrd"

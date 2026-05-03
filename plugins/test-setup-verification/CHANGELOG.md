@@ -6,6 +6,8 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-05-03
+
 ### Changed
 
 - **BREAKING:** Audits a single story's tests + stubs at `specs/story-NNN-slug/` instead of a version's tests at `docs/V{N}/`.

@@ -1,6 +1,6 @@
 {
   "name": "spec-writing",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Spec-driven development skill that produces a high-level SPECS.md overview plus executable Cucumber-compatible .feature files (one per feature) with full Gherkin scenarios. Use this skill whenever the user wants to write specs, define features, describe what an app should do, plan a new project's behavior, capture requirements, write acceptance criteria, or says things like \"let's spec this out\", \"what should this app do\", \"define the features\", \"write the requirements\", \"/spec-writing\". Also trigger when the user wants to update or refine existing specs, add new features to SPECS.md, or review specification coverage. Even if they don't say \"spec\" explicitly, trigger this skill if the conversation is about defining what software should do before building it.",
   "author": {
     "name": "thbttrd"
