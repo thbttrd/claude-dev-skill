@@ -1,7 +1,7 @@
 {
   "name": "spec-implementation",
-  "version": "1.0.0",
-  "description": "Autonomous GREEN-phase execution of pre-existing implementation plans for a **specific version** (V0, V1, ...) against pre-written failing tests, Gherkin .feature files, UI wireframes, and ARCHITECTURE.md. Executes wave by wave — each wave is a vertical slice that produces a testable end-to-end app. Tracks progress in both a local state file and project-tracking.json. Use this skill when tests are already written and failing (created by /test-setup) and you need to write the minimal implementation code that makes every test pass. Triggers on: \"implement V0\", \"execute the plans\", \"make the tests pass\", \"run the implementation\", \"GREEN phase\", or any request to execute pre-existing implementation plans for a version. Also use when resuming an interrupted implementation.",
+  "version": "2.0.0",
+  "description": "Per-story GREEN-phase executor. For ONE story (US-NNN) at a time, writes the minimal implementation code that makes every pre-written failing test pass. Reads the story's PLAN.md (REASONS canvas Operations), executes Operations one at a time (RED-A \u2192 RED-B \u2192 GREEN \u2192 REFACTOR), and runs per-story quality gates (Simplify / Code Review / Verify) at the end. If invoked for the Foundation Story (US-000) against an empty repo where state phase = planned, auto-chains /repo-initialization first. Tracks progress in specs/story-NNN-slug/state.json and updates specs/stories.json on completion. Use this skill after /test-setup US-NNN (tests in RED state). Triggers on: \"implement US-NNN\", \"make the tests pass for the story\", \"GREEN phase for US-NNN\", \"/spec-implementation US-NNN\", or any request to execute a story's PLAN.md against its failing tests.",
   "author": {
     "name": "thbttrd"
   },

@@ -1,96 +1,56 @@
 # State Schema
 
-Two levels of state are used by this skill:
+Two levels of state coordinate the story-based workflow:
 
-1. **`docs/project-tracking.json`** — project-wide source of truth (personas, epics, roadmap, per-version planning/test/impl/qa status). **Always lives under `docs/`**, never at the repository root.
-2. **`docs/V{N}/plans/implementation-state.json`** — version-scoped execution state for inter-loop coordination. There is exactly one of these per version: V0 has its own, V1 has its own, etc. Each one is frozen with its version (unlike `docs/project-tracking.json`, which evolves across versions).
+1. **`specs/stories.json`** — project-wide source of truth (personas, epics, stories[], project-wide architecture, design system). Every skill reads it and writes its own narrow slice. Documented separately at `plugins/high-level-scoping/skills/high-level-scoping/references/stories-json-schema.md`.
+2. **`specs/story-NNN-slug/state.json`** — per-story execution state for inter-loop coordination. There is exactly one of these per story; it is created by `/test-setup` and updated by every downstream skill until `/verification-and-validation` flips the story to `verified`.
 
-`V{N}` below refers to the target version being worked on (V0, V1, V2, ...).
+This document covers the per-story `state.json` only.
 
-## Full Schema — `docs/V{N}/plans/implementation-state.json`
+---
+
+## Full Schema — `specs/story-NNN-slug/state.json`
 
 ```json
 {
-  "version": "V0",
+  "story_id": "US-NNN",
   "schema_version": 1,
-  "phase": "orientation | scaffolding | planning | test_setup | executing | completed | verifying | verified",
-  "branch": "impl/spec-2026-03-30-1425",
+  "phase_local": "test_setup | executing | verifying | verified",
+  "branch": "impl/US-NNN-slug",
   "started_at": "ISO 8601 timestamp",
   "completed_at": "ISO 8601 timestamp or null",
   "iteration": 1,
 
-  "specs": {
-    "specs_file": "docs/V0/specs/SPECS.md",
-    "feature_files": [
-      "docs/V0/specs/features/F-001-study-session.feature",
-      "..."
-    ],
-    "feature_count": 11,
-    "tech_stack": {
-      "runtime": "bun",
-      "framework": "next.js",
-      "language": "typescript",
-      "orm": "drizzle",
-      "database": "sqlite",
-      "test_unit": "vitest",
-      "test_bdd": "playwright-bdd",
-      "styling": "tailwind",
-      "ui_components": "shadcn/ui"
-    }
+  "plan": {
+    "plan_file": "specs/story-NNN-slug/PLAN.md",
+    "operations_count": 4
   },
 
-  "scaffolding_status": "pending | in_progress | completed | skipped",
-
-  "waves": {
-    "W0-foundation": {
-      "status": "planned | tests_written | in_progress | completed",
+  "operations": {
+    "Op-1": {
+      "title": "Authenticate against the user store",
+      "covers_scenarios": ["User logs in with valid credentials", "User logs in with invalid credentials"],
       "tests_status": "pending | in_progress | red",
-      "plan_file": "docs/V0/plans/00-foundation.md",
-      "stories": [],
-      "depends_on": [],
-      "tasks_total": 5,
-      "tasks_completed": 0,
-      "current_task": 0,
+      "stub_status": "pending | created",
+      "implementation_status": "pending | in_progress | green",
       "started_at": null,
       "completed_at": null
     },
-    "W1-auth-golden-path": {
-      "status": "planned",
-      "tests_status": "pending",
-      "plan_file": "docs/V0/plans/W1-auth-golden-path.md",
-      "stories": ["US-001", "US-003"],
-      "depends_on": ["W0-foundation"],
-      "tasks_total": 0,
-      "tasks_completed": 0,
-      "current_task": 0,
-      "started_at": null,
-      "completed_at": null
-    }
+    "Op-2": { "...": "..." }
   },
 
-  "quality_gates": {
-    "W0-foundation": {
-      "simplified": false,
-      "reviewed": false,
-      "verified": false,
-      "review_findings": [],
-      "verification_results": {
-        "tests_passed": null,
-        "bdd_passed": null,
-        "lint_passed": null,
-        "types_passed": null
-      }
-    }
+  "test_plan_rows": {
+    "T-01": { "type": "BDD", "file": "e2e/steps/auth.steps.ts", "written": true, "passing": false },
+    "T-02": { "type": "unit", "file": "src/modules/auth/__tests__/auth.service.test.ts", "written": true, "passing": false }
   },
 
-  "current_wave": "W0-foundation",
+  "current_operation": "Op-1",
 
   "errors": [
     {
-      "wave": "W1-auth-golden-path",
-      "task": 2,
-      "error": "Test still failing after implementation",
-      "details": "Expected card flip animation but component not rendering",
+      "operation": "Op-1",
+      "message": "Test still failing after implementation",
+      "details": "Expected status 401 but got 500",
       "attempts": 1,
       "resolved": false,
       "timestamp": "ISO 8601"
@@ -98,118 +58,112 @@ Two levels of state are used by this skill:
   ],
 
   "summary": {
-    "waves_completed": 0,
-    "waves_total": 4,
-    "tasks_completed": 0,
-    "tasks_total": 0,
-    "tests_written": 0,
+    "operations_total": 4,
+    "operations_red": 1,
+    "operations_green": 0,
+    "tests_written": 6,
     "last_commit": null
   }
 }
 ```
 
+The `phase_local` field reflects which sub-skill is operating on the story. It is distinct from the project-wide `phase` in `specs/stories.json#stories[i].phase` (`backlog | scoped | specced | planned | red | green | verified`). The two evolve in lockstep but answer different questions:
+
+- **`phase_local`** — *which skill is currently writing to this story*
+- **`stories[i].phase`** — *what the project-level kanban shows for this story*
+
+---
+
 ## Phases Handled by Each Skill
 
-| Phase         | Skill                                                         |
-| ------------- | ------------------------------------------------------------- |
-| `orientation` | `/plan-writing` (reads specs, builds DAG)                     |
-| `scaffolding` | `/repo-initialization` (project setup)                        |
-| `planning`    | `/plan-writing` (writes plan files)                           |
-| `test_setup`  | `/test-setup` (writes all failing tests + source stubs)       |
-| `executing`   | `/spec-implementation` (GREEN phase + quality gates)          |
-| `completed`   | `/spec-implementation` (all waves done, quality gates passed) |
-| `verifying`   | `/verification-and-validation` (E2E curl + Playwright)        |
-| `verified`    | `/verification-and-validation` (everything passes)            |
+| Skill                            | Reads `phase_local` | Writes `phase_local` to | Project-level `phase` set to |
+| -------------------------------- | ------------------- | ----------------------- | ---------------------------- |
+| `/test-setup`                    | (creates state.json) | `test_setup` → `executing` after RED done | `red` |
+| `/spec-implementation`           | `executing`         | `executing` → `verifying` after GREEN done | `green` |
+| `/verification-and-validation`   | `verifying`         | `verifying` → `verified` after E2E passes | `verified` |
 
-The `/test-setup` skill operates when phase is `"planning"` (transitions to `"test_setup"`)
-or `"test_setup"` (resumes). It transitions to `"executing"` when all tests are written.
+A story's state.json is created by `/test-setup` when the project-level `phase` is `planned` (i.e., a `PLAN.md` exists). It does NOT exist before that.
 
-The `/spec-implementation` skill only operates when phase is `"executing"` or `"completed"`.
-If the phase is earlier, it stops and directs the user to the appropriate prerequisite skill.
+---
 
-## State Transitions
+## State Transitions (per story)
 
 ```
-Phase transitions (across skills):
-  orientation → scaffolding → planning → test_setup → executing → completed → verifying → verified
+phase_local transitions (one per story):
+  test_setup → executing → verifying → verified
 
-Wave transitions (within a version):
-  planned → tests_written → in_progress → completed
-                                ↓
-                             blocked (can retry → in_progress)
+operations transitions (one per Operation in PLAN.md):
+  pending → in_progress → red       (RED-A and RED-B written, tests fail)
+                       → green     (GREEN written, tests pass)
+                       → blocked   (can retry → in_progress)
 
-Test status transitions (within /test-setup):
-  pending → in_progress → red
-
-Quality gate flow (after wave tasks done):
-  simplified=false → run simplify → simplified=true
-  reviewed=false   → run review   → reviewed=true
-  verified=false   → run verify   → verified=true
-  all true → wave status = completed
+test_plan_rows transitions:
+  written: false → true             (set by /test-setup)
+  passing: false → true             (set by /spec-implementation when test goes green)
 ```
 
-## Reading State on Entry (test-setup)
+The per-story `phase_local` and the project-level `phase` advance together at each handoff:
 
 ```
-1. Does docs/project-tracking.json exist?
+Sub-skill        | phase_local | stories[i].phase
+-----------------+-------------+------------------
+Pre-/test-setup  | (no file)   | planned
+/test-setup done | executing   | red
+/spec-impl done  | verifying   | green
+/V&V done        | verified    | verified
+```
+
+---
+
+## Reading State on Entry (`/test-setup`)
+
+```
+1. Does specs/stories.json exist?
    NO  → STOP. Run /high-level-scoping first.
-   YES → Read it, identify the target version V{N}.
+   YES → Read it. Find target story (CLI arg or AskUserQuestion picker).
 
-2. Does docs/V{N}/plans/implementation-state.json exist?
-   NO  → STOP. Run /plan-writing first for V{N}.
-   YES → Read it.
+2. What is stories[i].phase?
+   backlog   → STOP. Run /spec-writing US-NNN first (and /high-level-scoping in update mode if needed).
+   scoped    → STOP. Run /spec-writing US-NNN first.
+   specced   → STOP. Run /plan-writing US-NNN first.
+   planned   → Create specs/story-NNN-slug/state.json with phase_local = "test_setup". Begin writing tests.
+   red       → state.json must exist with phase_local = "test_setup" or "executing". Resume.
+   green or beyond → STOP. Tests already written.
 
-3. What phase?
-   orientation  → STOP. Run /plan-writing first.
-   scaffolding  → STOP. Run /repo-initialization first.
-   planning     → Transition to "test_setup", begin writing tests for V{N}.
-   test_setup   → Resume from where the previous iteration left off.
-   executing    → STOP. Tests already written.
-   completed    → STOP. Tests already written.
+3. Are dependencies satisfied?
+   For each id in stories[i].depends_on_story_ids:
+     If stories[<dep>].phase != "verified" AND stories[<dep>].is_foundation != true:
+       STOP with the offending dep id and a hint to run /verification-and-validation on it.
+
+4. Run BDD Toolchain Pre-Flight gate (see SKILL.md for the four checks).
+   If any check fails → emit TOOLING_NOT_READY and stop.
 ```
 
-## Reading State on Entry (spec-implementation)
-
-```
-1. Read docs/project-tracking.json → identify target version V{N}.
-2. Does docs/V{N}/plans/implementation-state.json exist?
-   NO  → STOP. Run /repo-initialization and /plan-writing first.
-   YES → Read it.
-
-3. What phase?
-   orientation  → STOP. Run /plan-writing first.
-   scaffolding  → STOP. Run /repo-initialization first.
-   planning     → STOP. Run /plan-writing first.
-   test_setup   → STOP. Run /test-setup to finish writing tests.
-   executing    → Run pre-flight plan check:
-                   - Verify all wave plan files exist under docs/V{N}/plans/
-                   - If any missing → revert phase to "planning", stop
-                   - If all present → find current_wave, resume its current_task
-   completed    → Output completion promise (ralph-loop) or report done
-
-4. Are there unresolved errors?
-   YES → Attempt to resolve the most recent one first
-   NO  → Continue normal flow
-```
+---
 
 ## Updating State
 
 **Always use atomic writes** — write to a temp file first, then rename:
 
 ```bash
-# Write to temp, then move (prevents corruption on interruption)
-cat > docs/V{N}/plans/implementation-state.json.tmp << 'EOF'
+cat > specs/story-NNN-slug/state.json.tmp << 'EOF'
 { ... }
 EOF
-mv docs/V{N}/plans/implementation-state.json.tmp docs/V{N}/plans/implementation-state.json
+mv specs/story-NNN-slug/state.json.tmp specs/story-NNN-slug/state.json
 ```
 
-**Update frequency:**
+**Update frequency (per /test-setup):**
 
-- After every task completion
-- After every quality gate step
-- After every wave status change
-- After every phase transition
-- After every error encountered
+- After every Operation's RED-A is committed: bump that Operation's `tests_status` toward `in_progress` then `red`.
+- After every Operation's RED-B is committed: same row.
+- After every test file is written: append to `test_plan_rows` with `written: true, passing: false`.
+- After every error encountered: append to `errors[]`.
+- When all Operations have `tests_status = "red"`: flip `phase_local` to `"executing"` (handoff signal to `/spec-implementation`).
 
-`docs/project-tracking.json` is updated at wave boundaries only (not per task), so it stays focused on project-level progress. See `docs/project-tracking.json`'s `roadmap.versions[VN].test_setup` / `.implementation` / `.qa` blocks for the per-version rollup.
+`specs/stories.json` is updated **once per story**, when test setup completes for the entire story:
+
+- `stories[i].test_setup = { bdd_step_files, unit_test_files, integration_test_files, completed_at }`
+- `stories[i].phase = "red"`
+- Append `{ phase: "red", at: "<today>" }` to `stories[i].history`
+- Update `project.updated_at`
+- Regenerate `specs/STORIES.md`

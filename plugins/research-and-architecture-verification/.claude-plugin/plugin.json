@@ -1,7 +1,7 @@
 {
   "name": "research-and-architecture-verification",
-  "version": "1.0.0",
-  "description": "Verifies the output of /research-and-architecture for MIM AA compliance, template completeness, and consistency with SPECS.md. Spawns a fresh agent to audit ARCHITECTURE.md against the MIM AA reference, the architecture template, and the project's SPECS.md. Produces a structured compliance report with pass/fail verdicts, specific violations, and actionable recommendations (fix or proceed to next phase). Use this skill after running /research-and-architecture, before running /repo-initialization. Also triggers on: \"verify the architecture\", \"check architecture quality\", \"audit ARCHITECTURE.md\", \"is the architecture ready\", \"validate architecture before scaffolding\", \"MIM AA compliance check\", or any request to review architecture quality.",
+  "version": "2.0.0",
+  "description": "Verifies the output of /research-and-architecture for MIM AA compliance, template completeness, and consistency with the project's specs/stories.json and specs/PROJECT.md. Spawns a fresh agent to audit specs/ARCHITECTURE.md against the MIM AA reference, the architecture template, and the story backlog. Produces a structured compliance report with pass/fail verdicts, specific violations, and actionable recommendations (fix or proceed to next phase). Use this skill after running /research-and-architecture, before running /repo-initialization. Also triggers on: \"verify the architecture\", \"check architecture quality\", \"audit ARCHITECTURE.md\", \"is the architecture ready\", \"validate architecture before scaffolding\", \"MIM AA compliance check\", or any request to review architecture quality.",
   "author": {
     "name": "thbttrd"
   },

@@ -1,6 +1,6 @@
 # ARCHITECTURE.md Template
 
-Use this template to produce the final `docs/V{N}/architecture/ARCHITECTURE.md`. Adapt sections as needed — not every project requires every section. Remove sections that don't apply.
+Use this template to produce the final `specs/ARCHITECTURE.md`. Adapt sections as needed — not every project requires every section. Remove sections that don't apply. The document is project-wide and additive: when new stories require new modules, the file is enriched in place rather than duplicated per version.
 
 ---
 
@@ -10,7 +10,7 @@ Use this template to produce the final `docs/V{N}/architecture/ARCHITECTURE.md`.
 > [One-sentence architecture summary]
 
 **Last updated:** [date]
-**Based on:** SPECS.md v[version/date]
+**Based on:** `specs/PROJECT.md` and `specs/stories.json` (last updated [date])
 **Architecture approach:** MIM AA (Module Infrastructure-Module)
 
 ## Table of Contents
@@ -23,7 +23,7 @@ Use this template to produce the final `docs/V{N}/architecture/ARCHITECTURE.md`.
 
 ### 1.2 Architecture Approach
 
-Brief explanation of why MIM AA was chosen for this project and how it maps to the feature set defined in SPECS.md.
+Brief explanation of why MIM AA was chosen for this project and how it maps to the story backlog defined in `specs/stories.json`.
 
 ### 1.3 Key Architecture Decisions
 
@@ -38,7 +38,7 @@ Brief explanation of why MIM AA was chosen for this project and how it maps to t
 
 | Layer   | Technology | Version   | Rationale                     |
 | ------- | ---------- | --------- | ----------------------------- |
-| [layer] | [tech]     | [version] | [why — refined from SPECS.md] |
+| [layer] | [tech]     | [version] | [why — refined from `specs/PROJECT.md`'s tech-stack pointer] |
 
 ### 2.2 Stack Compatibility Notes
 
@@ -52,9 +52,9 @@ Brief explanation of why MIM AA was chosen for this project and how it maps to t
 
 ### 3.1 Business-Modules
 
-| Module        | Process Owned         | Public API Surface      | Features (from SPECS.md) |
-| ------------- | --------------------- | ----------------------- | ------------------------ |
-| [module-name] | [process description] | [key methods/endpoints] | F-001, F-003             |
+| Module        | Process Owned         | Public API Surface      | Stories (from `specs/stories.json`) |
+| ------------- | --------------------- | ----------------------- | ----------------------------------- |
+| [module-name] | [process description] | [key methods/endpoints] | US-001, US-003                      |
 
 ### 3.2 Infrastructure-Modules
 
@@ -78,7 +78,7 @@ Brief explanation of why MIM AA was chosen for this project and how it maps to t
 
 **Type:** Business-Module
 **Process:** [what business process this owns]
-**Features:** F-001, F-002
+**Stories:** US-001, US-002 (and any future stories that touch this module)
 **Public API:**
 
 - `[method/endpoint signature]` — [what it does]
@@ -163,7 +163,7 @@ module-name/
 
 ### 8.3 Mapping to Gherkin Features
 
-[How the `.feature` files from docs/V{N}/specs/ map to actual test implementations]
+[How the `.feature` files from `specs/story-NNN-slug/features/` map to actual test implementations across modules. Each story owns its feature files; the architecture only documents the test-strategy patterns each module uses.]
 
 ## 9. Deployment & Infrastructure
 
@@ -205,5 +205,5 @@ module-name/
 |------|-----------|
 | BM | Business-Module — contains business logic, no infrastructure code |
 | Infra-Module | Infrastructure-Module — implements I/O for exactly one BM |
-| [domain term] | [definition from SPECS.md glossary] |
+| [domain term] | [definition from `specs/PROJECT.md` glossary] |
 ```

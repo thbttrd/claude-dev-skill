@@ -2,7 +2,7 @@
 
 The DESIGN.md format is the **Google-Stitch / VoltAgent awesome-design-md standard**: a plain-text design system document AI agents read to generate consistent UI. It has **9 fixed sections** in this exact order. Markdown signals — headings, bullets, bold, tables — carry the structure; LLMs parse this format more reliably than YAML, JSON, or any custom schema.
 
-Use this file as the canonical structure when writing `docs/V{N}/specs/DESIGN.md`. The contents below are placeholders — replace bracketed text with project-specific values. Keep all 9 section headings intact.
+Use this file as the canonical structure when writing `specs/DESIGN.md` — the project-wide design system. The contents below are placeholders — replace bracketed text with project-specific values. Keep all 9 section headings intact. The file is project-wide and re-runnable: when the user wants to change brand inspiration, the file is rewritten; when they want to tweak tokens, it's edited in place. There is no per-version copy and no version directory.
 
 ---
 

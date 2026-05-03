@@ -9,7 +9,7 @@ This document covers the conventions a generated mockup must follow and provides
 ## File location & naming
 
 ```
-docs/V{N}/specs/mockups/
+specs/story-NNN-slug/mockups/
 ├── UI-F-NNN-screen-slug.html              # winner — desktop, all states stacked
 ├── UI-F-NNN-screen-slug-mobile.html       # winner — mobile reflow
 ├── UI-F-NNN-screen-slug-A.html            # variant scratch (deleted after pick)
@@ -46,7 +46,7 @@ Every mockup starts with an HTML comment briefing a future reader (often a codin
 <!--
   UI-F-NNN — [Screen Name]
   Feature: [F-NNN feature name]
-  DESIGN.md: docs/V{N}/specs/DESIGN.md (section 9 / Agent Prompt Guide pasted below)
+  DESIGN.md: specs/DESIGN.md (section 9 / Agent Prompt Guide pasted below)
 
   > [Paste the DESIGN.md Agent Prompt Guide paragraph verbatim. This is the dense
   > one-paragraph briefing — archetype + atmosphere + tokens + motion personality +

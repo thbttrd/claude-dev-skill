@@ -1,7 +1,7 @@
 {
   "name": "spec-writing",
-  "version": "1.0.0",
-  "description": "Spec-driven development skill that produces a high-level SPECS.md overview plus executable Cucumber-compatible .feature files (one per feature) with full Gherkin scenarios. Use this skill whenever the user wants to write specs, define features, describe what an app should do, plan a new project's behavior, capture requirements, write acceptance criteria, or says things like \"let's spec this out\", \"what should this app do\", \"define the features\", \"write the requirements\", \"/spec-writing\". Also trigger when the user wants to update or refine existing specs, add new features to SPECS.md, or review specification coverage. Even if they don't say \"spec\" explicitly, trigger this skill if the conversation is about defining what software should do before building it.",
+  "version": "2.0.0",
+  "description": "Story-based spec-writing skill that produces, for one user story at a time, a `STORY.md` (INVEST-shaped User Story + Acceptance Criteria + Rules) plus one or more Cucumber-compatible `.feature` files with full Gherkin scenarios. Runs an INVEST gate (Phase 0) before any spec generation. Output lives at `specs/story-NNN-slug/`. Use this skill whenever the user wants to spec a specific story, define behaviour for a feature, capture acceptance criteria, or says things like \"spec story US-001\", \"/spec-writing US-NNN\", \"let's spec out the auth story\", \"write the Gherkin for this feature\". Also trigger when the user wants to update or refine an existing story's spec, add new rules, or audit acceptance-criteria coverage.",
   "author": {
     "name": "thbttrd"
   },

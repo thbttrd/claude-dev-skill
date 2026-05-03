@@ -1,47 +1,59 @@
 ---
 name: high-level-scoping
-version: 1.0.0
-description: Agile project scoping skill that produces personas, epics, prioritized user stories, a high-level architecture diagram (via the d2-architect skill), and a versioned roadmap starting from a V0 walking skeleton. Outputs a structured JSON file for project tracking and a lightweight ARCHITECTURE.md with the diagram embedded (later enriched by /research-and-architecture). Use this skill when the user wants to scope a new project, define epics and user stories, plan a product roadmap, do agile discovery, create a product backlog, or says things like "let's scope this out", "plan this project", "what should we build first", "create a backlog", "/high-level-scoping". Also trigger when the user mentions Kanban, Scrum, sprints, epics, user stories in the context of starting a new project.
+version: 2.0.0
+description: Agile project scoping skill that produces personas, epics, an INVEST-shaped story backlog, a high-level architecture diagram (via the d2-architect skill), and a story DAG anchored on a Foundation Story (US-000) — the walking skeleton. Outputs `specs/stories.json` (machine-readable tracker), `specs/STORIES.md` (human-readable kanban), `specs/PROJECT.md` (project overview), and `specs/ARCHITECTURE.md` (lightweight, later enriched by /research-and-architecture). Use this skill when the user wants to scope a new project, define epics and user stories, plan a backlog, do agile discovery, or says things like "let's scope this out", "plan this project", "what should we build first", "create a backlog", "/high-level-scoping". Also trigger when the user mentions Kanban, Scrum, sprints, epics, user stories, or a story DAG in the context of starting a new project.
 ---
 
 # High-Level Scoping Skill
 
-Produce a lean, agile-friendly project scope that is **just enough to start building** without over-specifying upfront. The philosophy: discover broadly, structure into actionable chunks, plan vertical slices that deliver value early.
+Produce a lean, agile-friendly project scope that is **just enough to start building** without over-specifying upfront. The philosophy: discover broadly, structure into INVEST-shaped stories, and order them as a DAG anchored on a Foundation Story (`US-000`) — the walking skeleton.
 
-This skill creates the initial **`docs/project-tracking.json`** — the single source of truth for the entire project lifecycle. The file always lives at `docs/project-tracking.json` (**not** at the repository root). Other skills (`/spec-writing`, `/research-and-architecture`, etc.) read from and enrich this same file as the project progresses through sprints. Each skill adds its own fields when the time comes.
+This skill creates the project's **`specs/stories.json`** — the single source of truth for the entire project lifecycle. The file always lives at `specs/stories.json`. Other skills (`/spec-writing`, `/research-and-architecture`, `/plan-writing`, …) read from and enrich this same file as each story progresses through its lifecycle. There are **no version directories** — a story's progress is tracked by its `phase` (`backlog → scoped → specced → planned → red → green → verified`).
 
 **Documentation layout (important — all downstream skills follow this):**
 
 ```
-docs/
-├── project-tracking.json                  # single, evolving project-wide source of truth
-├── V0/                                    # everything specific to version V0
-│   ├── specs/                             # SPECS.md, UI-SPECS.md, UI-F-*.md, features/, wireframes/
-│   ├── architecture/                      # ARCHITECTURE.md, architecture.png, architecture-detailed.png
-│   ├── plans/                             # 00-foundation.md, DAG.md, W*-*.md, implementation-state.json
-│   └── qa-report.md                       # V0's verification report
-├── V1/                                    # V1 begins as a full copy of V0, then is modified
-│   └── ... (same structure)
-└── V2/ ...
+specs/
+├── stories.json                              # single, evolving project-wide source of truth
+├── STORIES.md                                # human-readable kanban (regenerated)
+├── PROJECT.md                                # project overview, NFRs, glossary, tech-stack pointer
+├── ARCHITECTURE.md                           # project-wide architecture (lightweight at scoping time)
+├── architecture.png                          # high-level diagram, generated via d2-architect
+├── story-000-foundation/                     # Foundation Story directory (created here as a stub; populated later)
+└── story-NNN-slug/                           # one directory per story
 ```
 
-**Version snapshot rule (applies to V1 and beyond):** before the first skill starts working on a new version V{N} where N ≥ 1, `docs/V{N}/` is created by duplicating `docs/V{N-1}/` wholesale. This preserves the prior version's docs frozen-in-time as a historical record and lets the new version evolve independently. V0 is the only version created from scratch (by this skill for the diagram, then by the downstream skills for the rest).
+**No `docs/` folder.** No version segments. Stories are not duplicated when new ones are added — their content is frozen by `phase` advancement, not by directory copies.
 
-The initial structure contains:
+The initial structure produced by this skill contains:
 
 1. **Personas** — Who uses the product and what drives them
 2. **Epics** — Big chunks of value, each with a description
-3. **User Stories** — Concrete stories attached to epics, prioritized by business impact (MoSCoW)
-4. **High-Level Architecture** — Big functional modules and their relationships (diagram generated via the `d2-architect` skill, compiled to PNG, and embedded in a lightweight `ARCHITECTURE.md`)
-5. **Roadmap** — V0 walking skeleton + subsequent versions as vertical slices of a working end-to-end app
+3. **INVEST stories** — Concrete, dependency-aware backlog items, prioritised by business impact (MoSCoW). Each story declares `depends_on_story_ids`.
+4. **Foundation Story (US-000)** — The walking skeleton, generated automatically as the root of the DAG.
+5. **High-level architecture** — Big functional modules and their relationships (diagram via the `d2-architect` skill, embedded in a lightweight `ARCHITECTURE.md`)
+6. **Story DAG** — `depends_on_story_ids` graph that orders the backlog without forcing it into version buckets
 
 **No heavy specs. No detailed software architecture patterns. No Gherkin. Just enough structure to fill a backlog and start sprinting.**
 
 ---
 
+## Pre-Flight: Detect Legacy Layout
+
+Before any work, scan for the legacy version+wave layout. If detected, hard-stop with the migration command. The migration script is non-destructive.
+
+| Check                                       | Action on detection                                                                                                                                          |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `docs/project-tracking.json` exists         | Hard-stop. Print: `Legacy layout detected. Run: node scripts/migrate-tracking.mjs --input docs/project-tracking.json --out specs/   then re-run /high-level-scoping.` |
+| `docs/V0/`, `docs/V1/`, … directory exists  | Hard-stop. Print the same migration command and a note that file moves are listed in the generated `specs/MIGRATION.md`.                                    |
+| `specs/stories.json` already exists         | You're in **update mode** (see "Updating an Existing Scoping" below).                                                                                          |
+| Neither legacy nor `specs/stories.json`     | You're in **create mode**. Proceed.                                                                                                                          |
+
+---
+
 ## Phase 1: Discovery
 
-The purpose of discovery is to understand the problem space, the people, and the value before structuring anything. Same interactive methodology as spec-writing — adapted for agile scoping.
+The purpose of discovery is to understand the problem space, the people, and the value before structuring anything.
 
 ### CRITICAL: Always Use the AskUserQuestion Tool
 
@@ -60,8 +72,9 @@ Rules for using AskUserQuestion:
 
 ### Starting the Conversation
 
-1. **Check for an existing `docs/project-tracking.json`** (and, for backward compatibility, `project-tracking.json` at the repository root — if found there, offer to move it to `docs/project-tracking.json` before continuing). If one exists, read it — you're in **update mode**. Summarize what's already scoped and use AskUserQuestion to ask what the user wants to add or change.
-2. **If no `project-tracking.json` exists**, you're in **create mode**. Ask the user to describe what they're building, then immediately follow up with structured AskUserQuestion calls.
+1. Run the **Pre-Flight** check above. Hard-stop on legacy layout.
+2. **If `specs/stories.json` exists**, you're in **update mode**. Read it, summarise what's already scoped, and use AskUserQuestion to ask what the user wants to add or change.
+3. **If `specs/stories.json` does not exist**, you're in **create mode**. Ask the user to describe what they're building, then immediately follow up with structured AskUserQuestion calls.
 
 ### Batch 1 — Vision & Problem (3-4 questions)
 
@@ -76,139 +89,85 @@ Rules for using AskUserQuestion:
 
 ### Batch 2 — Personas Deep-Dive (2-4 questions)
 
-Based on the user answer about who uses the product, dig into each persona:
-
-1. **Header: "Persona 1"** — "What's the primary persona's main goal?"
-   - Options based on context, always concrete
-2. **Header: "Pain points"** — "What frustrates this persona today?"
-   - `multiSelect: true` with specific frustrations inferred from the problem description
-3. **Header: "Persona 2?"** — "Is there a second distinct type of user?"
-   - Options: "Yes — [inferred role]", "Yes — different role", "No, just one type of user", "There are 3+ types"
-4. If multiple personas, follow up with their goals and pain points
+Based on the user answer about who uses the product, dig into each persona. Same pattern as the legacy skill: persona name, primary goal, pain points, second persona Y/N.
 
 ### Batch 3 — Core Workflows (2-4 questions)
 
-Now understand what people actually DO:
-
-1. **Header: "Core flow"** — "What's the single most important thing a user does in this app?"
-   - Options: concrete workflows inferred from the problem
-2. **Header: "Workflows"** — "What other major workflows exist?"
-   - `multiSelect: true` with inferred workflows
-3. **Header: "MVP flow"** — "Which workflow is the absolute minimum for a useful product?"
-   - Options from the workflows already identified
-4. **Header: "Dependencies"** — "Do any workflows depend on others? (e.g., must sign up before ordering)"
-   - Options: "Yes — [describe dependency chain]", "They're mostly independent", "Not sure"
+Now understand what people actually DO. Same pattern: core flow, secondary workflows, MVP flow, dependencies between workflows.
 
 ### Batch 4+ — Feature-Specific & Business Rules
 
-Continue with AskUserQuestion for each major area from `references/discovery-checklist.md`. Adapt to what matters based on previous answers:
+Continue with AskUserQuestion for each major area from `references/discovery-checklist.md`. Adapt to what matters based on previous answers.
 
-- Business rules and constraints
-- Integrations and external dependencies
-- Platform and distribution
-- Scale and constraints
-
-**Don't over-discover.** Match depth to project complexity. A weekend project needs 2-3 batches. An enterprise product needs 5-6.
+**Don't over-discover.** Match depth to project complexity.
 
 ### Probing for Clarity
 
-After each batch, analyze answers and determine what needs clarification:
-
-- Vague answers get follow-up AskUserQuestion calls with more specific options
-- Use "what happens when..." scenarios to surface edge cases worth capturing
-- Use `preview` fields to show your understanding (persona cards, workflow sketches) and let the user confirm
+After each batch, analyse answers and determine what needs clarification. Vague answers get follow-up `AskUserQuestion` calls with more specific options.
 
 ### When to Stop Discovering
 
 **CRITICAL: NEVER transition to structuring on your own.** Use AskUserQuestion:
 
-- **Header: "Next step"** — "Ready to structure this into epics and user stories, or is there more to explore?"
-  - Options:
-    - "Structure it now (Recommended)" — description: "I have enough to produce personas, epics, stories, and a roadmap"
-    - "I have more to add" — description: "I'll ask about the area you want to explore"
-    - "Explore more areas" — description: "I'll cover remaining discovery categories"
-    - "Summarize what we have" — description: "I'll recap everything before moving on"
+- **Header: "Next step"** — "Ready to structure this into epics, stories, and a DAG, or is there more to explore?"
+  - Options: "Structure it now (Recommended)", "I have more to add", "Explore more areas", "Summarize what we have"
 
 Loop back into discovery if the user wants more exploration.
 
 ---
 
-## Phase 2: Structuring — Personas, Epics & User Stories
+## Phase 2: Structuring — Personas, Epics & INVEST Stories
 
-Transform discovery insights into structured, prioritized backlog items.
+Transform discovery insights into structured, prioritised backlog items.
 
 ### Step 1: Confirm Personas
 
-Present the personas you've identified using AskUserQuestion with `preview` fields showing persona cards:
-
-- **Header: "Personas"** — "Here are the personas I've identified. Look right?"
-  - Option per persona with preview showing:
-    ```
-    P-001: Busy Parent
-    Role: Working parent managing family logistics
-    Goals:
-      - Save time on meal planning
-      - Reduce grocery waste
-    Pain points:
-      - No time to plan meals weekly
-      - Forgets what's in the fridge
-    Tech: Medium
-    Primary: Yes
-    ```
-  - Option: "Adjust these" — description: "I'll modify based on your feedback"
-  - Option: "Add another persona"
+Present the personas you've identified using `AskUserQuestion` with `preview` fields showing persona cards. Same shape as the legacy skill.
 
 ### Step 2: Propose Epics
 
-Group the discovered workflows and features into epics. Present them:
+Group the discovered workflows and features into epics. Present them via `AskUserQuestion` with previews.
 
-- **Header: "Epics"** — "Here are the epics I've grouped. Does this breakdown make sense?"
-  - Preview showing the epic list with descriptions
-  - Options: "Looks good (Recommended)", "Merge some epics", "Split an epic", "Reorder priorities"
+### Step 3: Break Down into INVEST Stories
 
-### Step 3: Break Down into User Stories
+For each epic, propose stories in "As a / I want / So that" format with **at least 2 acceptance criteria**, plus a lightweight INVEST sanity check:
 
-For each epic, propose user stories in "As a / I want / So that" format with acceptance criteria. Present them in batches per epic using AskUserQuestion:
+- **I**ndependent — does this story unavoidably need another not yet scoped? If so, surface it.
+- **N**egotiable — does the story prescribe a UI click or a tech choice? Rephrase toward outcomes.
+- **V**aluable — is the "So that …" clause a real user benefit, or filler?
+- **E**stimable — are AC concrete enough that "I could size this in story points"?
+- **S**mall — does it fit in roughly ≤ 6 operations of work? If not, propose a split.
+- **T**estable — can each AC be turned into at least one Gherkin scenario later?
 
-- **Header: "[Epic]"** — "Here are the user stories for [Epic title]. Anything to add or change?"
-  - Preview showing the stories with priorities
-  - Options: "Looks good", "Add more stories", "Change priorities", "Remove some"
+The full INVEST gate runs in `/spec-writing` (Phase 0). Here, INVEST is a quick filter to keep the backlog clean. Initialise each story's `invest` flags to `false` (not yet checked) — `/spec-writing` will flip them.
 
-### Step 4: Prioritize
+Present stories per epic via `AskUserQuestion` with previews. Read `references/stories-json-schema.md` for the exact ID conventions and field shape.
 
-Present the full prioritized backlog for final validation:
+### Step 4: Prioritise
 
-- **Header: "Priorities"** — "Here's the full backlog sorted by priority. Agree with the ordering?"
-  - Preview showing all stories grouped by MoSCoW priority (must-have, should-have, could-have, wont-have) with business impact
-  - Options: "Approve (Recommended)", "Adjust priorities", "Move stories between epics"
-
-Read `references/json-schema.md` for the exact ID conventions and priority system.
+Present the full prioritised backlog for final validation. Use MoSCoW (`must-have`, `should-have`, `could-have`, `wont-have`) and `business_impact` (`high`, `medium`, `low`).
 
 ---
 
 ## Phase 3: High-Level Architecture
 
-Draw the big functional modules and how they relate. **This is NOT software architecture** — no hexagonal, no MIM AA, no layers. Think product modules: "Auth", "Dashboard", "Notifications", "Payments", etc.
+Draw the big functional modules and how they relate. **This is NOT software architecture** — no hexagonal, no MIM AA, no layers. Think product modules: "Auth", "Dashboard", "Notifications", "Payments", etc. Detailed design is `/research-and-architecture`'s job.
 
 ### Step 1: Identify Modules
 
-From the epics and user stories, identify the big functional blocks. Present them:
-
-- **Header: "Modules"** — "Here are the major modules I see. Missing anything?"
-  - Preview showing modules with responsibilities and dependencies
-  - Options: "Looks right (Recommended)", "Add a module", "Merge modules", "Adjust dependencies"
+From the epics and stories, identify the big functional blocks. Confirm them via `AskUserQuestion`.
 
 ### Step 2: Generate the Architecture Diagram (via `d2-architect`)
 
-Invoke the **`d2-architect`** skill to produce the diagram. Create `docs/V0/architecture/` first if it doesn't exist; this is V0's frozen architecture snapshot (later versions will get their own copies via the version snapshot rule).
+Invoke the **`d2-architect`** skill to produce the diagram. Create `specs/` first if it doesn't exist; this is the project-wide architecture directory (no version segment).
 
 Call `d2-architect` with:
 
-- **Modules**: every confirmed module from Step 1 — each with `id` (M-NNN), `name`, optional `description`, optional `icon_key` (from `d2-architect/references/icons.md`, e.g. `aws/rds`, `dev/react`) when the module maps unambiguously to a named AWS service or dev tool, and optional `shape` hint (e.g. `cloud` for a 3rd-party integration, `person` for a user persona) when no icon applies.
+- **Modules**: every confirmed module — each with `id` (`M-NNN`), `name`, optional `description`, optional `icon_key` from `d2-architect/references/icons.md`, and optional `shape` hint when no icon applies.
 - **Dependencies**: every dependency between modules, each with `from`, `to`, and an optional `label` describing the relationship in user-facing terms ("reads from", "notifies", "authenticates via"). No protocol names.
-- **output_dir**: `docs/V0/architecture/`
+- **output_dir**: `specs/`
 - **basename**: `architecture`
-- **title**: `"<Project Name> — High-Level Architecture (V0)"`
+- **title**: `"<Project Name> — High-Level Architecture"`
 - **direction**: `right`
 - **layout**: `elk`
 
@@ -217,22 +176,22 @@ Call `d2-architect` with:
 - One level of nesting max (typically an `external` group for 3rd-party services)
 - No databases, caches, or infrastructure internals — those belong in `/research-and-architecture`'s detailed diagram
 - Arrow labels use user-facing verbs, not technology names
-- Use `shape: person` for personas, `shape: cloud` + dashed stroke for external services — `d2-architect`'s Pattern 1 already codifies this
+- Use `shape: person` for personas, `shape: cloud` + dashed stroke for external services
 
 `d2-architect` returns:
 
-- `docs/V0/architecture/architecture.d2` — editable d2 source
-- `docs/V0/architecture/architecture.png` — the compiled diagram
+- `specs/architecture.d2` — editable d2 source
+- `specs/architecture.png` — the compiled diagram
 - A markdown embed snippet to paste in Step 3
 
 ### Step 3: Write the Initial ARCHITECTURE.md
 
-Write `docs/V0/architecture/ARCHITECTURE.md` as a **lightweight overview** that `/research-and-architecture` will later enrich with MIM AA detail. Use this template:
+Write `specs/ARCHITECTURE.md` as a **lightweight overview** that `/research-and-architecture` will later enrich with MIM AA detail. Use this template:
 
 ```markdown
-# Architecture — V0
+# Architecture
 
-_High-level view generated by `/high-level-scoping` on <YYYY-MM-DD>. The `/research-and-architecture` skill expands this document with detailed MIM AA design._
+_High-level view generated by `/high-level-scoping` on <YYYY-MM-DD>. The `/research-and-architecture` skill expands this document with detailed MIM AA design as the project evolves._
 
 ## High-Level Architecture
 
@@ -252,7 +211,7 @@ _High-level view generated by `/high-level-scoping` on <YYYY-MM-DD>. The `/resea
 
 ## Notes
 
-- Diagram source: `architecture.d2` — regenerate the PNG with `~/.claude/skills/d2-architect/scripts/compile.sh architecture.d2 architecture.png`
+- Diagram source: `architecture.d2` — regenerate the PNG via the `d2-architect` skill.
 - This document is the starting point. `/research-and-architecture` will append tech stack, ADRs, detailed module map, data architecture, testing strategy, etc.
 ```
 
@@ -260,137 +219,176 @@ The embed snippet returned by `d2-architect` (`![High-Level Architecture](archit
 
 ### Step 4: Validate with User
 
-Show the user the rendered PNG (and/or open `docs/V0/architecture/ARCHITECTURE.md`):
-
-- **Header: "Architecture"** — "Here's the high-level architecture. Any changes?"
-  - Options: "Looks good (Recommended)", "Add a module", "Change relationships", "Redraw it"
-
-If changes are requested, update the module list / dependencies and re-invoke `d2-architect` with the revised input. The `.d2` source is hand-editable too, but re-invoking the skill is simpler when the structure changes.
+Show the user the rendered PNG and ask via `AskUserQuestion` whether to lock it in or revise.
 
 ---
 
-## Phase 4: Roadmap — Vertical Slices
+## Phase 4: Story DAG (replaces "Roadmap — Vertical Slices")
 
-Plan the delivery as a series of **vertical slices**, each being a **complete, working, end-to-end app** — not a horizontal layer.
+Order the backlog as a **directed acyclic graph** of stories anchored on the Foundation Story.
 
-### What Makes a Good Vertical Slice
+### Step 1: Generate the Foundation Story (US-000)
 
-A vertical slice:
+The Foundation Story is created automatically as the first story (`US-000`) of the highest-priority epic. It is the **walking skeleton** — the thinnest possible end-to-end path that proves the architecture works.
 
-- Delivers **user-visible value** (not "set up the database" or "create the API layer")
-- Is **deployable and testable** on its own
-- Touches all necessary layers (UI, logic, data) but only for the stories in that slice
-- Each version **builds on the previous one** — V1 includes everything in V0 plus more
+Defaults:
 
-### Step 1: Define V0 — Walking Skeleton
+- `id`: `US-000`
+- `slug`: `foundation`
+- `is_foundation`: `true`
+- `as_a`: `developer`
+- `i_want`: `an end-to-end app skeleton wired through every layer`
+- `so_that`: `the architecture is proven and ready for feature work`
+- `priority`: `must-have`
+- `business_impact`: `high`
+- `acceptance_criteria` (defaults — confirm with user via AskUserQuestion):
+  - The repo builds, type-check passes, lint passes.
+  - One smoke endpoint (e.g., `GET /health`) returns 200 from a real server.
+  - One smoke UI page (if the project has UI) renders successfully.
+  - One Gherkin scenario walks through that path end-to-end.
+- `depends_on_story_ids`: `[]`
 
-V0 is the thinnest possible end-to-end slice that proves the architecture works. It should:
+Confirm the AC with `AskUserQuestion` before writing.
 
-- Include the single most critical user story from the highest-priority epic
-- Touch all major modules minimally (e.g., basic auth, one core workflow, simple UI)
-- Be ugly but functional — no polish, no edge cases, just the golden path
+### Step 2: Set `depends_on_story_ids` for Every Other Story
 
-Present V0:
+For every non-foundation story, identify which other stories it depends on. Default: depends on `US-000` only (the foundation). For stories that build on top of others (e.g., a settings story depends on auth), add those.
 
-- **Header: "V0"** — "Here's the walking skeleton. Is this the right starting point?"
-  - Preview showing V0 stories and what the user can do end-to-end
-  - Options: "Perfect (Recommended)", "Too thin — add more", "Too much — simplify", "Wrong stories"
+Use `AskUserQuestion` per epic:
 
-### Step 2: Define V1, V2, ...
+- **Header: "[Epic] deps"** — "For these stories, what do they depend on?"
+  - Preview: list of stories in the epic
+  - Options:
+    - "Foundation only (Recommended)" — depends_on_story_ids = ["US-000"]
+    - "Auth + foundation" — depends_on_story_ids = ["US-000", "US-001"]
+    - "I'll specify per story"
 
-Each subsequent version adds a coherent chunk of value:
+### Step 3: Validate the Full DAG
 
-- **V1**: Core features — the must-haves that make the product actually useful
-- **V2**: Should-haves — polish, secondary workflows, better UX
-- **V3+**: Could-haves — nice-to-haves, optimizations, edge cases
+Present the DAG via `AskUserQuestion` with a Mermaid `preview` of the dependency graph:
 
-Present each version:
+- **Header: "DAG ok?"** — "Here's the story DAG. Ready to generate?"
+  - Preview: rendered Mermaid graph from `specs/STORIES.md`'s "Dependency view" section
+  - Options: "Generate the tracker (Recommended)", "Adjust dependencies", "Go back to stories"
 
-- **Header: "V[N]"** — "Here's version [N]. Does this grouping make sense?"
-  - Preview showing the stories in this version and what's new
-  - Options: "Approve (Recommended)", "Move stories between versions", "Add another version", "Done with roadmap"
-
-### Step 3: Validate Full Roadmap
-
-Present the complete roadmap overview:
-
-- **Header: "Roadmap"** — "Here's the full roadmap. Ready to generate?"
-  - Preview showing all versions with their stories
-  - Options: "Generate the scoping JSON (Recommended)", "Adjust versions", "Go back to stories"
+There is **no concept of versions, releases, or sprints** in this output. Velocity, sprints, and release planning are project-management concerns, not architectural ones — they live in whatever PM tool the team uses, not in `specs/stories.json`.
 
 ---
 
 ## Phase 5: Generate Output
 
-### Step 1: Generate `docs/project-tracking.json`
+### Step 1: Generate `specs/stories.json`
 
-Read `references/json-schema.md` for the exact schema and write the JSON file.
+Read `references/stories-json-schema.md` for the exact schema and write the JSON file.
 
-**File location:** `docs/project-tracking.json`. Create the `docs/` directory if it does not exist. Do NOT write it to the repository root — the file always lives under `docs/`. If a legacy `project-tracking.json` exists at the repository root, move it into `docs/` first (and tell the user what you moved).
+**File location:** `specs/stories.json`. Create the `specs/` directory if it does not exist. Do NOT write under `docs/`. If a legacy `docs/project-tracking.json` exists, the Pre-Flight check has already hard-stopped this skill — the user must run the migration script first.
 
 **Rules:**
 
-- Every ID must follow the conventions in `references/json-schema.md`
-- Every user story must have at least 2 acceptance criteria
+- Every ID must follow the conventions in `references/stories-json-schema.md`
+- Every story must have at least 2 acceptance criteria
 - Every epic must be linked to at least one persona
-- V0 must contain at least one story from the highest-priority epic
-- The `architecture.diagram_path` must point to the exported PNG from Phase 3 (which lives at `docs/V0/architecture/architecture.png`)
+- Every epic must list its stories under `story_ids`
+- The Foundation Story (`US-000`) must exist with `is_foundation: true` and `depends_on_story_ids: []`
+- Every non-foundation story must have a non-empty `depends_on_story_ids`
+- Every story starts in `phase: "scoped"` (not `backlog`) — INVEST has been informally checked at this point
+- The `architecture.diagram_path` must point to `specs/architecture.png`
+- Initialise each story's `invest` flags to `false` (the rigorous gate runs in `/spec-writing`)
 
-### Step 2: Post-Generation Gate
+### Step 2: Generate `specs/STORIES.md`
 
-Use AskUserQuestion:
+Read `references/stories-md-template.md` and render the human-readable kanban from `specs/stories.json`. The file is regenerated on every `phase` transition by the skill that triggers the transition.
 
-- **Header: "Done"** — "The scoping JSON has been generated. What's next?"
+### Step 3: Generate `specs/PROJECT.md`
+
+Write a lightweight project overview at `specs/PROJECT.md`:
+
+```markdown
+# Project — <Project Name>
+
+<one-paragraph description from discovery>
+
+## Personas
+
+(table from `personas[]`)
+
+## Tech Stack
+
+The detailed tech stack is documented in [`ARCHITECTURE.md`](./ARCHITECTURE.md). At scoping time we capture only the gross choices made during discovery (e.g., "TypeScript + Next.js", "Python + FastAPI"). `/research-and-architecture` enriches this later.
+
+## Non-functional Requirements
+
+(captured during discovery — performance, accessibility, security, scale)
+
+## Glossary
+
+(domain terms with definitions — populated by `/spec-writing` per story; this section starts as a stub)
+
+## Changelog
+
+- YYYY-MM-DD — Project scoped. Foundation Story (US-000) defined. <N> stories in backlog.
+```
+
+### Step 4: Post-Generation Gate
+
+Use `AskUserQuestion`:
+
+- **Header: "Done"** — "The scoping has been generated. What's next?"
   - Options:
     - "Launch review agent (Recommended)" — description: "A separate agent will review the scoping for completeness and coherence"
     - "Accept as-is" — description: "The scoping is final"
     - "Adjust something" — description: "I'll tell you what to change"
-    - "Start a sprint" — description: "Pick user stories for the first sprint and start building"
+    - "Start with the Foundation Story" — description: "Run /spec-writing US-000 to begin"
 
 ### If the user picks "Launch review agent"
 
-Spawn a **separate Claude agent** (using the Agent tool with `model: "opus"`) to review `docs/project-tracking.json`. The agent must check:
+Spawn a separate Claude agent (using the Agent tool with `model: "opus"`) to review `specs/stories.json`. The agent must check:
 
-1. **Structural integrity** — Valid JSON, all required fields present, IDs are sequential and unique
+1. **Structural integrity** — Valid JSON, all required fields present, IDs sequential and unique
 2. **Completeness** — Every epic has stories, every story has acceptance criteria, all personas are referenced
-3. **Coherence** — No contradictions between stories, dependencies make sense, roadmap versions are true vertical slices
-4. **Roadmap sanity** — V0 is genuinely a walking skeleton (not too fat), versions build on each other, no story appears in multiple versions
-5. **Priority consistency** — Must-haves appear in V0/V1, wont-haves don't appear in any version
+3. **Foundation sanity** — `US-000` exists with `is_foundation: true` and no upstream dependencies
+4. **DAG sanity** — No cycles in `depends_on_story_ids`; every dependency points at an existing story
+5. **Coherence** — No contradictions between stories; story dependencies make sense
+6. **Priority consistency** — Must-haves don't depend on could-haves; won't-haves are not in the DAG at all
 
 The agent returns a verdict (PASS / MINOR / MAJOR) with findings. Present results and let the user decide what to fix.
 
-### If the user picks "Start a sprint"
+### If the user picks "Start with the Foundation Story"
 
-Use AskUserQuestion to let the user pick which stories to tackle first, then hand off to implementation (the user can use other skills like `/plan-writing` or start coding directly).
+Hand off to `/spec-writing US-000`.
 
 ---
 
 ## Updating an Existing Scoping
 
-When `docs/project-tracking.json` already exists:
+When `specs/stories.json` already exists:
 
 - Read it completely
-- Summarize what's there
-- Ask what the user wants to change (add epic, reprioritize, adjust roadmap, add persona)
+- Summarise what's there
+- Ask what the user wants to change (add story, reprioritise, add epic, adjust DAG, add persona)
 - Make targeted changes — don't regenerate everything
-- Increment the `updated_at` field
-- If the architecture changed, re-invoke `d2-architect` to regenerate the diagram (updates both `architecture.d2` and `architecture.png`), and update the module table in `docs/V0/architecture/ARCHITECTURE.md` accordingly
+- Increment `project.updated_at`
+- Re-render `specs/STORIES.md` from the updated JSON
+- If the architecture changed, re-invoke `d2-architect` to regenerate the diagram (`specs/architecture.d2` + `.png`), and update the module table in `specs/ARCHITECTURE.md` accordingly
 
 ---
 
 ## Quality Checklist
 
-Before finalizing, verify:
+Before finalising, verify:
 
-- [ ] Every persona has a unique ID (P-NNN) and at least one goal
-- [ ] Every epic has a unique ID (E-NNN), a description, and is linked to personas
-- [ ] Every user story has a unique global ID (US-NNN), follows "As a / I want / So that", has priority + business_impact + at least 2 acceptance criteria
-- [ ] Architecture modules have unique IDs (M-NNN) and clear responsibilities
-- [ ] Architecture diagram has been generated via `d2-architect` (`docs/V0/architecture/architecture.d2` and `.png` both exist)
-- [ ] `docs/V0/architecture/ARCHITECTURE.md` exists, embeds the PNG, and lists all modules
-- [ ] V0 is a genuine walking skeleton — thinnest possible end-to-end slice
-- [ ] Each roadmap version is a vertical slice (working app, not a layer)
-- [ ] No user story appears in multiple versions
-- [ ] All must-have stories are in V0 or V1
-- [ ] All wont-have stories are NOT in any version
-- [ ] The JSON is valid and follows the schema in `references/json-schema.md`
+- [ ] Every persona has a unique ID (`P-NNN`) and at least one goal
+- [ ] Every epic has a unique ID (`E-NNN`), a description, and is linked to personas
+- [ ] Every epic lists its stories under `story_ids`
+- [ ] Every story has a unique global ID (`US-NNN`), follows "As a / I want / So that", has priority + business_impact + at least 2 acceptance criteria
+- [ ] The Foundation Story (`US-000`) exists with `is_foundation: true` and `depends_on_story_ids: []`
+- [ ] Every non-foundation story has a non-empty `depends_on_story_ids`
+- [ ] The DAG is acyclic
+- [ ] Architecture modules have unique IDs (`M-NNN`) and clear responsibilities
+- [ ] Architecture diagram has been generated via `d2-architect` (`specs/architecture.d2` and `.png` both exist)
+- [ ] `specs/ARCHITECTURE.md` exists, embeds the PNG, and lists all modules
+- [ ] `specs/PROJECT.md` exists with the project overview
+- [ ] `specs/STORIES.md` is rendered from `specs/stories.json` and shows the kanban + dependency view
+- [ ] No `docs/V*/` directories exist anywhere
+- [ ] All `wont-have` stories are NOT in `depends_on_story_ids` of any other story
+- [ ] The JSON is valid and follows the schema in `references/stories-json-schema.md`

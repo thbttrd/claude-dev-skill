@@ -1,7 +1,7 @@
 {
   "name": "verification-and-validation",
-  "version": "1.0.0",
-  "description": "Full end-to-end verification of a completed implementation for a **specific version** (V0, V1, ...) against specs, feature files, wireframes, and UI specs. Starts the application, tests every API endpoint with curl, exercises every UI scenario via Playwright MCP, and fixes any deviation found. Use this skill after /implementation has completed for the target version (all waves done, all quality gates passed). Triggers on: \"verify the app\", \"validate the implementation\", \"verify V0\", \"run E2E verification\", \"test the running app\", \"check everything works\", or any request to verify a completed implementation against its specs. Also use when resuming an interrupted verification — the state file tells you where you left off.",
+  "version": "2.0.0",
+  "description": "Per-story end-to-end verification of a completed implementation. Runs the full automated test suite, starts the application, exercises every API endpoint with curl, walks every UI scenario via Playwright MCP, and FIXES any deviation found. Operates on ONE story (US-NNN) at a time; when everything passes, flips the story's phase to verified and writes the QA report to specs/story-NNN-slug/verification/qa-report.md. Use after /spec-implementation US-NNN (story phase = green). Optional --all-pending flag to walk every green story in turn. Triggers on: \"verify the app\", \"validate US-NNN\", \"run E2E verification for the story\", \"test the running app\", \"check everything works for US-NNN\", or any request to certify a green story as verified.",
   "author": {
     "name": "thbttrd"
   },

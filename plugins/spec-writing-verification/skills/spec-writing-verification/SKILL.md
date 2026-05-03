@@ -1,162 +1,154 @@
 ---
 name: spec-writing-verification
-version: 1.0.0
+version: 2.0.0
 description: >
-  Verifies the output of /spec-writing for completeness, coherence, and template
-  compliance. Spawns a fresh agent to audit SPECS.md and all docs/V{N}/specs/features/*.feature
-  files against the spec-writing skill's rules, templates, and quality checklist.
-  Produces a structured compliance report with pass/fail verdicts, specific findings,
-  and actionable recommendations (fix or proceed to next phase). Use this skill after
-  running /spec-writing, before running /research-and-architecture. Also triggers on:
-  "verify the specs", "check the spec quality", "audit SPECS.md", "are the specs ready",
-  "validate specs before architecture", or any request to review specification quality.
+  Per-story verification of the output of /spec-writing for completeness, coherence,
+  INVEST compliance, and template fidelity. Spawns a fresh agent to audit
+  specs/story-NNN-slug/STORY.md + specs/story-NNN-slug/features/*.feature against
+  the spec-writing skill's templates and rules. Produces a structured compliance
+  report with pass/fail verdicts, specific findings, and actionable recommendations
+  (fix or proceed to /plan-writing). Use this skill after running /spec-writing for
+  a specific story, before running /plan-writing for that same story. Also triggers
+  on: "verify the spec for US-NNN", "audit the story spec", "check INVEST compliance",
+  "are the specs ready", "validate spec before planning".
 ---
 
-# Spec Writing Verification
+# Spec Writing Verification (per story)
 
-Audits the artifacts produced by `/spec-writing` and produces a compliance report.
-This is a **quality gate** between spec-writing and research-and-architecture.
+Audits the artifacts produced by `/spec-writing` for **one story at a time** and produces a compliance report. This is a **quality gate** between spec-writing and plan-writing for that story.
 
-The verification runs in a **fresh agent** (via the Agent tool) so the review has no
-context bias from the generation session. The auditor only sees the artifacts, the
-templates, and the rules — not the conversation that produced them.
+The verification runs in a **fresh agent** (via the Agent tool) so the review has no context bias from the generation session.
+
+## Pre-Flight
+
+| Check                                       | Action                                                                                                                                          |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/V*/` directory exists                 | Hard-stop with the migration command.                                                                                                           |
+| `specs/stories.json` does not exist         | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                |
+| Target story id missing                     | Ask the user which story to verify (default: stories whose `phase = specced`).                                                                  |
+| `specs/story-NNN-slug/STORY.md` not found   | Hard-stop. Print: `Story US-NNN has no STORY.md yet. Run /spec-writing US-NNN first.`                                                          |
 
 ## When to Run
 
 ```
-/spec-writing → /spec-writing-verification → /research-and-architecture
+/spec-writing US-NNN → /spec-writing-verification US-NNN → /plan-writing US-NNN
 ```
-
-Run this after `/spec-writing` completes. The report will either clear the specs for
-the next phase or list specific items to fix first.
 
 ## What Gets Verified
 
-| Artifact      | Expected Location                          |
-| ------------- | ------------------------------------------ |
-| SPECS.md      | `docs/V{N}/specs/SPECS.md`                 |
-| Feature files | `docs/V{N}/specs/features/F-NNN-*.feature` |
+| Artifact      | Expected Location                                              |
+| ------------- | -------------------------------------------------------------- |
+| STORY.md      | `specs/story-NNN-slug/STORY.md`                                |
+| Feature files | `specs/story-NNN-slug/features/F-NNN-*.feature`                |
+| stories.json  | `specs/stories.json` — for cross-checking the INVEST flags and `phase` |
 
-UI artifacts (`DESIGN.md`, `UI-F-NNN-*.md`, `mockups/*.html`) are produced by `/ui-specs` and verified by **`/ui-specs-verification`** (or by `/ui-specs`'s own Phase D review pass) — out of scope for this skill.
+UI artifacts (`specs/DESIGN.md`, `specs/story-NNN-slug/ui/UI-F-NNN-*.md`, `specs/story-NNN-slug/mockups/*.html`) are produced by `/ui-specs` and verified by its own review pass — out of scope here.
 
 ## Execution
 
-**Spawn a fresh Opus agent** with the audit prompt below. Do not perform the audit
-inline — the fresh context is the point. The agent must read the actual files, the
-templates, and produce the report.
+**Spawn a fresh Opus agent** with the audit prompt below. Do not perform the audit inline — the fresh context is the point.
 
 ### Agent Prompt
 
-Use the Agent tool with `model: "opus"` and the following prompt (fill in the paths):
+Use the Agent tool with `model: "opus"` and the following prompt (fill in the story id and paths):
 
 ```
-You are a specification quality auditor. Your job is to verify that the output of
-the spec-writing skill is complete, coherent, and template-compliant.
+You are a specification quality auditor for the story-based workflow. Your job
+is to verify that the output of /spec-writing for story US-NNN is complete,
+coherent, and template-compliant.
 
 ## Artifacts to Audit
 
 Read these files:
-1. SPECS.md at `docs/V{N}/specs/SPECS.md` (where V{N} is the target version being audited — read `docs/project-tracking.json` to determine the latest version with a `spec_status` field)
-2. Every .feature file in `docs/V{N}/specs/features/`
+1. specs/story-NNN-slug/STORY.md
+2. Every .feature file in specs/story-NNN-slug/features/
+3. specs/stories.json — find the entry where id = "US-NNN" and use it for cross-checks
 
-Do NOT audit `DESIGN.md`, `UI-F-NNN-*.md`, or anything in `docs/V{N}/specs/mockups/` — those belong to `/ui-specs` and have their own verification path.
+Do NOT audit specs/DESIGN.md or specs/story-NNN-slug/{mockups,ui}/ — those belong
+to /ui-specs.
+
+## Reference Documents
+
+- specs/<plugin>/spec-writing/references/story-md-template.md
+- specs/<plugin>/spec-writing/references/feature-file-template.md
 
 ## Verification Checklist
 
-### A. SPECS.md Structure (Template Compliance)
+### A. STORY.md Structure (Template Compliance)
 
-Check that SPECS.md contains ALL of these sections in order:
-- [ ] Project name and one-paragraph description
-- [ ] Last updated date and status
-- [ ] Table of Contents that matches actual sections
-- [ ] Tech Stack table (Layer | Technology | Rationale) — at least 3 rows
-- [ ] Features section with at least one feature
-- [ ] Non-Functional Requirements with at least one category
-- [ ] Glossary table with at least 3 domain terms
-- [ ] Changelog table
+Check that STORY.md contains ALL of these:
+- [ ] Header line with epic, priority, business impact
+- [ ] Header line with phase, foundation flag, depends_on, mockup links (if UI), specification date
+- [ ] User Story section with As a / I want / So that — all three parts
+- [ ] INVEST Check table with all six letters and a note for each
+- [ ] Acceptance Criteria list with ≥ 2 entries, each as a checkbox
+- [ ] Rules list with ≥ 1 entry, each with a sad-path note
+- [ ] Feature files mapping table
+- [ ] Out-of-scope section (or explicit "—" with rationale)
+- [ ] Notes section (may be empty)
 
-For each check, report PASS or FAIL with the specific issue.
+### B. INVEST Compliance
 
-### B. Feature Completeness (Per Feature)
-
-For EACH feature F-NNN in SPECS.md, verify:
-- [ ] Has a unique sequential ID (F-001, F-002, ... with no gaps or duplicates)
-- [ ] Has a complete User Story: "As a [role] / I want to [action] / So that [benefit]"
-      — all three parts present, role is specific, action is concrete, benefit is clear
-- [ ] Has a Rules bullet list with at least 2 rules
-- [ ] Has a link to the corresponding .feature file
-- [ ] The linked .feature file actually exists on disk
+- [ ] Every INVEST letter is `✅` (the gate ran and passed)
+- [ ] STORY.md INVEST table matches `specs/stories.json#stories[i].invest`
+- [ ] `invest.checked_at` is set to a valid date
+- [ ] If any letter is `❌`, the agent flags it as a critical failure and the verdict is FAIL
 
 ### C. Feature File Quality (Per .feature File)
 
-For EACH .feature file in docs/V{N}/specs/features/, verify:
+For EACH .feature file in specs/story-NNN-slug/features/, verify:
 
 **Structural:**
 - [ ] File name follows convention: F-NNN-kebab-case-slug.feature
 - [ ] Contains exactly one Feature: block
-- [ ] Has the @F-NNN tag at feature level matching the file name
-- [ ] Feature description matches the User Story in SPECS.md (identical text)
-- [ ] Uses Rule: blocks to group scenarios
+- [ ] Has both @US-NNN and @F-NNN tags at feature level
+- [ ] Feature description ties back to the User Story in STORY.md
+- [ ] Uses Rule: blocks to group scenarios; Rule: titles match the Rules list in STORY.md
 
 **Scenario Coverage:**
 - [ ] Every Rule: block has at least one @happy-path scenario
 - [ ] Every Rule: block has at least one @sad-path scenario
+- [ ] Every Acceptance Criterion in STORY.md is covered by at least one scenario
 - [ ] Scenarios are tagged (@happy-path, @sad-path, @edge-case)
-- [ ] Total scenario count is reasonable (at least 2 per Rule)
 
 **Writing Quality:**
-- [ ] Scenarios use declarative language (behavior, not UI click sequences)
-- [ ] Given/When/Then steps are concrete — search for vague words:
+- [ ] Scenarios use declarative language (behaviour, not UI clicks)
+- [ ] Given/When/Then steps are concrete — flag every occurrence of vague words:
       "appropriate", "properly", "correctly", "valid", "invalid" without specifics,
-      "should work", "as expected". Flag each occurrence.
-- [ ] Scenario names are unique across all feature files
-- [ ] Scenarios are self-contained (no implicit state from other scenarios)
+      "should work", "as expected"
+- [ ] Scenario names are unique within the story
 - [ ] Steps use consistent person (all "I" or all "the user", not mixed)
 
 **Gherkin Syntax:**
-- [ ] Valid Gherkin parseable by Cucumber (Feature > Rule > Scenario > Given/When/Then)
+- [ ] Valid Gherkin parseable by Cucumber
 - [ ] Proper indentation (2 spaces per level)
 - [ ] Scenario Outline uses Examples: table correctly (if used)
-- [ ] Data Tables are properly formatted (if used)
-- [ ] Doc Strings use triple quotes correctly (if used)
+- [ ] Data Tables and Doc Strings well-formed (if used)
 
 ### D. Cross-File Coherence
 
-- [ ] Every feature in SPECS.md has a corresponding .feature file
-- [ ] Every .feature file has a corresponding entry in SPECS.md
-- [ ] No orphaned .feature files (files without SPECS.md entry)
-- [ ] Rules listed in SPECS.md match the Rule: blocks in the .feature file
-      (same count, same text — flag any mismatches)
-- [ ] No contradictory scenarios across feature files (e.g., one feature assumes
-      a capability that another feature restricts)
-- [ ] No duplicate scenarios covering the same behavior in different files
-- [ ] Glossary terms in SPECS.md are actually used in the feature files
-- [ ] Feature files don't use domain terms not defined in the glossary
+- [ ] Every Feature ID in STORY.md's mapping table has a matching .feature file on disk
+- [ ] Every .feature file in features/ appears in STORY.md's mapping table (no orphans)
+- [ ] Rules in STORY.md and Rule: blocks in .feature files match (count + text)
+- [ ] No contradictory scenarios across feature files
+- [ ] Glossary terms used in scenarios are defined in specs/PROJECT.md
+- [ ] Tags are consistent: every scenario tagged with at least @happy-path | @sad-path | @edge-case
 
-### E. Non-Functional Requirements Quality
+### E. specs/stories.json Integration
 
-- [ ] Each NFR category has at least one requirement
-- [ ] Requirements are measurable (not vague — "fast" is bad, "under 200ms p95" is good)
-- [ ] Search for vague NFRs: "fast", "secure", "scalable", "reliable", "good"
-      without specific metrics. Flag each.
-- [ ] Performance NFRs specify targets with units (ms, seconds, concurrent users, etc.)
-- [ ] Security NFRs name specific mechanisms (not just "the app should be secure")
+- [ ] `stories[i].artifacts.story_doc` points at STORY.md and the file exists
+- [ ] `stories[i].artifacts.feature_files` lists every .feature file present
+- [ ] `stories[i].spec.specified_at` is a valid date
+- [ ] `stories[i].phase` is `specced` (or beyond — verified is also acceptable for a re-audit)
+- [ ] `stories[i].history` has at least one `{phase: "specced", at: ...}` entry
+- [ ] `project.updated_at` was bumped recently
 
-### F. project-tracking.json Integration (if applicable)
+### F. Dependencies & DAG Sanity
 
-If project-tracking.json exists:
-- [ ] Every user story that was specified has a `spec` field with:
-  - `feature_file`: path to the .feature file (and the file exists)
-  - `rules`: non-empty array of rule summaries
-  - `specified_at`: valid date
-- [ ] If working on a specific version, that version has `spec_status` field
-- [ ] `project.updated_at` was updated
-
-### G. Tech Stack Completeness
-
-- [ ] Tech stack table covers at minimum: runtime/language, framework, database, testing
-- [ ] Every technology has a rationale (not blank)
-- [ ] Rationales are specific to this project (not generic "it's popular")
+- [ ] `stories[i].depends_on_story_ids` is non-empty (unless `is_foundation: true`)
+- [ ] Every depended-on story exists in stories.json
+- [ ] Every depended-on story is `is_foundation: true` OR has `phase: "verified"` (the dependency is satisfied)
+- [ ] No cycle introduced (the new spec doesn't add a dependency that creates a cycle)
 
 ## Output Format
 
@@ -164,61 +156,54 @@ Produce this exact report structure:
 
 ---
 
-# Spec Writing Verification Report
+# Spec Writing Verification Report — US-NNN
 
 **Date:** [today]
-**SPECS.md location:** [path]
-**Feature files found:** [count]
+**Story:** US-NNN — <title>
+**STORY.md:** specs/story-NNN-slug/STORY.md
+**Feature files:** [count]
 
 ## Overall Verdict: [PASS | PASS WITH WARNINGS | FAIL]
 
-PASS = all checks pass, ready for /research-and-architecture
-PASS WITH WARNINGS = minor issues that won't block architecture, but should be fixed
-FAIL = critical issues that must be fixed before proceeding
+PASS = ready for /plan-writing US-NNN
+PASS WITH WARNINGS = minor issues; consider fixing
+FAIL = critical issues that must be fixed before /plan-writing
 
 ## Summary
 
 | Area | Grade | Issues |
 |------|-------|--------|
-| A. SPECS.md Structure | [PASS/FAIL] | [count] |
-| B. Feature Completeness | [PASS/FAIL] | [count] |
+| A. STORY.md Structure | [PASS/FAIL] | [count] |
+| B. INVEST Compliance | [PASS/FAIL] | [count] |
 | C. Feature File Quality | [PASS/FAIL] | [count] |
 | D. Cross-File Coherence | [PASS/FAIL] | [count] |
-| E. NFR Quality | [PASS/FAIL] | [count] |
-| F. project-tracking.json | [PASS/FAIL/N/A] | [count] |
-| G. Tech Stack | [PASS/FAIL] | [count] |
+| E. stories.json Integration | [PASS/FAIL] | [count] |
+| F. Dependencies & DAG | [PASS/FAIL] | [count] |
 
 ## Critical Issues (Must Fix)
 
-[List each critical issue with:]
-- **Location:** file path and line/section
-- **Issue:** what's wrong
-- **Fix:** specific action to take
+[Each issue: location (file path + section/line), what's wrong, specific fix]
 
 ## Warnings (Should Fix)
 
-[List each warning with same format]
-
 ## Recommendations
-
-[Any suggestions for improvement that aren't strict failures]
 
 ## Next Step
 
-[Either "Ready for /research-and-architecture" or "Fix [N] critical issues first, then re-run /spec-writing-verification"]
+[Either "Ready for /plan-writing US-NNN" or "Fix [N] critical issues, then re-run /spec-writing-verification US-NNN"]
 
 ---
 ```
 
 ### After the Agent Returns
 
-1. Present the report to the user
-2. If the verdict is **FAIL**: list the critical issues and ask if they want to fix them now
-3. If the verdict is **PASS WITH WARNINGS**: show warnings and ask if they want to address them or proceed
-4. If the verdict is **PASS**: confirm readiness and suggest running `/research-and-architecture`
+1. Present the report to the user.
+2. If **FAIL**: list critical issues; ask if they want to fix now (loops back into `/spec-writing US-NNN` update mode).
+3. If **PASS WITH WARNINGS**: show warnings; ask whether to address or proceed.
+4. If **PASS**: confirm readiness and suggest running `/plan-writing US-NNN`.
 
 ## What This Skill Does NOT Do
 
-- It does not rewrite or fix the specs — it only reports issues
-- It does not assess whether the features are good ideas — it checks structural quality
-- It does not replace human review — it catches mechanical issues the human might miss
+- It does not rewrite or fix the spec — it reports issues.
+- It does not assess whether the story is a good idea — it checks structural quality.
+- It does not replace human review — it catches mechanical issues a human might miss.
