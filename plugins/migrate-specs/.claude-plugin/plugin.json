@@ -1,0 +1,10 @@
+{
+  "name": "migrate-specs",
+  "version": "1.0.0",
+  "description": "Audits a repository's existing spec/architecture/plan/design documents — in any shape (legacy `docs/V*/` layout, ad-hoc `docs/`, scattered root-level Markdown, partial `specs/` directories, etc.) — and migrates them to the canonical story-based layout produced by the rest of this marketplace (`specs/stories.json` + `specs/STORIES.md` + `specs/PROJECT.md` + `specs/ARCHITECTURE.md` + `specs/DESIGN.md` + `specs/story-NNN-slug/{STORY.md,PLAN.md,features,mockups,ui,verification,state.json}`). Best-effort rewrites legacy wave-style plans into the REASONS canvas, drops version segments from paths, and emits a `specs/MIGRATION.md` log of every action plus every gap that needs a human. Use this skill whenever the user wants to onboard an existing repo onto the story-based pipeline, or says \"migrate my specs\", \"convert to story-based layout\", \"reshape this repo's docs\", \"I have docs but they're in the old format\", \"/migrate-specs\". Also auto-triggered by every other pipeline skill's pre-flight when a recognised legacy layout is detected.",
+  "author": {
+    "name": "thbttrd"
+  },
+  "homepage": "https://github.com/thbttrd/claude-dev-skill",
+  "license": "MIT"
+}
