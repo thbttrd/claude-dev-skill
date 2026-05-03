@@ -8,3 +8,4 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Added
 - Initial marketplace bootstrap (Stage 1).
+- `scripts/migrate-tracking.mjs` — best-effort one-shot converter from a legacy `docs/project-tracking.json` (version+wave model) to `specs/stories.json` + `specs/STORIES.md` + `specs/MIGRATION.md` (story-based model). Pure Node.js, no dependencies. Idempotent via `--force`. Step 1 of the story-based-workflow rollout (see `PROPOSAL-story-based-workflow.md`).
