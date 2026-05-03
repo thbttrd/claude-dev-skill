@@ -1,8 +1,8 @@
 # UI Screen Specification Template
 
-Use this template for each feature that has a user-facing screen. One file per screen, saved at `docs/V{N}/specs/UI-F-NNN-screen-slug.md`. Replace bracketed text with project-specific content.
+Use this template for each story that has a user-facing screen. One file per screen, saved at `specs/story-NNN-slug/ui/UI-F-NNN-screen-slug.md`. Replace bracketed text with project-specific content.
 
-The HTML mockup at `docs/V{N}/specs/mockups/UI-F-NNN-screen-slug.html` is the **visual ground truth**. This markdown spec carries the rationale, the per-component token map, the interaction table, and the accessibility / responsive notes that the HTML alone can't express compactly.
+The HTML mockup at `specs/story-NNN-slug/mockups/UI-F-NNN-screen-slug.html` is the **visual ground truth**. This markdown spec carries the rationale, the per-component token map, the interaction table, and the accessibility / responsive notes that the HTML alone can't express compactly. The design system referenced throughout is project-wide and lives at `specs/DESIGN.md`.
 
 ---
 
