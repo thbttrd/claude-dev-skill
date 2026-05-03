@@ -350,6 +350,6 @@ Recorded under `stories[i].invest`. A story SHOULD have all six flags `true` bef
 - Every epic MUST be linked to at least one persona.
 - Every story MUST belong to exactly one epic (`epic_id` required).
 - The Foundation Story (`US-000`) MUST exist, MUST have `is_foundation: true`, and MUST have `depends_on_story_ids: []`.
-- A story's `depends_on_story_ids` MUST reference only stories whose `phase` is `verified` (or `is_foundation: true`) before that story can transition past `planned`.
+- A story's `depends_on_story_ids` MUST reference only ids that exist in `stories[]`. The DAG MUST be acyclic. Workflow timing — *when* during the lifecycle a dependency must be `verified` — is enforced by each skill's Pre-Flight (`/plan-writing`, `/test-setup`, `/spec-implementation`, `/verification-and-validation`), not by this schema. The current convention is that each of those skills requires every dependency to be `verified` (or `is_foundation: true`) before it will run on a downstream story; teams that want to relax that — e.g., allow `/test-setup` to run on a story whose dep is still `green` — change the skill's Pre-Flight, not the schema.
 - Every path stored in this file MUST live under `specs/`. Paths under `docs/V*/` are forbidden — if detected, the skill MUST hard-stop with the legacy-layout error and a pointer to `scripts/migrate-tracking.mjs`.
 - `phase` MUST progress in order; backwards transitions are allowed but MUST be logged in `history` with a note.

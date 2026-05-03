@@ -49,14 +49,20 @@ The UI principle: mockups and screen specs define the look and feel. UI componen
 
 ### Foundation Auto-Chain
 
-When `id = "US-000"`, `phase = "planned"`, and the repo is empty (no `package.json`, or only the bare git skeleton from `repo-initialization`'s prerequisites):
+When `id = "US-000"`, `phase = "planned"`, and the repo is empty (no `package.json`, or only the bare git skeleton):
 
 1. Print: `Foundation Story detected on empty repo. Chaining /repo-initialization first.`
 2. Invoke `/repo-initialization` via the `Skill` tool. It will scaffold the project, run its quality gates, and return.
-3. Once `/repo-initialization` returns successfully, re-run `/test-setup US-000` if `phase` hasn't been advanced to `red` yet (the scaffold doesn't include tests).
-4. Then proceed with the GREEN execution below.
+3. After `/repo-initialization` returns successfully, **stop** and print:
+   ```
+   Repo scaffolded successfully. Story US-000 is still at phase = planned (no tests written yet).
+   Next steps:
+     /test-setup US-000          # write the failing tests for the Foundation Story
+     /spec-implementation US-000 # re-invoke this skill to GREEN
+   ```
+   Do not silently chain `/test-setup`. Surface the next step explicitly so the user can review the scaffold before tests are written on top of it.
 
-For any other story, the user must run the prerequisite skills explicitly (`/test-setup US-NNN`).
+For any other story, the user must run the prerequisite skills explicitly (`/test-setup US-NNN`). The auto-chain is **only** for the Foundation Story on a fresh repo, and **only** chains `/repo-initialization` — exactly as documented in `PROPOSAL-story-based-workflow.md` §9.
 
 ---
 

@@ -25,6 +25,7 @@ Run these checks before any work:
 | `specs/stories.json` does not exist         | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                                                              |
 | Story argument provided (`/spec-writing US-NNN`) | Use it as the target story. Validate the id exists in `specs/stories.json`.                                                                                                              |
 | No story argument                            | Use `AskUserQuestion` to list stories whose `phase ∈ { scoped }` and ask which one to spec. Stories already in `specced` or beyond enter **update mode**.                                |
+| Target story's `phase` is `backlog`          | Hard-stop. Print: `Story US-NNN is still in backlog. Run /high-level-scoping in update mode to INVEST-check it and advance phase to "scoped" before specing.` This guards stories pulled in by the migration script (which defaults unknown phases to "backlog") from being specced without the lightweight INVEST sanity pass. |
 
 The story id chosen here is the only story this invocation modifies.
 

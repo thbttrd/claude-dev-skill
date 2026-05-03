@@ -1,7 +1,7 @@
 {
   "name": "research-and-architecture",
   "version": "2.0.0",
-  "description": "Research tech stacks and produce an ARCHITECTURE.md following MIM AA (Module Infrastructure-Module) architecture. Use this skill whenever the user wants to define architecture after writing specs, asks to research tech stacks, wants architecture decisions documented, mentions MIM or modular architecture, or runs /research-and-architecture. This skill consumes SPECS.md from the /spec-writing workflow and is the natural next step after specs are written. Also trigger when the user mentions 'architecture', 'tech stack research', 'stack validation', or 'module design'.",
+  "description": "\"Research tech stacks and produce a project-wide `specs/ARCHITECTURE.md` following MIM AA (Module Infrastructure-Module). Reads `specs/stories.json` (the story-based tracker) for the backlog and the personas. Produces a single ARCHITECTURE.md that evolves additively as new stories require new modules \u2014 no version directories, no snapshots. Use this skill whenever the user wants to define architecture after scoping, asks to research tech stacks, wants architecture decisions documented, mentions MIM or modular architecture, or runs /research-and-architecture. Also trigger when the user mentions 'architecture', 'tech stack research', 'stack validation', or 'module design', or when an existing ARCHITECTURE.md needs to be extended for a new story.\"",
   "author": {
     "name": "thbttrd"
   },

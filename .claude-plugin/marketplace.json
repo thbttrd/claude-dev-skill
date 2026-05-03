@@ -18,7 +18,7 @@
     {
       "name": "high-level-scoping",
       "source": "./plugins/high-level-scoping",
-      "description": "Agile project scoping skill that produces personas, epics, prioritized user stories, a high-level architecture diagram (via the d2-architect skill), and a versioned roadmap starting from a V0 walking skeleton.",
+      "description": "Agile project scoping skill that produces personas, epics, an INVEST-shaped story backlog, a high-level architecture diagram (via the d2-architect skill), and a story DAG anchored on a Foundation Story (US-000) \u2014 the walking skeleton. Outputs `specs/stories.json` (machine-readable tracker), `specs/STORIES.md` (human-readable kanban), `specs/PROJECT.md` (project overview), and `specs/ARCHITECTURE.md` (lightweight, later enriched by /research-and-architecture). Use this skill when the user wants to scope a new project, define epics and user stories, plan a backlog, do agile discovery, or says things like \"let's scope this out\", \"plan this project\", \"what should we build first\", \"create a backlog\", \"/high-level-scoping\". Also trigger when the user mentions Kanban, Scrum, sprints, epics, user stories, or a story DAG in the context of starting a new project.",
       "version": "2.0.0"
     },
     {
@@ -30,79 +30,79 @@
     {
       "name": "plan-writing",
       "source": "./plugins/plan-writing",
-      "description": "Plans the implementation of a **specific version** (V0, V1, ...) from project-tracking.json, producing a DAG of implementation plans organized into waves \u2014 where each wave delivers a vertical, testable, end-to-end slice of the app.",
+      "description": "Plans the implementation of one **user story** at a time (US-NNN) \u2014 not a release, not a wave. Reads the story's STORY.md + features + the project-wide ARCHITECTURE.md and produces a single PLAN.md in the **REASONS canvas** format (Requirements / Entities / Approach / Structure / Operations / Norms / Safeguards) plus an explicit Test Strategy and Test Plan. Plans are dry \u2014 zero code. Each Operation prescribes RED-A \u2192 RED-B \u2192 GREEN \u2192 REFACTOR. The story DAG lives in specs/stories.json (depends_on_story_ids); this skill does not produce any DAG artifact of its own. Use this skill after a story is specced (phase = specced), before /test-setup. Triggers on: \"plan US-NNN\", \"plan this story\", \"write the plan\", \"/plan-writing US-NNN\", or any request to produce an implementation plan for a single story.",
       "version": "2.0.0"
     },
     {
       "name": "plan-writing-verification",
       "source": "./plugins/plan-writing-verification",
-      "description": "Verifies the output of /plan-writing for a specific version (V0, V1, ...) for completeness, DAG correctness, TDD prescription compliance, and architecture alignment.",
+      "description": "Per-story verification of the output of /plan-writing for completeness, REASONS-canvas compliance, TDD prescription, Test Plan traceability, and architecture alignment. Spawns a fresh agent to audit specs/story-NNN-slug/PLAN.md against the plan template, the story's STORY.md + .feature files, and specs/ARCHITECTURE.md. Checks that every REASONS section is populated, every Operation prescribes RED-A \u2192 RED-B \u2192 GREEN \u2192 REFACTOR, every Test Plan row is traceable to a scenario / AC / safeguard, and module assignments respect ARCHITECTURE.md. Produces a structured compliance report. Use this skill after running /plan-writing US-NNN, before /test-setup US-NNN. Triggers on: \"verify the plan\", \"check plan quality\", \"audit the plan\", \"is the plan ready\", \"validate plan before test-setup\", \"/plan-writing-verification US-NNN\".",
       "version": "2.0.0"
     },
     {
       "name": "repo-initialization",
       "source": "./plugins/repo-initialization",
-      "description": "Scaffolds a new project repository from SPECS.md and ARCHITECTURE.md produced by /spec-writing and /research-and-architecture.",
+      "description": "Scaffolds a new project repository from `specs/ARCHITECTURE.md`, `specs/PROJECT.md`, and the Foundation Story (`specs/story-000-foundation/STORY.md`). Creates the full directory tree matching the MIM AA module structure, installs dependencies, configures tooling (TypeScript, ESLint, Prettier, Tailwind), sets up git commit hooks (conventional commits, type checking, linting, formatting via Husky + lint-staged + commitlint), sets up Claude Code hooks (same quality gates on every file edit), creates CLAUDE.md with project rules, creates README.md, and produces a clean .gitignore. Use this skill whenever you need to initialize a new repo, scaffold a project from architecture, bootstrap a codebase, or prepare a repo for story-based development. Also triggers on: \"initialize the repo\", \"scaffold the project\", \"set up the repo\", \"bootstrap from architecture\", \"create project structure\", or any request to turn the Foundation Story + architecture into a ready-to-code repo.",
       "version": "2.0.0"
     },
     {
       "name": "repo-initialization-verification",
       "source": "./plugins/repo-initialization-verification",
-      "description": "Verifies the output of /repo-initialization for completeness and correctness.",
+      "description": "Verifies the output of /repo-initialization for completeness and correctness. Spawns a fresh agent to audit the scaffolded repository against specs/ARCHITECTURE.md \u2014 checking directory structure matches the module map, all tooling configs exist and work, git hooks enforce quality gates, Claude hooks are configured, CLAUDE.md and README.md are present and complete, and the full quality gate suite passes. Produces a structured compliance report with pass/fail verdicts and actionable recommendations (fix or proceed to /test-setup US-000). Use this skill after running /repo-initialization, before starting /test-setup or /spec-implementation. Also triggers on: \"verify the scaffold\", \"check repo setup\", \"audit the project structure\", \"is the repo ready\", \"validate repo before implementation\", or any request to review scaffolding quality.",
       "version": "2.0.0"
     },
     {
       "name": "research-and-architecture",
       "source": "./plugins/research-and-architecture",
-      "description": "Research tech stacks and produce an ARCHITECTURE.md following MIM AA (Module Infrastructure-Module) architecture.",
+      "description": "\"Research tech stacks and produce a project-wide `specs/ARCHITECTURE.md` following MIM AA (Module Infrastructure-Module). Reads `specs/stories.json` (the story-based tracker) for the backlog and the personas. Produces a single ARCHITECTURE.md that evolves additively as new stories require new modules \u2014 no version directories, no snapshots. Use this skill whenever the user wants to define architecture after scoping, asks to research tech stacks, wants architecture decisions documented, mentions MIM or modular architecture, or runs /research-and-architecture. Also trigger when the user mentions 'architecture', 'tech stack research', 'stack validation', or 'module design', or when an existing ARCHITECTURE.md needs to be extended for a new story.\"",
       "version": "2.0.0"
     },
     {
       "name": "research-and-architecture-verification",
       "source": "./plugins/research-and-architecture-verification",
-      "description": "Verifies the output of /research-and-architecture for MIM AA compliance, template completeness, and consistency with SPECS.md.",
+      "description": "Verifies the output of /research-and-architecture for MIM AA compliance, template completeness, and consistency with the project's specs/stories.json and specs/PROJECT.md. Spawns a fresh agent to audit specs/ARCHITECTURE.md against the MIM AA reference, the architecture template, and the story backlog. Produces a structured compliance report with pass/fail verdicts, specific violations, and actionable recommendations (fix or proceed to next phase). Use this skill after running /research-and-architecture, before running /repo-initialization. Also triggers on: \"verify the architecture\", \"check architecture quality\", \"audit ARCHITECTURE.md\", \"is the architecture ready\", \"validate architecture before scaffolding\", \"MIM AA compliance check\", or any request to review architecture quality.",
       "version": "2.0.0"
     },
     {
       "name": "spec-implementation",
       "source": "./plugins/spec-implementation",
-      "description": "Autonomous GREEN-phase execution of pre-existing implementation plans for a **specific version** (V0, V1, ...) against pre-written failing tests, Gherkin .feature files, UI wireframes, and ARCHITECTURE.md.",
+      "description": "Per-story GREEN-phase executor. For ONE story (US-NNN) at a time, writes the minimal implementation code that makes every pre-written failing test pass. Reads the story's PLAN.md (REASONS canvas Operations), executes Operations one at a time (RED-A \u2192 RED-B \u2192 GREEN \u2192 REFACTOR), and runs per-story quality gates (Simplify / Code Review / Verify) at the end. If invoked for the Foundation Story (US-000) against an empty repo where state phase = planned, auto-chains /repo-initialization first. Tracks progress in specs/story-NNN-slug/state.json and updates specs/stories.json on completion. Use this skill after /test-setup US-NNN (tests in RED state). Triggers on: \"implement US-NNN\", \"make the tests pass for the story\", \"GREEN phase for US-NNN\", \"/spec-implementation US-NNN\", or any request to execute a story's PLAN.md against its failing tests.",
       "version": "2.0.0"
     },
     {
       "name": "spec-writing",
       "source": "./plugins/spec-writing",
-      "description": "Spec-driven development skill that produces a high-level SPECS.md overview plus executable Cucumber-compatible .feature files (one per feature) with full Gherkin scenarios.",
+      "description": "Story-based spec-writing skill that produces, for one user story at a time, a `STORY.md` (INVEST-shaped User Story + Acceptance Criteria + Rules) plus one or more Cucumber-compatible `.feature` files with full Gherkin scenarios. Runs an INVEST gate (Phase 0) before any spec generation. Output lives at `specs/story-NNN-slug/`. Use this skill whenever the user wants to spec a specific story, define behaviour for a feature, capture acceptance criteria, or says things like \"spec story US-001\", \"/spec-writing US-NNN\", \"let's spec out the auth story\", \"write the Gherkin for this feature\". Also trigger when the user wants to update or refine an existing story's spec, add new rules, or audit acceptance-criteria coverage.",
       "version": "2.0.0"
     },
     {
       "name": "spec-writing-verification",
       "source": "./plugins/spec-writing-verification",
-      "description": "Verifies the output of /spec-writing for completeness, coherence, and template compliance.",
+      "description": "Per-story verification of the output of /spec-writing for completeness, coherence, INVEST compliance, and template fidelity. Spawns a fresh agent to audit specs/story-NNN-slug/STORY.md + specs/story-NNN-slug/features/*.feature against the spec-writing skill's templates and rules. Produces a structured compliance report with pass/fail verdicts, specific findings, and actionable recommendations (fix or proceed to /plan-writing). Use this skill after running /spec-writing for a specific story, before running /plan-writing for that same story. Also triggers on: \"verify the spec for US-NNN\", \"audit the story spec\", \"check INVEST compliance\", \"are the specs ready\", \"validate spec before planning\".",
       "version": "2.0.0"
     },
     {
       "name": "test-setup",
       "source": "./plugins/test-setup",
-      "description": "Writes all BDD step definitions and unit tests for every plan in the DAG for a **specific version** (V0, V1, ...) BEFORE any implementation code exists.",
+      "description": "Per-story RED-phase scaffolder. For ONE story (US-NNN) at a time, writes all BDD step definitions and unit/integration tests prescribed by the story's PLAN.md (REASONS canvas Test Plan), plus the minimal source stubs required for tests to compile. Tests are real \u2014 they call actual API endpoints, service methods, and functions \u2014 but those implementations are empty stubs, so tests fail at assertion time, not because of missing imports or empty test.todo() placeholders. Operates after /plan-writing US-NNN, before /spec-implementation US-NNN. Triggers on: \"set up tests for US-NNN\", \"scaffold the tests for the story\", \"create failing tests\", \"RED phase for US-NNN\", \"/test-setup US-NNN\".",
       "version": "2.0.0"
     },
     {
       "name": "test-setup-verification",
       "source": "./plugins/test-setup-verification",
-      "description": "Verifies the output of /test-setup for completeness, correctness, and RED-state compliance for a specific version (V0, V1, ...).",
+      "description": "Per-story verification of /test-setup output for completeness, RED-state compliance, BDD-runner wiring, and Test Plan traceability. Spawns a fresh agent to audit BDD step definition files, unit / integration tests, and source stubs against the story's PLAN.md (Test Plan), STORY.md, and features/*.feature. Confirms every test is real (calls actual code, not placeholders), every test fails because implementations are empty stubs (not because of import errors), and the project's BDD runner is wired so .feature files actually drive the suite (not Gherkin pasted as comments inside *.spec.ts). Produces a structured compliance report. Use after /test-setup US-NNN, before /spec-implementation US-NNN. Triggers on: \"verify the tests for US-NNN\", \"check the test setup\", \"audit the failing tests\", \"is the story RED-ready\", \"/test-setup-verification US-NNN\".",
       "version": "2.0.0"
     },
     {
       "name": "ui-specs",
       "source": "./plugins/ui-specs",
-      "description": "Produces a project's design system + UI mockups for a specific version V{N}.",
+      "description": "Produces a project's design system + per-story UI mockups and screen specs. The design system (`specs/DESIGN.md` \u2014 Google-Stitch / VoltAgent 9-section format) is project-wide and re-runnable; the mockups and screen specs are per-story under `specs/story-NNN-slug/{mockups,ui}/`. Drives the design system through three branches the user picks from \u2014 copy a brand DESIGN.md from the VoltAgent awesome-design-md catalog (`npx getdesign@latest add <brand>`), start from one and tweak it, or build from scratch via realtimecolors.com aesthetic discovery. For each UI story, proposes 2-3 HTML mockup variants side-by-side (rendered + screenshotted via Playwright MCP), the user picks one, then iterates to acceptance. Use this skill whenever the user wants to define a design system, write UI specs, generate mockups, pick brand colors/fonts, draw screen layouts, or says \"design system\", \"DESIGN.md\", \"ui specs\", \"mockups\", \"wireframes\", \"/ui-specs\". Auto-invoked by `/spec-writing US-NNN` whenever a story has a user-facing screen. Triggers also when the user wants to tweak the project-wide DESIGN.md, swap brand inspiration, or redo the screens for an existing story.",
       "version": "2.0.0"
     },
     {
       "name": "verification-and-validation",
       "source": "./plugins/verification-and-validation",
-      "description": "Full end-to-end verification of a completed implementation for a **specific version** (V0, V1, ...) against specs, feature files, wireframes, and UI specs.",
+      "description": "Per-story end-to-end verification of a completed implementation. Runs the full automated test suite, starts the application, exercises every API endpoint with curl, walks every UI scenario via Playwright MCP, and FIXES any deviation found. Operates on ONE story (US-NNN) at a time; when everything passes, flips the story's phase to verified and writes the QA report to specs/story-NNN-slug/verification/qa-report.md. Use after /spec-implementation US-NNN (story phase = green). Optional --all-pending flag to walk every green story in turn. Triggers on: \"verify the app\", \"validate US-NNN\", \"run E2E verification for the story\", \"test the running app\", \"check everything works for US-NNN\", or any request to certify a green story as verified.",
       "version": "2.0.0"
     }
   ]

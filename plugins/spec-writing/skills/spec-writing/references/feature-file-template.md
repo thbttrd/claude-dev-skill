@@ -30,7 +30,7 @@ Feature: [Feature name in natural language]
   Background:
     Given [common precondition shared by most/all scenarios]
 
-  Rule: [Business rule description — same text as in SPECS.md Rules list]
+  Rule: [Business rule description — same text as in STORY.md Rules list]
 
     @happy-path
     Scenario: [Descriptive name for the successful case]
@@ -73,9 +73,10 @@ Tags enable selective test execution (`cucumber --tags "@F-001"`) and reporting.
 
 ### Required Tags
 
-| Tag      | Where         | Purpose                             |
-| -------- | ------------- | ----------------------------------- |
-| `@F-NNN` | Feature level | Links to the feature ID in SPECS.md |
+| Tag       | Where         | Purpose                                                        |
+| --------- | ------------- | -------------------------------------------------------------- |
+| `@US-NNN` | Feature level | Links to the parent story id; lets test runners filter by story |
+| `@F-NNN`  | Feature level | Links to the story-local feature id in STORY.md's feature-file map |
 
 ### Recommended Tags
 
@@ -160,15 +161,17 @@ These rules ensure the `.feature` files are valid and parseable by any Cucumber-
 
 ---
 
-## Relationship to SPECS.md
+## Relationship to STORY.md
 
-Each `.feature` file corresponds to a feature section in SPECS.md:
+Each `.feature` file lives under its parent story at `specs/story-NNN-slug/features/F-NNN-*.feature` and corresponds to a section of the story's `STORY.md`:
 
-| SPECS.md                             | Feature file                                        |
+| STORY.md                             | Feature file                                        |
 | ------------------------------------ | --------------------------------------------------- |
-| Feature ID (F-001)                   | `@F-001` tag                                        |
+| Story id (`US-NNN`)                  | `@US-NNN` tag at the feature level                  |
+| Feature id from feature-file map     | `@F-NNN` tag and file name                          |
 | User Story (As a / I want / So that) | `Feature:` description (identical text)             |
 | Rules bullet list                    | `Rule:` blocks (same text, expanded with scenarios) |
+| Acceptance Criteria                  | Mapped to scenarios via the Rule the AC belongs to  |
 | —                                    | Full `Scenario:` blocks with Given/When/Then        |
 
-The Rules listed in SPECS.md should be kept in sync with the `Rule:` blocks in the feature file. If a Rule is added or removed from either place, update the other.
+The Rules listed in `STORY.md` should be kept in sync with the `Rule:` blocks in the feature file. If a Rule is added or removed from either place, update the other.

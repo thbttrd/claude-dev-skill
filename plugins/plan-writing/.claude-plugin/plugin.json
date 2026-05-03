@@ -1,7 +1,7 @@
 {
   "name": "plan-writing",
   "version": "2.0.0",
-  "description": "Plans the implementation of a **specific version** (V0, V1, ...) from project-tracking.json, producing a DAG of implementation plans organized into waves — where each wave delivers a vertical, testable, end-to-end slice of the app. Each plan prescribes steps-first TDD (BDD step definitions and unit tests BEFORE implementation code) and respects MIM AA module boundaries. Plans are dry (zero code). Use this skill after specs and architecture are ready for a version, before starting implementation or /spec-implementation. Also triggers on: \"plan V0\", \"plan this version\", \"write the plans\", \"create implementation plans\", \"plan the implementation\", \"build the DAG\", \"what order should we implement\", or any request to break a version into implementable work packages.",
+  "description": "Plans the implementation of one **user story** at a time (US-NNN) \u2014 not a release, not a wave. Reads the story's STORY.md + features + the project-wide ARCHITECTURE.md and produces a single PLAN.md in the **REASONS canvas** format (Requirements / Entities / Approach / Structure / Operations / Norms / Safeguards) plus an explicit Test Strategy and Test Plan. Plans are dry \u2014 zero code. Each Operation prescribes RED-A \u2192 RED-B \u2192 GREEN \u2192 REFACTOR. The story DAG lives in specs/stories.json (depends_on_story_ids); this skill does not produce any DAG artifact of its own. Use this skill after a story is specced (phase = specced), before /test-setup. Triggers on: \"plan US-NNN\", \"plan this story\", \"write the plan\", \"/plan-writing US-NNN\", or any request to produce an implementation plan for a single story.",
   "author": {
     "name": "thbttrd"
   },
