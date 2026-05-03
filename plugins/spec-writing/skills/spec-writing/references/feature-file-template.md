@@ -7,14 +7,13 @@ Feature files use standard Gherkin syntax that can be parsed and executed by BDD
 ## File Naming
 
 ```
-docs/V{N}/specs/features/
+specs/story-NNN-slug/features/
 ├── F-001-study-session.feature
 ├── F-002-spaced-repetition.feature
-├── F-003-topic-organization.feature
 └── ...
 ```
 
-**Convention:** `F-NNN-kebab-case-slug.feature` where `F-NNN` matches the feature ID in SPECS.md. All feature files live in `docs/V{N}/specs/features/`.
+**Convention:** `F-NNN-kebab-case-slug.feature` where `F-NNN` is a feature id local to its parent story. Feature ids are sequential within the story (F-001, F-002, …); they do not need to be globally unique across stories. A simple story typically owns a single `.feature` file; complex stories may split scenarios across two or three files when one Gherkin Feature would otherwise become unwieldy.
 
 ---
 
