@@ -1,6 +1,6 @@
 # ARCHITECTURE.md Template
 
-Use this template to produce the final `docs/V{N}/architecture/ARCHITECTURE.md`. Adapt sections as needed — not every project requires every section. Remove sections that don't apply.
+Use this template to produce the final `specs/ARCHITECTURE.md`. Adapt sections as needed — not every project requires every section. Remove sections that don't apply. The document is project-wide and additive: when new stories require new modules, the file is enriched in place rather than duplicated per version.
 
 ---
 
@@ -163,7 +163,7 @@ module-name/
 
 ### 8.3 Mapping to Gherkin Features
 
-[How the `.feature` files from docs/V{N}/specs/ map to actual test implementations]
+[How the `.feature` files from `specs/story-NNN-slug/features/` map to actual test implementations across modules. Each story owns its feature files; the architecture only documents the test-strategy patterns each module uses.]
 
 ## 9. Deployment & Infrastructure
 
