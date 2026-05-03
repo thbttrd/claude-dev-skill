@@ -1,209 +1,192 @@
-# Plan Template
+# PLAN.md Template — REASONS Canvas
 
-Plans are dry — they contain zero code. They describe _what_ to build and _what to test_,
-referencing Gherkin scenarios as the behavioral specification. The implementing agent
-reads the plan and the .feature file to write the actual code.
+Each story owns a `PLAN.md` at `specs/story-NNN-slug/PLAN.md`. It is a **structured prompt** an agent can execute autonomously, organised around the **REASONS canvas** (Requirements / Entities / Approach / Structure / Operations / Norms / Safeguards) plus an explicit **Test Strategy** and **Test Plan**.
 
-## File Location
+Inspired by [Martin Fowler — Structured Prompt-Driven Development](https://martinfowler.com/articles/structured-prompt-driven/). Plans are dry — they describe *what* to build and *what to test*, never *how*. If you find yourself writing actual code in a plan, stop. Describe the component, don't implement it.
 
-Plans are organized inside each version's own directory under `docs/V{N}/plans/`:
+The plan is the durable artifact. When the implementation reality diverges from the plan, **fix the plan first, then update the code** — keeping intent and implementation aligned.
+
+---
+
+## File location
 
 ```
-docs/
-├── project-tracking.json
-├── V0/
-│   ├── specs/                      # V0 specs (separate skill)
-│   ├── architecture/               # V0 architecture (separate skill)
-│   └── plans/                      # <-- this skill writes here
-│       ├── 00-foundation.md
-│       ├── DAG.md
-│       ├── implementation-state.json
-│       ├── W1-auth-golden-path.md
-│       ├── W2-dashboard-and-stats.md
-│       └── W3-settings-and-edge-cases.md
-├── V1/
-│   └── plans/
-│       ├── 00-foundation.md
-│       ├── DAG.md
-│       ├── W1-...
-│       └── ...
+specs/story-NNN-slug/PLAN.md
 ```
 
-V{N+1}'s `plans/` directory is **not** automatically created — it is populated fresh when `/plan-writing` is next invoked for V{N+1}. The prior version's plans are preserved frozen in `docs/V{N}/plans/` as a historical record.
+One plan per story. There is no `00-foundation.md`, no `WN-…md`, no `DAG.md` — the DAG lives in `specs/stories.json` as each story's `depends_on_story_ids`. The Foundation Story (`US-000`) has its own `PLAN.md` like every other story; the only thing that distinguishes it is what's in its **Operations** (schema bring-up, BM/Infra skeletons, smoke endpoint + UI page) and the depth of its **Structure** (the entire scaffold's wiring).
 
-## Wave Plan Template
+---
+
+## Template
 
 ```markdown
-# Wave N: [Vertical Slice Name]
+# PLAN: US-NNN — <Story title>
 
-**Version:** VN
-**Wave:** N of M
-**User stories:** US-001, US-003, US-007
-**Architecture modules:** [BM + Infra-Modules involved]
-**UI screen specs:** `docs/V{N}/specs/UI-F-NNN-slug.md`, wireframes in `docs/V{N}/specs/wireframes/`
-**Depends on:** Wave N-1 (all tasks must be complete)
-**Estimated tasks:** N
-**What becomes testable:** [1-2 sentences: after this wave, the user can do X end-to-end]
+> **Story:** [STORY.md](./STORY.md) · **Features:** see `./features/F-*.feature`
+> **Mockups:** [`mockups/UI-F-NNN-screen.html`](./mockups/UI-F-NNN-screen.html) (omit if no UI)
+> **Architecture:** [`specs/ARCHITECTURE.md`](../ARCHITECTURE.md) · **Design system:** [`specs/DESIGN.md`](../DESIGN.md) (if UI)
+> **Depends on:** US-XXX (verified), US-YYY (verified) — or "—" for the Foundation Story
+> **Generated:** YYYY-MM-DD by `/plan-writing` · **Phase target:** planned → red → green → verified
 
 ---
 
-## Context
+## R — Requirements
 
-[What this wave delivers. Which user stories it implements. Why this grouping makes
-sense as a vertical slice. What end-to-end flows the user can exercise after this wave.]
+What problem are we solving, and what is the Definition of Done?
 
-## Architecture Notes
+- **Problem:** <one paragraph drawn from STORY.md's User Story + context>
+- **Definition of Done:**
+  - Every Gherkin scenario in `./features/F-*.feature` passes via the BDD runner.
+  - Every unit test for the story's modules passes.
+  - The Test Plan below has every row green.
+  - Manual `curl` walkthrough matches the AC; UI walkthrough via Playwright matches the mockup (if UI).
+  - `state.json.phase = "verified"` after `/verification-and-validation US-NNN`.
+- **Acceptance criteria** (mirrored from STORY.md, traceability):
+  - [ ] AC-1 — <observable behaviour>
+  - [ ] AC-2 — <observable behaviour>
 
-[Which modules this wave touches. Key constraints from ARCHITECTURE.md. How this wave's
-code fits into the existing structure from previous waves.]
+## E — Entities
 
-## Prerequisites
+Domain entities involved in this story and how they relate. Reference (don't redefine) entities owned by other modules — link to the owning module's section in `specs/ARCHITECTURE.md`.
 
-[What must be in place from previous waves. List specific APIs/services/types that
-this wave's tasks will call from Wave 0..N-1.]
+| Entity     | Owned by module       | Key fields                          | Relationship                            |
+| ---------- | --------------------- | ----------------------------------- | --------------------------------------- |
+| Session    | BM-study              | id, userId, cards[], startedAt      | belongs_to User, has_many Card          |
+| Card       | BM-cards (existing)   | (see ARCHITECTURE.md#bm-cards)      | belongs_to Subtopic                     |
 
----
+If the story introduces a new entity, mark it as **NEW** and update `specs/ARCHITECTURE.md`'s data ownership map accordingly (re-invoke `/research-and-architecture` if the change is non-trivial).
 
-## Tasks
+## A — Approach
 
-### Task 1: [Short descriptive name]
+The strategy to satisfy the requirements. Surface the trade-offs explicitly so reviewers can challenge them.
 
-**Story:** US-NNN — [story title]
-**Module:** [Module from ARCHITECTURE.md]
-**What:** [One sentence deliverable]
+- **Chosen approach:** <1-3 paragraphs describing the strategy at the level of "we route X through Y because Z". No code.>
+- **Alternatives rejected:**
+  - <Alt 1> — rejected because <reason>.
+  - <Alt 2> — rejected because <reason>.
+- **Trade-offs accepted:** <what we knowingly leave on the table — e.g., "no caching layer in this story; revisit when load > N rps">.
 
-**Scenarios covered:**
+## S — Structure
 
-- "[Scenario name from .feature file]"
-- "[Another scenario name]"
+Where the change fits in the system. Files to create or modify, dependencies, contracts. Reference `specs/ARCHITECTURE.md` for the canonical module map; the table below lists what *this story* touches.
 
-**UI spec:** [Reference to wireframe PNG + UI-F-*.md section, or "N/A"]
+| Module / file                                          | Role                | Action      |
+| ------------------------------------------------------ | ------------------- | ----------- |
+| `src/modules/study/study.service.ts`                   | BM service          | modify      |
+| `src/modules/study/types.ts`                           | BM types            | extend      |
+| `src/modules/study-sessions/repo.ts`                   | Infra repo          | create      |
+| `src/modules/study-sessions/schema.ts`                 | DB schema           | extend      |
+| `src/app/study/page.tsx`                               | UI entrypoint       | create      |
+| `src/app/api/study/sessions/route.ts`                  | API entrypoint      | create      |
+| `e2e/steps/study-session.steps.ts`                     | BDD steps           | create      |
+| `src/modules/study/__tests__/study.service.test.ts`    | unit tests          | create      |
+| `src/modules/study-sessions/__tests__/repo.int.test.ts` | integration tests  | create      |
 
-**RED-A — BDD Step Definitions (write first):**
+**Dependency direction:** `study (BM) → study-sessions (Infra)` only. No cross-BM imports introduced. Bootstrap goes through `getStudyService()` exported from `study-sessions/index.ts`, matching the pattern in `specs/ARCHITECTURE.md`.
 
-- Create/update step file: `e2e/steps/<feature>.steps.ts`
-- Bind these Given/When/Then patterns:
-  - `Given [pattern]` → [describe what the binding does]
-  - `When [pattern]` → [describe the action call]
-  - `Then [pattern]` → [describe the assertion]
-- Run BDD tests → expect FAILURE (implementation doesn't exist yet)
-- Commit: `test(<scope>): add BDD steps for [scenario]`
+## O — Operations
 
-**RED-B — Unit/Integration Tests (write second):**
+Concrete, ordered steps the agent will execute. Each operation is one TDD cycle (RED-A → RED-B → GREEN → REFACTOR). One operation maps to one Gherkin Rule by default; complex Rules may need two operations.
 
-- Create test file: `src/modules/<module>/<file>.test.ts`
-- Test type: [sociable unit with fakes | integration with real DB | overlapping unit]
-- Assert these behaviors:
-  - [behavior 1 from scenario Given/When/Then]
-  - [behavior 2]
-- Fakes needed: [list which interfaces need fake implementations]
-- Run tests → expect FAILURE
-- Commit: `test(<scope>): add failing test for [scenario]`
+### Operation 1 — <descriptive title>
 
-**GREEN — Implementation (write third):**
+**Covers scenarios:** <Scenario name(s) from .feature file>
+**Module:** <module name from Structure>
 
-- Create/modify: `src/modules/<module>/<file>.ts`
-- This [component/service/route] does: [description]
-- Connects to: [which existing APIs/services it calls]
-- UI: [reference wireframe + design tokens, or N/A]
-- Run full test suite → ALL must pass (including BDD + unit)
-- Commit: `feat(<scope>): implement [what]`
+- **RED-A (BDD steps):** create/modify `e2e/steps/study-session.steps.ts`. Bind `Given <pattern>`, `When <pattern>`, `Then <pattern>` to real Playwright/`request` actions (real navigation, real API calls, real DOM assertions — no empty-callback placeholders). Run `bun bdd` → MUST FAIL. Commit: `test(US-NNN): add BDD steps for <scenario>`.
+- **RED-B (unit/integration):** create `<test file path>`. Test type: <sociable unit with fakes | integration with real DB>. Assert <behaviour>. Hand-written fakes: <list>. Run `bun test` → MUST FAIL. Commit: `test(US-NNN): add failing tests for <scenario>`.
+- **GREEN:** implement the minimum in `<source file path>` to pass both. Place code in the correct module per Structure. Run `bun test && bun bdd` → ALL PASS. Commit: `feat(US-NNN): implement <what>`.
+- **REFACTOR (optional):** clean obvious duplication, naming. `bun test && bun bdd` still PASS. Commit: `refactor(US-NNN): <what>`.
 
-**REFACTOR (if needed):**
+### Operation 2 — …
 
-- [What to clean up, or "None expected"]
-- Commit: `refactor(<scope>): [what]`
+(Repeat for every Rule the story has. Aim for ≤ 6 operations — if the story needs more, the INVEST `S` (Small) check probably failed and the story should have been split during `/spec-writing`.)
 
-**Verify:** `[exact test command]`
+## N — Norms
 
----
+Cross-cutting engineering norms that apply to this story. Pull from `specs/ARCHITECTURE.md`'s Best Practices section and from the project's `CLAUDE.md`. List only what is **load-bearing** for this story; don't restate the whole rulebook.
 
-### Task 2: [Short descriptive name]
+- **Naming:** kebab-case files, PascalCase classes, camelCase functions.
+- **Logging:** every public service method emits one structured log line at debug level on entry and exit.
+- **Defensive coding:** validate inputs at module boundaries; trust internal callers.
+- **Observability:** every API route emits one structured log line per request with the story id (`US-NNN`) tagged.
+- **Style:** no `any` types; explicit return types on exported functions.
+- **Architecture compliance:** no cross-BM imports; no foreign keys across modules; all inter-module access through the module's `index.ts` public API.
 
-[Same structure]
+## S — Safeguards
 
----
+Non-negotiable boundaries — invariants, performance limits, security rules. These are *bright lines*: if a Safeguard is violated, the implementation is wrong, regardless of what the tests say.
 
-## Parallel Execution Within This Wave
-
-[Which tasks/stories are independent and can be dispatched to separate agents]
-
-| Agent   | Tasks     | Stories |
-| ------- | --------- | ------- |
-| Agent A | Tasks 1-3 | US-001  |
-| Agent B | Tasks 4-5 | US-003  |
-
----
-
-## Wave N Verification
-
-After all tasks in this wave are complete:
-
-1. Run full test suite: `[command]`
-2. Start the app: `[command]`
-3. Manually verify these end-to-end flows:
-   - [ ] [Describe flow from US-NNN: user does X → sees Y → does Z → sees W]
-   - [ ] [Describe flow from US-NNN: ...]
-4. Run BDD suite for this wave's scenarios: `[command]`
-
-The app should be fully functional for all Wave 0..N stories after this wave.
+- **Invariants:** <e.g., "a Session cannot have zero cards", "a Card cannot belong to two Subtopics">.
+- **Performance:** <e.g., "`startSession()` p95 ≤ 200 ms with 1 000 cards seeded — assert via the bench test in the Test Plan">.
+- **Security:** <e.g., "session creation requires an authenticated user; users cannot read other users' sessions">.
+- **Data:** <e.g., "no destructive migration on existing tables; only additive schema changes">.
 
 ---
 
-## Completion Criteria
+## Test Strategy
 
-- [ ] All tasks completed in RED-A → RED-B → GREEN → REFACTOR order
-- [ ] All BDD step definitions created for this wave's scenarios
-- [ ] All unit/integration tests passing
-- [ ] BDD scenarios passing for this wave's stories
-- [ ] No lint errors, no type errors
-- [ ] Code placed in correct architecture modules
-- [ ] UI follows wireframes and design tokens (if applicable)
-- [ ] No regressions in full test suite (including previous waves)
-- [ ] Wave verification checklist passes (app is testable end-to-end)
+How testing is approached for this story (the *how*, not the *what*). Anchored to `specs/ARCHITECTURE.md`'s Testing Strategy section — overrides only.
+
+- **Test pyramid for this story:**
+  - 1 BDD scenario per Gherkin scenario (Playwright via playwright-bdd) — exercises the running app end-to-end.
+  - Sociable unit tests for BM services, with hand-written fakes for repos.
+  - Integration tests for Infra repos against a real test database.
+  - Bench tests for any performance Safeguard.
+- **Doubles policy:** hand-written fakes only. No `vi.mock()`, no `jest.fn()`. Fakes live in `<module>/__tests__/fakes/`.
+- **Test data:** seeded via the `request` fixture in BDD; via fake constructors in unit tests; via SQL fixtures in integration tests.
+- **Determinism:** all tests must be deterministic. No real network. No real time — inject a clock fake when time matters.
+- **Coverage target:** every Gherkin scenario reaches GREEN; line coverage on touched BM modules ≥ 90%.
+- **Performance assertions:** the perf invariants in Safeguards have a dedicated benchmark test.
+
+## Test Plan
+
+The exact tests to write for this story (the *what*). Each row is one test, traceable to a scenario or invariant. `/test-setup US-NNN` reads this table and writes the failing tests; `/spec-implementation US-NNN` makes them pass; `/verification-and-validation US-NNN` re-runs them as part of the QA pass.
+
+| ID    | Type         | Scenario / invariant                                  | File                                                            | Asserts                                                       |
+| ----- | ------------ | ----------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------- |
+| T-01  | BDD          | "User starts a session with cards due"                | e2e/steps/study-session.steps.ts                                | UI shows first due card after navigation                      |
+| T-02  | BDD          | "User starts a session with no cards due"             | e2e/steps/study-session.steps.ts                                | Empty-state message visible                                   |
+| T-03  | unit         | startSession orders cards by difficulty               | src/modules/study/__tests__/study.service.test.ts                | session.cards[0].difficulty === "beginner"                    |
+| T-04  | unit         | submitRating updates the card's interval              | src/modules/study/__tests__/study.service.test.ts                | review.nextDueAt advances by SRS algorithm                    |
+| T-05  | integration  | sessions repo persists and re-reads a session         | src/modules/study-sessions/__tests__/repo.int.test.ts            | created session returned identically by findById              |
+| T-06  | bench        | Safeguard: startSession p95 ≤ 200ms @ 1k cards        | src/modules/study/__tests__/study.service.bench.ts               | p95 ≤ 200ms                                                   |
+
+Each row references a Gherkin scenario (by name), an AC (by id), or a Safeguard. Untraceable rows are not allowed — every test must justify its existence by referencing the spec.
+
+---
+
+## Verification (per story)
+
+After all Operations are GREEN:
+
+1. `bun test` — all unit + integration tests pass (story + previously verified stories).
+2. `bun bdd` — all Gherkin scenarios for this story pass; previously verified stories don't regress.
+3. `bun lint && bun typecheck` — clean.
+4. Start the app: `bun dev`. Run `curl` walkthrough (script in `./verification/curl-walkthrough.sh` if needed).
+5. Run the Playwright walkthrough described in STORY.md AC-N (if UI).
+6. Write `./verification/qa-report.md` summarising tests passed, scenarios verified, fixes applied.
+
+## Completion criteria
+
+- [ ] Every operation completed in RED-A → RED-B → GREEN → REFACTOR order.
+- [ ] Every row in the Test Plan is GREEN.
+- [ ] Architecture compliance: no cross-BM imports, no foreign keys across modules, no infrastructure types in BM public APIs.
+- [ ] UI matches `mockups/UI-F-NNN-*.html` (visual diff via Playwright if UI).
+- [ ] No regressions in previously verified stories.
+- [ ] `state.json.phase = "verified"`; `specs/stories.json#stories[i].phase = "verified"`.
+- [ ] `specs/STORIES.md` regenerated to reflect the new phase.
 ```
 
-## Foundation Plan Template
+---
 
-The foundation plan uses the same structure but with these differences:
+## Rules for the planner (`/plan-writing`)
 
-- **Wave:** Always 0
-- **User stories:** "N/A — shared infrastructure"
-- **What becomes testable:** "Dev environment is functional, all service interfaces exist, test infrastructure is ready"
-
-### Typical Foundation Tasks (scoped to version)
-
-1. **Database schema** — only entities needed by this version's stories.
-   Target: each Infra-Module's schema. Group related tables per module.
-
-2. **Shared types and constants** — only what this version needs.
-   Target: `shared-kernel` module.
-
-3. **Database connection and utilities** — ORM setup, connection factory.
-   Target: `shared-infra` module.
-
-4. **BM service skeletons with DI interfaces** — only for Business-Modules
-   involved in this version. Service class + dependency interfaces.
-   Critical: Wave 1 needs these to write tests against.
-
-5. **Test infrastructure** — fixtures, factories, fakes for this version's modules.
-
-### Foundation TDD
-
-Even foundation follows RED-GREEN-REFACTOR:
-
-- Unit tests for shared utilities
-- Integration tests for repository CRUD against real DB
-- Sociable unit tests for BM services with fakes
-
-### Foundation Verification
-
-```markdown
-## Wave 0 Verification
-
-1. Run full test suite: `[command]`
-2. Verify all service interfaces are defined and importable
-3. Verify database migrations run cleanly
-4. Verify test fixtures and fakes work
-5. The app doesn't need to start yet — but the dev environment must be functional
-```
+- **Plans are dry — zero code.** Describe components and contracts, not implementations.
+- **One plan per story.** Period.
+- **Reference, don't restate.** Architecture goes in `specs/ARCHITECTURE.md`. STORY.md owns the User Story. PLAN.md lives in the *gap* between them: how to actually do this story.
+- **Operations ≤ 6 by default.** If a story needs more, suspect the INVEST `S` check missed something — surface it back to `/spec-writing` for a split.
+- **Test Plan rows must be traceable.** Every row points to a scenario, an AC, or a Safeguard. No untraceable tests.
+- **Safeguards are non-negotiable.** They override the Test Plan in case of conflict — if a Safeguard is violated by an otherwise-passing implementation, the implementation is wrong.
+- **The plan is the durable artifact.** When reality diverges, fix the plan first, then the code.

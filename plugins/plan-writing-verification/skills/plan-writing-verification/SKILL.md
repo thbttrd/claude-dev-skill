@@ -1,50 +1,51 @@
 ---
 name: plan-writing-verification
-version: 1.0.0
+version: 2.0.0
 description: >
-  Verifies the output of /plan-writing for a specific version (V0, V1, ...) for
-  completeness, DAG correctness, TDD prescription compliance, and architecture
-  alignment. Spawns a fresh agent to audit all plan files in docs/V{N}/plans/ against
-  the plan template, the DAG analysis rules, ARCHITECTURE.md, SPECS.md, and the
-  feature files. Checks that every wave delivers a vertical slice, the DAG has
-  sequential waves with parallelizable stories within each wave, every task
-  prescribes steps-first TDD (BDD steps -> unit tests -> implementation), and module
-  assignments match the architecture. Produces a structured compliance report with
-  pass/fail verdicts and actionable recommendations. Use this skill after running
-  /plan-writing, before starting /test-setup. Also triggers on: "verify the plans",
-  "check plan quality", "audit the implementation plans", "are the plans ready",
-  "validate plans before implementation", "check the DAG", or any request to review
-  plan quality before coding begins.
+  Per-story verification of the output of /plan-writing for completeness,
+  REASONS-canvas compliance, TDD prescription, Test Plan traceability, and
+  architecture alignment. Spawns a fresh agent to audit
+  specs/story-NNN-slug/PLAN.md against the plan template, the story's
+  STORY.md + .feature files, and specs/ARCHITECTURE.md. Checks that every
+  REASONS section is populated, every Operation prescribes RED-A → RED-B →
+  GREEN → REFACTOR, every Test Plan row is traceable to a scenario / AC /
+  safeguard, and module assignments respect ARCHITECTURE.md. Produces a
+  structured compliance report. Use this skill after running /plan-writing
+  US-NNN, before /test-setup US-NNN. Triggers on: "verify the plan", "check
+  plan quality", "audit the plan", "is the plan ready", "validate plan
+  before test-setup", "/plan-writing-verification US-NNN".
 ---
 
-# Plan Writing Verification
+# Plan Writing Verification (per story)
 
-Audits the implementation plans and DAG produced by `/plan-writing` for a **specific
-version** (V0, V1, ...) and produces a compliance report. This is a **quality gate**
-between planning and test setup.
+Audits the implementation plan for **one story** and produces a compliance report. Quality gate between `/plan-writing` and `/test-setup`.
 
-The verification runs in a **fresh agent** so the review has no context bias from
-the planning session. The auditor reads the plan files, the DAG, the feature files,
-and ARCHITECTURE.md — then checks compliance from scratch.
+The verification runs in a **fresh agent** so the review has no context bias from the planning session. The auditor reads the plan, the spec, the architecture, and checks compliance from scratch.
+
+## Pre-Flight
+
+| Check                                                 | Action                                                                                                                                          |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/V*/` directory exists                           | Hard-stop with the migration command.                                                                                                           |
+| `specs/stories.json` does not exist                   | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                |
+| Target story id missing                               | Ask the user which story to verify (default: stories whose `phase = planned`).                                                                  |
+| `specs/story-NNN-slug/PLAN.md` does not exist         | Hard-stop. Print: `Story US-NNN has no PLAN.md yet. Run /plan-writing US-NNN first.`                                                            |
 
 ## When to Run
 
 ```
-/repo-initialization-verification -> /plan-writing -> /plan-writing-verification -> /test-setup
+/spec-writing-verification US-NNN → /plan-writing US-NNN → /plan-writing-verification US-NNN → /test-setup US-NNN
 ```
 
 ## What Gets Verified
 
-| Artifact         | Expected Location                           |
-| ---------------- | ------------------------------------------- |
-| Foundation plan  | `docs/V{N}/plans/00-foundation.md`          |
-| Wave plans       | `docs/V{N}/plans/WN-slug.md` (one per wave) |
-| DAG document     | `docs/V{N}/plans/DAG.md`                    |
-| State file       | `docs/V{N}/plans/implementation-state.json` |
-| Project tracking | `project-tracking.json`                     |
-| ARCHITECTURE.md  | `docs/V{N}/architecture/ARCHITECTURE.md`    |
-| SPECS.md         | `docs/V{N}/specs/SPECS.md`                  |
-| Feature files    | `docs/V{N}/specs/features/*.feature`        |
+| Artifact      | Expected Location                                              |
+| ------------- | -------------------------------------------------------------- |
+| PLAN.md       | `specs/story-NNN-slug/PLAN.md`                                 |
+| STORY.md      | `specs/story-NNN-slug/STORY.md` — for cross-checks             |
+| Feature files | `specs/story-NNN-slug/features/F-NNN-*.feature`                |
+| Architecture  | `specs/ARCHITECTURE.md` — for module-assignment compliance     |
+| Tracker       | `specs/stories.json` — for phase + dependency cross-checks     |
 
 ## Execution
 
@@ -55,331 +56,164 @@ and ARCHITECTURE.md — then checks compliance from scratch.
 Use the Agent tool with `model: "opus"` and the following prompt:
 
 ```
-You are an implementation plan auditor. Your job is to verify that the plans produced
-by the plan-writing skill for a specific version are complete, correct, and ready for
-parallel agent execution.
+You are a plan quality auditor for a story-based dev pipeline. Your job is
+to verify that PLAN.md for story US-NNN is complete, REASONS-canvas-compliant,
+TDD-prescriptive, and architecturally sound.
 
-## Step 0: Determine Version
+## Step 1: Read the Artifacts
 
-Read project-tracking.json to identify the target version (V0, V1, ...).
-Use the version whose `planning` field exists and was most recently written.
-Set VN = the version directory name (e.g., "V0", "V1").
+1. specs/story-NNN-slug/PLAN.md
+2. specs/story-NNN-slug/STORY.md
+3. specs/story-NNN-slug/features/F-NNN-*.feature
+4. specs/ARCHITECTURE.md
+5. specs/PROJECT.md (for NFR cross-checks)
+6. specs/stories.json — find the entry where id = "US-NNN" for cross-checks
 
-## Step 1: Read All Artifacts
-
-Read these files:
-1. Every file in docs/V{N}/plans/ (00-foundation.md, WN-*.md, DAG.md)
-2. docs/V{N}/plans/implementation-state.json
-3. docs/V{N}/architecture/ARCHITECTURE.md
-4. docs/V{N}/specs/SPECS.md
-5. Every .feature file in docs/V{N}/specs/features/
-6. project-tracking.json
-7. docs/V{N}/specs/UI-SPECS.md and docs/V{N}/specs/UI-F-*.md (if they exist)
+Reference: <plan-writing plugin>/skills/plan-writing/references/plan-template.md
 
 ## Verification Checklist
 
-### A. Plan File Completeness
+### A. REASONS Canvas Completeness
 
-**A1. Version directory exists:**
-- [ ] docs/V{N}/plans/ directory exists and contains plan files
+PLAN.md must contain ALL of these sections in order:
+- [ ] R — Requirements (Problem, DoD, AC mirror)
+- [ ] E — Entities (table with module ownership)
+- [ ] A — Approach (chosen approach + alternatives + trade-offs)
+- [ ] S — Structure (file table + dependency direction)
+- [ ] O — Operations (numbered, ordered, ≤ 6 by default)
+- [ ] N — Norms (load-bearing for this story)
+- [ ] S — Safeguards (invariants, perf, security, data)
+- [ ] Test Strategy
+- [ ] Test Plan (table with id, type, scenario/AC/safeguard, file, asserts)
+- [ ] Verification (per-story checklist)
+- [ ] Completion Criteria (checkboxes)
 
-**A2. Foundation plan exists:**
-- [ ] docs/V{N}/plans/00-foundation.md exists and is non-empty
+For each section: PASS or FAIL with the specific issue.
 
-**A3. Wave plans exist:**
-For each wave referenced in the DAG:
-- [ ] A corresponding wave plan file exists: docs/V{N}/plans/WN-slug.md
-- [ ] File name follows the pattern: WN-<descriptive-slug>.md (e.g., W1-core-api.md)
+### B. Operations Quality (Per Operation)
 
-**A4. No orphaned plans:**
-- [ ] Every plan file in docs/V{N}/plans/ corresponds to a wave in the DAG
-      (except 00-foundation.md and DAG.md and implementation-state.json)
+For EACH Operation in the plan, verify:
 
-**A5. DAG.md exists:**
-- [ ] docs/V{N}/plans/DAG.md exists and is non-empty
-- [ ] Contains a dependency graph (Mermaid or ASCII)
-- [ ] Contains a wave table
-- [ ] Contains a parallel execution guide
+- [ ] Has a descriptive title and "Covers scenarios" line referencing real Gherkin scenarios
+- [ ] Has a Module reference matching a module in specs/ARCHITECTURE.md
+- [ ] Prescribes all four phases:
+  - [ ] RED-A: BDD step bindings, real Playwright/request actions, MUST FAIL, commit message
+  - [ ] RED-B: unit/integration test, fakes listed, MUST FAIL, commit message
+  - [ ] GREEN: minimal implementation, file paths, full-suite PASS, commit message
+  - [ ] REFACTOR: optional, but if listed must include "still PASS" + commit message
+- [ ] Commit message scope is `US-NNN` for story work or `foundation` for the Foundation Story
 
-### B. Plan Template Compliance (Per Plan)
+### C. Test Plan Traceability
 
-For EACH plan file (foundation + all waves), verify it contains:
+For EACH row in the Test Plan, verify:
 
-**B1. Header metadata:**
-- [ ] Wave ID (e.g., "W0 - Foundation", "W1 - Core API")
-- [ ] User Stories covered (US-NNN list, or "N/A" for foundation)
-- [ ] Architecture module(s) — references real modules from ARCHITECTURE.md
-- [ ] UI screen spec reference (or "N/A")
-- [ ] Depends on — list of prior wave IDs
-- [ ] Estimated task count
+- [ ] Has an id (T-01, T-02, …)
+- [ ] Has a type (BDD | unit | integration | bench)
+- [ ] References a real Gherkin scenario, AC id from STORY.md, or Safeguard from PLAN.md
+- [ ] Has a concrete file path
+- [ ] Has a non-vague assertion description
 
-**B2. Context section:**
-- [ ] Contains 1-2 sentences describing the wave's vertical slice
-- [ ] References the User Stories (US-NNN) from SPECS.md
+Cross-checks:
+- [ ] Every Gherkin scenario in the story's .feature files has at least one BDD row
+- [ ] Every AC in STORY.md has at least one row (BDD or unit)
+- [ ] Every Safeguard with an observable assertion has at least one row
+- [ ] No untraceable rows (every row references a spec artifact)
 
-**B3. Architecture Notes:**
-- [ ] Names specific module(s) from ARCHITECTURE.md
-- [ ] Mentions data ownership or dependency rules
+### D. Architecture Compliance
 
-**B4. Prerequisites:**
-- [ ] Lists specific APIs/services/types from prior waves
-- [ ] If depends_on is non-empty, prerequisites section is non-empty
+- [ ] Every module referenced in Structure exists in specs/ARCHITECTURE.md (or is marked NEW with a clear note)
+- [ ] No cross-BM imports introduced (BM-A's plan does not directly import from BM-B's internals)
+- [ ] Dependency direction matches ARCHITECTURE.md (Infra → BM, never BM → Infra)
+- [ ] No infrastructure types in BM public APIs
+- [ ] Bootstrap pattern matches the architecture's bootstrap section
+- [ ] Data ownership claims align with specs/ARCHITECTURE.md's data ownership map
 
-**B5. Tasks section:**
-- [ ] Has at least 1 task
-- [ ] Task count matches the "Estimated tasks" in the header
+### E. Story & Spec Alignment
 
-**B6. Completion Criteria:**
-- [ ] Lists all quality gates (tests, lint, typecheck, BDD)
+- [ ] Plan's "Depends on" line matches stories[i].depends_on_story_ids
+- [ ] Every dependency listed is `verified` or `is_foundation: true`
+- [ ] Plan's AC mirror matches STORY.md's Acceptance Criteria 1:1
+- [ ] Operations cover every Rule in the story's .feature files
+- [ ] Mockup links resolve (if UI)
 
-### C. TDD Prescription Compliance (CRITICAL)
+### F. Norms & Safeguards Quality
 
-This is the most important check. For EACH task in EVERY plan:
+- [ ] Norms list is non-empty and load-bearing (not generic boilerplate copied from CLAUDE.md)
+- [ ] Safeguards has at least one invariant entry
+- [ ] Performance Safeguards have measurable targets (units, p95/p99 specifics)
+- [ ] Security Safeguards name specific mechanisms
 
-**C1. RED-A (BDD Step Definitions) prescribed FIRST:**
-- [ ] Task explicitly describes BDD step definitions to write
-- [ ] Specifies which step file to create/update
-- [ ] Lists Given/When/Then patterns to bind
-- [ ] States "run BDD tests -> expect FAILURE"
-- [ ] Prescribes a commit: test(<scope>): add BDD steps for ...
+### G. specs/stories.json Integration
 
-**C2. RED-B (Unit/Integration Tests) prescribed SECOND:**
-- [ ] Task explicitly describes tests to write AFTER step definitions
-- [ ] Specifies which test file to create
-- [ ] Names the test type (sociable unit / integration / overlapping)
-- [ ] Lists specific behaviors to assert
-- [ ] Names fakes needed (for sociable unit tests)
-- [ ] States "run tests -> expect FAILURE"
-- [ ] Prescribes a commit: test(<scope>): add failing test for ...
+- [ ] stories[i].artifacts.plan points at PLAN.md and the file exists
+- [ ] stories[i].planning.operations_count matches the count of Operations in PLAN.md
+- [ ] stories[i].planning.planned_at is a valid date
+- [ ] stories[i].phase is `planned` (or beyond — `red`/`green`/`verified` are acceptable for re-audits)
+- [ ] stories[i].history has a `{phase: "planned", at: ...}` entry
+- [ ] project.updated_at was bumped recently
 
-**C3. GREEN (Implementation) prescribed THIRD:**
-- [ ] Task explicitly describes implementation AFTER tests
-- [ ] Specifies which files to create/modify
-- [ ] Names the module from ARCHITECTURE.md
-- [ ] States "run full test suite -> ALL must pass"
-- [ ] Prescribes a commit: feat(<scope>): implement ...
+### H. Size & Splitability
 
-**C4. Order is explicit and unambiguous:**
-- [ ] The RED-A -> RED-B -> GREEN sequence is clearly labeled in the task
-- [ ] An implementing agent cannot misinterpret the order
-- [ ] Search for any task that mentions "implement" before "test" — flag as CRITICAL
-
-**C5. REFACTOR mentioned (optional but present):**
-- [ ] Task mentions refactor step (even if "None expected")
-
-### D. DAG Correctness
-
-**D1. Sequential wave ordering:**
-- [ ] Waves are numbered sequentially: W0 -> W1 -> W2 -> ...
-- [ ] W0 is always the foundation wave
-- [ ] Each wave WN depends only on waves W0 through W(N-1)
-
-**D2. Vertical slice per wave:**
-- [ ] Each wave (except W0 foundation) touches all necessary layers
-      (API/routes, business logic, persistence, UI if applicable)
-- [ ] No wave is purely a "backend" or "frontend" wave — each delivers
-      end-to-end functionality
-
-**D3. Story-level parallelism within waves:**
-- [ ] Within a single wave, independent user stories (US-NNN) can run in parallel
-- [ ] Stories within the same wave have NO dependencies on each other
-- [ ] The wave plan clearly marks which stories are independent
-
-**D4. Acyclicity:**
-- [ ] No circular dependencies between waves
-- [ ] Foundation (W0) has zero dependencies
-- [ ] No wave depends on itself or on a later wave
-
-**D5. DAG.md consistency:**
-- [ ] DAG.md matches the implementation-state.json waves and dependency fields
-- [ ] Mermaid/ASCII graph edges match the wave ordering in plans
-
-### E. Architecture Alignment
-
-For each plan:
-
-**E1. Module assignment:**
-- [ ] Every task's "Module" field names a module from ARCHITECTURE.md section 3
-- [ ] Business logic tasks target Business-Modules (not Infra-Modules)
-- [ ] Infrastructure tasks (repos, schema, bootstrap) target Infra-Modules
-- [ ] No task targets a module that doesn't exist in ARCHITECTURE.md
-
-**E2. Data ownership:**
-- [ ] Tasks that create/modify database tables target the correct Infra-Module
-      (the one that owns that table per ARCHITECTURE.md section 6)
-- [ ] No task writes to a table owned by another module
-
-**E3. Dependency direction:**
-- [ ] No task imports from a BM's internal files (only through index.ts)
-- [ ] No BM task references an Infra-Module directly
-
-**E4. Feature-to-module mapping:**
-- [ ] The module(s) listed in the plan header match the ARCHITECTURE.md mapping
-      (section 3.1 shows which features each BM owns)
-
-### F. Scenario Coverage
-
-**F1. All user stories covered:**
-For each US-NNN user story in the version (from SPECS.md / project-tracking.json):
-- [ ] The user story appears in exactly one wave plan
-- [ ] No user story is orphaned (in the version but not in any wave)
-- [ ] No user story is duplicated across multiple waves
-
-**F2. All scenarios covered:**
-For each .feature file relevant to this version's user stories:
-- [ ] Every Scenario name appears in at least one wave's task list
-- [ ] No scenario is orphaned (in the feature file but not in any plan)
-
-**F3. All Rules covered:**
-- [ ] Every Rule: block in each relevant .feature file maps to at least one task
-
-**F4. No duplicate coverage:**
-- [ ] No scenario is claimed by tasks in two different wave plans
-      (unless one wave provides the foundation and another consumes it)
-
-### G. Foundation Plan Quality
-
-**G1. Covers shared infrastructure for THIS VERSION:**
-- [ ] Database schema task exists (targets Infra-Module schemas needed by this version)
-- [ ] Shared types task exists (targets shared-kernel types needed by this version)
-- [ ] Database connection task exists (targets shared-infra)
-- [ ] Test infrastructure task exists (fixtures, fakes, factories)
-
-**G2. Module skeletons scoped to this version:**
-- [ ] For each Business-Module used by this version's waves, the foundation plan
-      includes a task to create the service skeleton with DI interfaces
-- [ ] For each Infra-Module used by this version's waves, the foundation plan
-      includes a task to create repository implementations and the bootstrap function
-- [ ] Does NOT include skeletons for modules not touched by this version
-
-**G3. Enables wave 1:**
-- [ ] Foundation plan produces everything that W1 plans list as prerequisites
-- [ ] If a W1 plan says "Uses CardCatalogService from foundation", then
-      foundation has a task that creates CardCatalogService
-
-### H. Parallelizability
-
-**H1. Inter-wave sequencing:**
-- [ ] Waves execute sequentially: W0 must complete before W1 starts, etc.
-- [ ] Each wave's prerequisites are fully satisfied by prior waves
-
-**H2. Intra-wave parallelism:**
-For each pair of independent stories within the same wave:
-- [ ] They don't modify the same files (no merge conflicts)
-- [ ] They target different modules (or different parts of the same module)
-- [ ] They have no implicit ordering between them
-
-**H3. Self-containment:**
-- [ ] Each plan contains enough context for an independent agent to execute it
-      without reading other plans (except knowing prior wave APIs are available)
-
-### I. Project Tracking Verification
-
-**I1. planning field written back:**
-- [ ] project-tracking.json has the version's `planning` field populated
-- [ ] planning.plan_dir matches "docs/V{N}/plans/"
-- [ ] planning.dag_file matches "docs/V{N}/plans/DAG.md"
-- [ ] planning.waves_count matches the actual number of waves (including foundation)
-- [ ] planning.total_tasks matches the sum of tasks across all wave plans
-- [ ] planning.planned_at is a valid ISO timestamp
+- [ ] Operations count ≤ 6 (default ceiling). If higher, flag as WARNING and recommend splitting the story.
+- [ ] Test Plan row count is reasonable (rough thumb: 2-4 rows per Operation)
 
 ## Output Format
 
+Produce this exact report structure:
+
 ---
 
-# Plan Writing Verification Report
+# Plan Writing Verification Report — US-NNN
 
 **Date:** [today]
-**Version:** [VN]
-**Plans found:** [count] (1 foundation + [N] wave plans)
-**DAG waves:** [count]
-**Total tasks across all plans:** [count]
-**Max parallelism:** [highest independent story count in any wave]
+**Story:** US-NNN — <title>
+**PLAN.md:** specs/story-NNN-slug/PLAN.md
+**Operations:** [count]
+**Test Plan rows:** [count]
 
 ## Overall Verdict: [PASS | PASS WITH WARNINGS | FAIL]
 
-PASS = all plans complete, DAG valid, TDD prescribed, ready for /test-setup
-PASS WITH WARNINGS = minor issues that won't block /test-setup
-FAIL = critical issues (missing TDD prescription, invalid DAG, missing plans)
+PASS = ready for /test-setup US-NNN
+PASS WITH WARNINGS = minor issues; consider fixing
+FAIL = critical issues that must be fixed before /test-setup
 
 ## Summary
 
-| Area | Grade | Critical | Warnings |
-|------|-------|----------|----------|
-| A. Plan Completeness | [A-F] | [count] | [count] |
-| B. Template Compliance | [A-F] | [count] | [count] |
-| C. TDD Prescription | [A-F] | [count] | [count] |
-| D. DAG Correctness | [A-F] | [count] | [count] |
-| E. Architecture Alignment | [A-F] | [count] | [count] |
-| F. Scenario Coverage | [A-F] | [count] | [count] |
-| G. Foundation Quality | [A-F] | [count] | [count] |
-| H. Parallelizability | [A-F] | [count] | [count] |
-| I. Project Tracking | [A-F] | [count] | [count] |
-
-## DAG Overview
-
-```
-
-[Reproduce the wave table from DAG.md]
-
-```
-
-## Wave Summary
-
-| Wave | Plan File | User Stories | Tasks | Layers Touched |
-|------|-----------|-------------|-------|----------------|
-| W0 | 00-foundation.md | N/A | [N] | infra, shared |
-| W1 | W1-slug.md | US-001, US-002 | [N] | API, BM, IM, UI |
-| W2 | W2-slug.md | US-003 | [N] | API, BM, IM, UI |
-
-## Scenario Coverage Matrix
-
-| User Story | Scenarios in .feature | Scenarios in plans | Coverage |
-|------------|----------------------|-------------------|----------|
-| US-001 | [N] | [M] | [M/N]% |
-
-## TDD Compliance Summary
-
-| Plan | Tasks | All prescribe RED-A? | All prescribe RED-B? | All prescribe GREEN? | Order explicit? |
-|------|-------|---------------------|---------------------|---------------------|----------------|
-| 00-foundation | [N] | [YES/NO] | [YES/NO] | [YES/NO] | [YES/NO] |
-| W1-slug | [N] | [YES/NO] | [YES/NO] | [YES/NO] | [YES/NO] |
+| Area | Grade | Issues |
+|------|-------|--------|
+| A. REASONS Canvas Completeness | [PASS/FAIL] | [count] |
+| B. Operations Quality          | [PASS/FAIL] | [count] |
+| C. Test Plan Traceability      | [PASS/FAIL] | [count] |
+| D. Architecture Compliance     | [PASS/FAIL] | [count] |
+| E. Story & Spec Alignment      | [PASS/FAIL] | [count] |
+| F. Norms & Safeguards Quality  | [PASS/FAIL] | [count] |
+| G. stories.json Integration    | [PASS/FAIL] | [count] |
+| H. Size & Splitability         | [PASS/FAIL] | [count] |
 
 ## Critical Issues (Must Fix)
 
-[For each:]
-- **ID:** [V-XX]
-- **Area:** [which checklist area]
-- **Plan:** [which plan file]
-- **Task:** [which task number, if applicable]
-- **Issue:** [what's wrong]
-- **Fix:** [specific action to take]
+[Each: location (file:section), issue, specific fix]
 
 ## Warnings (Should Fix)
 
-[Same format]
-
 ## Recommendations
-
-[Any suggestions beyond strict compliance]
 
 ## Next Step
 
-[Either "Ready for /test-setup -- dispatch wave 0 (foundation) first" or
- "Fix [N] critical issues first, then re-run /plan-writing-verification"]
+[Either "Ready for /test-setup US-NNN" or "Fix [N] critical issues, then re-run /plan-writing-verification US-NNN"]
 
 ---
 ```
 
 ### After the Agent Returns
 
-1. Present the report to the user
-2. If **FAIL**: list critical issues, ask if they want to fix them
-3. If **PASS WITH WARNINGS**: show warnings, ask if they want to address or proceed
-4. If **PASS**: confirm readiness and suggest proceeding to `/test-setup`
+1. Present the report to the user.
+2. If **FAIL**: list critical issues; ask if they want to fix now (loops back into `/plan-writing US-NNN` update mode).
+3. If **PASS WITH WARNINGS**: show warnings; ask whether to address or proceed.
+4. If **PASS**: confirm readiness and suggest running `/test-setup US-NNN`.
 
 ## What This Skill Does NOT Do
 
-- It does not write or fix plans — it only reports issues
-- It does not execute any plan — it verifies they're ready for execution
-- It does not validate code — there's no code yet, only plans
+- It does not rewrite or fix the plan — it reports issues.
+- It does not assess whether the chosen Approach is the best one — it checks structural quality.
+- It does not replace human review — it catches mechanical issues a human might miss.
