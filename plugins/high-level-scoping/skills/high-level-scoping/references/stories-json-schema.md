@@ -51,6 +51,7 @@ Common rules:
 
 - ALWAYS update `project.updated_at` when modifying the file.
 - ALWAYS append a row to `stories[i].history` whenever `phase` changes (`{ "phase": "<new>", "at": "<ISO date>" }`).
+- ALWAYS re-render `specs/STORIES.md` after any phase change by running `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/regen_stories_md.py specs/stories.json` (the script is owned by `/high-level-scoping` and lives at `plugins/high-level-scoping/skills/high-level-scoping/scripts/regen_stories_md.py`). If the user's repo has a copy at `scripts/regen-stories-md.py`, run that instead so the project repo stays self-contained.
 - New top-level keys are allowed — the schema is open for extension.
 
 ---

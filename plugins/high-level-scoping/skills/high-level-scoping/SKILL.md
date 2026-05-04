@@ -1,6 +1,6 @@
 ---
 name: high-level-scoping
-version: 2.0.0
+version: 2.1.0
 description: Agile project scoping skill that produces personas, epics, an INVEST-shaped story backlog, a high-level architecture diagram (via the d2-architect skill), and a story DAG anchored on a Foundation Story (US-000) — the walking skeleton. Outputs `specs/stories.json` (machine-readable tracker), `specs/STORIES.md` (human-readable kanban), `specs/PROJECT.md` (project overview), and `specs/ARCHITECTURE.md` (lightweight, later enriched by /research-and-architecture). Use this skill when the user wants to scope a new project, define epics and user stories, plan a backlog, do agile discovery, or says things like "let's scope this out", "plan this project", "what should we build first", "create a backlog", "/high-level-scoping". Also trigger when the user mentions Kanban, Scrum, sprints, epics, user stories, or a story DAG in the context of starting a new project.
 ---
 
@@ -295,9 +295,29 @@ Read `references/stories-json-schema.md` for the exact schema and write the JSON
 - The `architecture.diagram_path` must point to `specs/architecture.png`
 - Initialise each story's `invest` flags to `false` (the rigorous gate runs in `/spec-writing`)
 
-### Step 2: Generate `specs/STORIES.md`
+### Step 2: Generate `specs/STORIES.md` (deterministic, via script)
 
-Read `references/stories-md-template.md` and render the human-readable kanban from `specs/stories.json`. The file is regenerated on every `phase` transition by the skill that triggers the transition.
+Do **not** hand-write this file. Run the canonical regenerator that ships with the skill:
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/regen_stories_md.py specs/stories.json
+```
+
+The script reads `specs/stories.json` and writes `specs/STORIES.md` (kanban tables grouped by `phase`, Mermaid DAG, epics table). Pure stdlib Python, no deps. `references/stories-md-template.md` documents what the script produces — it's reference material now, not a hand-rendering instruction.
+
+**Every skill that mutates `phase` MUST re-run this script** so STORIES.md never drifts from stories.json. The same rule lives in `references/stories-json-schema.md` so downstream skills (`/spec-writing`, `/plan-writing`, etc.) inherit it.
+
+### Step 2b: Wire the script into the project repo
+
+Copy the script into the user's repo so they (and CI) can regenerate without invoking Claude:
+
+```bash
+mkdir -p scripts
+cp ${CLAUDE_PLUGIN_ROOT}/scripts/regen_stories_md.py scripts/regen-stories-md.py
+chmod +x scripts/regen-stories-md.py
+```
+
+The copy is the project's authoritative version; if the skill ships an updated regenerator, the next `/high-level-scoping` run re-copies it (no manual sync). Document the command in `PROJECT.md` so contributors can find it.
 
 ### Step 3: Generate `specs/PROJECT.md`
 

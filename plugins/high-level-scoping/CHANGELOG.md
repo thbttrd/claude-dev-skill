@@ -6,6 +6,18 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-05-04
+
+### Added
+
+- New script `scripts/regen_stories_md.py` (Python stdlib, no deps). Reads `specs/stories.json` and writes `specs/STORIES.md` deterministically — kanban tables grouped by `phase`, Mermaid DAG (excluding `backlog`), epics table.
+- Phase 5 Step 2 of the skill now invokes the script via `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/regen_stories_md.py specs/stories.json` instead of hand-rendering. New Step 2b copies the script into the user's repo at `scripts/regen-stories-md.py` so it can be run locally / in CI without invoking Claude.
+- New common rule in `references/stories-json-schema.md`: every skill that mutates `phase` MUST re-run the regenerator (with a fallback to the project-local copy when present). Downstream skills (`/spec-writing`, `/plan-writing`, `/test-setup`, `/spec-implementation`, `/verification-and-validation`) inherit this obligation.
+
+### Changed
+
+- `references/stories-md-template.md` is now reference documentation describing the script's output, not a hand-rendering instruction. The script is the source of truth for the file's shape.
+
 ## [2.0.0] — 2026-05-03
 
 ### Added

@@ -1,6 +1,8 @@
 # `specs/STORIES.md` Template
 
-`specs/STORIES.md` is the **human-readable kanban index** of the project. It is regenerated from `specs/stories.json` on every `phase` transition. Manual edits are tolerated but will be overwritten — change the JSON, not the markdown.
+`specs/STORIES.md` is the **human-readable kanban index** of the project. It is regenerated **deterministically** from `specs/stories.json` on every `phase` transition by `scripts/regen_stories_md.py` (the canonical script ships with this skill). Manual edits are tolerated but will be overwritten — change the JSON, not the markdown.
+
+> **This file is reference / documentation.** The script is the source of truth for what STORIES.md looks like; this template documents the layout for humans reading the schema. Don't hand-render unless the script can't run (e.g., Python missing on the host); even then, prefer fixing Python over hand-rendering.
 
 The file has three sections: a header, a single kanban table grouped by `phase`, and a dependency view. It is intentionally short; per-story detail belongs in each story's `STORY.md`.
 
