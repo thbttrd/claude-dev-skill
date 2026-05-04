@@ -19,7 +19,7 @@
       "name": "high-level-scoping",
       "source": "./plugins/high-level-scoping",
       "description": "Agile project scoping skill that produces personas, epics, an INVEST-shaped story backlog, a high-level architecture diagram (via the d2-architect skill), and a story DAG anchored on a Foundation Story (US-000) \u2014 the walking skeleton. Outputs `specs/stories.json` (machine-readable tracker), `specs/STORIES.md` (human-readable kanban), `specs/PROJECT.md` (project overview), and `specs/ARCHITECTURE.md` (lightweight, later enriched by /research-and-architecture). Use this skill when the user wants to scope a new project, define epics and user stories, plan a backlog, do agile discovery, or says things like \"let's scope this out\", \"plan this project\", \"what should we build first\", \"create a backlog\", \"/high-level-scoping\". Also trigger when the user mentions Kanban, Scrum, sprints, epics, user stories, or a story DAG in the context of starting a new project.",
-      "version": "2.0.0"
+      "version": "2.1.0"
     },
     {
       "name": "html-architect",
