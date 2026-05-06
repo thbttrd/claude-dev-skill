@@ -519,3 +519,11 @@ To keep the diff bounded:
 ## TL;DR
 
 Move from "version + wave + docs/V{N}/" to "story + REASONS plan + specs/story-NNN-slug/". One folder per story, one tracker (`specs/stories.json`), one Foundation Story (`US-000`) instead of a V0 walking skeleton, RED/GREEN/REFACTOR preserved at the operation level inside each story's PLAN.md, INVEST enforced at spec time, and a single project-wide ARCHITECTURE.md that evolves over time. 8 commits to roll out, with a migration script for any existing project on the old layout.
+
+---
+
+## Follow-up: per-Operation execution (v3.0.0 of the test/impl skills)
+
+After this proposal landed, the next iteration moves the execution granularity from "one story at a time" to "**one Operation of one story at a time**". Each of `test-setup`, `test-setup-verification`, `spec-implementation`, and the new `spec-implementation-verification` accepts an optional `Op-X` arg and defaults to the next pending Operation (read from `state.json`). Story-level wrap-up gates (Simplify, Code Review, Verify) live inside `/spec-implementation` and trigger automatically when invoked without `Op-X` after every Op is GREEN. The story remains the unit of *planning, audit, and shipping*; the Operation becomes the unit of *execution*.
+
+The full design, decisions, and edge cases for that follow-up are captured locally in `docs/superpowers/specs/2026-05-06-per-operation-workflow-design.md` (the `docs/` folder is git-ignored — the design is recapped in each affected plugin's `CHANGELOG.md` and reflected in the per-story-loop table in the top-level README).

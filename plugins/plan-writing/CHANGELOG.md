@@ -6,6 +6,13 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-05-06
+
+### Added
+
+- **`Op` column in the Test Plan table** — every test row is now tagged with the Operation that owns it (`Op-1`, `Op-2`, …). The per-Operation skills (`/test-setup`, `/test-setup-verification`, `/spec-implementation`, `/spec-implementation-verification`) filter the table by this column. Backward-compatible: pre-existing PLAN.md files without the column degrade gracefully — downstream skills fall back to the legacy heuristic of matching scenario names.
+- Updated "Rules for the planner" with a corresponding rule: every Test Plan row MUST have an `Op` value matching one of the Operations defined above.
+
 ## [2.0.0] — 2026-05-03
 
 ### Added

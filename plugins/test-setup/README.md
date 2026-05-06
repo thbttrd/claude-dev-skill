@@ -1,8 +1,8 @@
 # test-setup
 
-> Writes all BDD step definitions and unit tests for every plan in the DAG for a **specific version** (V0, V1, ...) BEFORE any implementation code exists.
+> Per-Operation RED-phase scaffolder. Writes the failing BDD steps and unit tests for **one Operation of one story** at a time (`/test-setup US-NNN Op-X`), plus the source stubs those tests need to compile.
 
-**Version:** 1.0.0 · **License:** MIT · **Part of:** [`claude-dev-skill`](../../README.md)
+**Version:** 3.0.0 · **License:** MIT · **Part of:** [`claude-dev-skill`](../../README.md)
 
 ## Install
 

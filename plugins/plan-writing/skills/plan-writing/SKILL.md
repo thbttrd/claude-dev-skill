@@ -1,6 +1,6 @@
 ---
 name: plan-writing
-version: 2.0.0
+version: 2.1.0
 description: >
   Plans the implementation of one **user story** at a time (US-NNN) — not a
   release, not a wave. Reads the story's STORY.md + features + the project-wide
@@ -141,6 +141,7 @@ Anchor to `specs/ARCHITECTURE.md`'s Testing Strategy section. Document only **ov
 Build a row-per-test table. Each row:
 
 - Has an id (`T-01`, `T-02`, …)
+- Has an `Op` value (`Op-1`, `Op-2`, …) matching one of the Operations defined above
 - Names the test type (`BDD | unit | integration | bench`)
 - References a Gherkin scenario, an AC id, or a Safeguard — the Asserts column makes the link concrete
 - Names the file path where the test lives
@@ -148,6 +149,8 @@ Build a row-per-test table. Each row:
 Every Gherkin scenario gets at least one BDD row. Every AC gets at least one row (BDD or unit). Every Safeguard with an observable assertion gets a row (often a bench or integration test).
 
 **No untraceable rows.** A test that doesn't reference a spec artifact is a test without a reason.
+
+**Every row MUST have an `Op` value.** The per-Operation skills (`/test-setup US-NNN Op-X`, `/spec-implementation US-NNN Op-X`, `/spec-implementation-verification US-NNN Op-X`) filter the table by this column to know which tests to write, implement, or audit for the requested Operation. A row with no `Op` value can never be picked up by these skills.
 
 ---
 

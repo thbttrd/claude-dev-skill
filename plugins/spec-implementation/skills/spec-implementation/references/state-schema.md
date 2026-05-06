@@ -1,19 +1,30 @@
-# State Schema
+# State Schema (v2 — per-Operation, GREEN side)
 
 Two levels of state coordinate the story-based workflow:
 
 1. **`specs/stories.json`** — project-wide source of truth (personas, epics, stories[], architecture, design system). Documented at `plugins/high-level-scoping/skills/high-level-scoping/references/stories-json-schema.md`.
-2. **`specs/story-NNN-slug/state.json`** — per-story execution state. Created by `/test-setup`; consumed and updated by `/spec-implementation` during GREEN; updated again by `/verification-and-validation`. Frozen at `phase_local: "verified"` once the story ships.
+2. **`specs/story-NNN-slug/state.json`** — per-story execution state. Created by `/test-setup`; consumed and updated by `/spec-implementation` during the GREEN phase; updated again by `/verification-and-validation`. Frozen at `phase_local: "verified"` once the story ships.
 
-This document covers the per-story `state.json` from `/spec-implementation`'s perspective. The shared schema is documented in `plugins/test-setup/skills/test-setup/references/state-schema.md`; the additions made during the GREEN phase are below.
+This document covers the per-story `state.json` from `/spec-implementation`'s perspective. The shared schema reference lives at `plugins/test-setup/skills/test-setup/references/state-schema.md`; the additions made during the GREEN phase are below.
+
+---
+
+## What changes in v2 for `/spec-implementation`
+
+`/spec-implementation` now has two modes, decided by the smart-default picker:
+
+- **Per-op mode** (default while ops are still `red`) — implements one Operation, runs the per-story suite filtered to `@US-NNN`, optionally REFACTORs, commits.
+- **Story-end mode** (no `Op-X` arg, all ops at `green` or `refactored`) — runs the three story-level quality gates (Simplify, Code Review, Verify) and flips `stories[i].phase` to `"green"`.
+
+The state schema picks up two cross-skill additions from v2 (documented in full in `test-setup`'s reference): the per-Op `operation_phase` cursor and the per-Op `red_audit` / `green_audit` blobs. The `quality_gates` and `implementation` blocks below are owned exclusively by `/spec-implementation`.
 
 ---
 
 ## Schema additions during `/spec-implementation`
 
-### `quality_gates` (story-level)
+### `quality_gates` (story-level, written only in story-end mode)
 
-After all Operations are GREEN, the three quality gates run **once per story** (not per wave; waves are gone). The block lives at the top level of `state.json`:
+After **every** Operation has reached `operation_phase ∈ {green, refactored}`, the three quality gates run **once per story**. The block lives at the top level of `state.json`:
 
 ```json
 "quality_gates": {
@@ -32,15 +43,16 @@ After all Operations are GREEN, the three quality gates run **once per story** (
 }
 ```
 
-### `implementation` block (per story)
+### `implementation` block (per story, written incrementally)
 
 ```json
 "implementation": {
-  "started_at": "ISO 8601 timestamp",
-  "completed_at": "ISO 8601 timestamp or null",
-  "operations_green": 4,
+  "started_at": "ISO 8601 timestamp",         // first time per-op mode runs
+  "completed_at": "ISO 8601 or null",         // set when story-end gates pass
+  "operations_green": 1,                       // bumped after every per-op GREEN
   "operations_total": 4,
-  "last_commit": "abc1234"
+  "last_commit": "abc1234",                    // bumped on every commit
+  "ops_completed": ["Op-1"]                    // ordered list of green'd ops
 }
 ```
 
@@ -63,22 +75,48 @@ Same shape as `/test-setup`'s schema, scoped per Operation:
 
 ---
 
+## Smart-Default Picker (`/spec-implementation`)
+
+```
+/spec-implementation US-NNN [Op-X]:
+  if Op-X passed explicitly:
+    if Op-X.operation_phase = green AND not --force → "Op-X is already green. Pass --force to redo."
+    elif Op-X.operation_phase ≠ red                 → "Op-X is not RED yet. Run /test-setup US-NNN Op-X first."
+    else                                              → enter per-op mode for Op-X.
+
+  if no Op-X arg:
+    if any op.operation_phase = red AND implementation_status ≠ green:
+      pick first such op → enter per-op mode.
+    elif all ops ∈ {green, refactored} AND quality_gates not all true:
+      enter story-end mode → run Simplify + Code Review + Verify.
+    elif all gates true:
+      "Story is GREEN. Run /verification-and-validation US-NNN."
+    else:
+      "Nothing to implement. State: <summary>."
+```
+
+The picker writes its choice to `current_operation`.
+
+---
+
 ## State Transitions (`/spec-implementation`)
 
 ```
-phase_local at entry: executing
-phase_local at exit:  verifying
+phase_local at entry:                executing
+phase_local during per-op cycles:    executing (sticky)
+phase_local after story-end gates:   verifying
 
 Per Operation (sequential, not parallel within a story):
-  pending → in_progress → green
-                        → blocked (can retry → in_progress)
+  operation_phase: red → green                          (per-op mode default path)
+                       → refactored                     (if PLAN.md prescribes a refactor)
+                       → blocked (can retry → red)
 
-Quality gate flow (after every Operation is green):
-  simplified = false  → run /simplify           → simplified = true
-  reviewed   = false  → run code-review subagent → reviewed   = true
+Quality gate flow (story-end mode, after every operation_phase ∈ {green, refactored}):
+  simplified = false  → run /simplify             → simplified = true
+  reviewed   = false  → run code-review subagent  → reviewed   = true
   verified   = false  → run story Verification    → verified   = true
   all true → state.json.phase_local = "verifying"
-            stories[i].phase = "green"
+            stories[i].phase         = "green"
 ```
 
 ---
@@ -96,10 +134,12 @@ Quality gate flow (after every Operation is green):
                              if id == "US-000" AND repo is empty,
                              chain /repo-initialization first; then exit
                              with a message instructing the user to run
-                             /test-setup US-000 then re-invoke this skill.
+                             /test-setup US-000 Op-1 then re-invoke this skill.
    red                    → state.json must exist with phase_local = "executing".
-                             Resume from current_operation.
-   green                  → All Operations done; check quality gates.
+                             Run the smart-default picker (per-op mode unless
+                             all ops green and gates pending → story-end mode).
+   green                  → If gates not all true, enter story-end mode.
+                             Else, story already shipped to green; STOP.
    verified               → STOP. Story already shipped.
 
 3. Are dependencies satisfied?
@@ -107,18 +147,24 @@ Quality gate flow (after every Operation is green):
      If stories[<dep>].phase != "verified" AND stories[<dep>].is_foundation != true:
        STOP with the offending dep id and a hint.
 
-4. Are there unresolved errors in state.json?
+4. Schema migration check:
+   If schema_version missing or = 1, run the v1 → v2 migration documented in
+   plugins/test-setup/skills/test-setup/references/state-schema.md.
+
+5. Are there unresolved errors in state.json.errors?
    YES → Attempt to resolve the most recent one first.
-   NO  → Continue normal flow.
+   NO  → Continue with the picker's chosen mode.
 ```
 
 ---
 
 ## Sync Protocol: `state.json` → `specs/stories.json`
 
-**When to sync (story boundary):**
+**Per-op mode never writes to `stories.json`.** All per-op churn lives in `state.json` only.
 
-1. All Operations have `implementation_status = "green"`.
+**Story-end mode (single sync, at story boundary):**
+
+1. All Operations have `operation_phase ∈ {green, refactored}`.
 2. All three `quality_gates.{simplified, reviewed, verified}` are `true`.
 3. `state.json.phase_local` advances `executing → verifying`.
 
@@ -145,12 +191,18 @@ EOF
 mv specs/story-NNN-slug/state.json.tmp specs/story-NNN-slug/state.json
 ```
 
-**Update frequency (`/spec-implementation`):**
+**Update frequency (`/spec-implementation` per-op mode):**
 
-- After every Operation completes GREEN: update that Operation's `implementation_status` and the `summary.operations_green` counter.
-- After every commit: update `summary.last_commit`.
-- After every quality gate finishes: flip the corresponding `quality_gates.<name>` flag.
-- After all gates pass: flip `phase_local` to `"verifying"` and sync to `specs/stories.json`.
-- After every error encountered: append to `errors[]`.
+- After GREEN commit → `Op-X.operation_phase = "green"`, `Op-X.implementation_status = "green"`, `summary.operations_green++`, `implementation.operations_green++`, `implementation.last_commit = <sha>`, `implementation.ops_completed.append("Op-X")`. Mark `test_plan_rows[T-N].passing = true` for every row with `op = Op-X`.
+- After REFACTOR commit (optional) → `Op-X.operation_phase = "refactored"`, update `implementation.last_commit`.
+- After every error encountered → append to `errors[]`.
+- Advance `current_operation` to the next pending op.
 
-`specs/stories.json` is updated **once per story** at completion, NOT per Operation. Per-Operation churn lives in `state.json` only.
+**Update frequency (`/spec-implementation` story-end mode):**
+
+- After Simplify finishes → `quality_gates.simplified = true`, update `implementation.last_commit`.
+- After Code Review finishes → `quality_gates.reviewed = true`, populate `quality_gates.review_findings`.
+- After Verify finishes → `quality_gates.verified = true`, populate `quality_gates.verification_results`.
+- When all three flip to true → `phase_local = "verifying"`, `implementation.completed_at = <now>`, then sync to `specs/stories.json`.
+
+`specs/stories.json` is updated **once per story** at the story-end gate completion, NOT per Operation. Per-Operation churn lives in `state.json` only.

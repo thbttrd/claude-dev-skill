@@ -142,18 +142,20 @@ How testing is approached for this story (the *how*, not the *what*). Anchored t
 
 ## Test Plan
 
-The exact tests to write for this story (the *what*). Each row is one test, traceable to a scenario or invariant. `/test-setup US-NNN` reads this table and writes the failing tests; `/spec-implementation US-NNN` makes them pass; `/verification-and-validation US-NNN` re-runs them as part of the QA pass.
+The exact tests to write for this story (the *what*). Each row is one test, traceable to a scenario or invariant **and tagged with the Operation that owns it**. `/test-setup US-NNN [Op-X]` reads only the rows whose `Op` column matches the requested Operation; `/spec-implementation US-NNN [Op-X]` makes those rows green; `/verification-and-validation US-NNN` re-runs the whole table as part of the QA pass.
 
-| ID    | Type         | Scenario / invariant                                  | File                                                            | Asserts                                                       |
-| ----- | ------------ | ----------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------- |
-| T-01  | BDD          | "User starts a session with cards due"                | e2e/steps/study-session.steps.ts                                | UI shows first due card after navigation                      |
-| T-02  | BDD          | "User starts a session with no cards due"             | e2e/steps/study-session.steps.ts                                | Empty-state message visible                                   |
-| T-03  | unit         | startSession orders cards by difficulty               | src/modules/study/__tests__/study.service.test.ts                | session.cards[0].difficulty === "beginner"                    |
-| T-04  | unit         | submitRating updates the card's interval              | src/modules/study/__tests__/study.service.test.ts                | review.nextDueAt advances by SRS algorithm                    |
-| T-05  | integration  | sessions repo persists and re-reads a session         | src/modules/study-sessions/__tests__/repo.int.test.ts            | created session returned identically by findById              |
-| T-06  | bench        | Safeguard: startSession p95 ≤ 200ms @ 1k cards        | src/modules/study/__tests__/study.service.bench.ts               | p95 ≤ 200ms                                                   |
+| ID    | Op    | Type         | Scenario / invariant                                  | File                                                            | Asserts                                                       |
+| ----- | ----- | ------------ | ----------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------- |
+| T-01  | Op-1  | BDD          | "User starts a session with cards due"                | e2e/steps/study-session.steps.ts                                | UI shows first due card after navigation                      |
+| T-02  | Op-1  | BDD          | "User starts a session with no cards due"             | e2e/steps/study-session.steps.ts                                | Empty-state message visible                                   |
+| T-03  | Op-1  | unit         | startSession orders cards by difficulty               | src/modules/study/__tests__/study.service.test.ts                | session.cards[0].difficulty === "beginner"                    |
+| T-04  | Op-2  | unit         | submitRating updates the card's interval              | src/modules/study/__tests__/study.service.test.ts                | review.nextDueAt advances by SRS algorithm                    |
+| T-05  | Op-3  | integration  | sessions repo persists and re-reads a session         | src/modules/study-sessions/__tests__/repo.int.test.ts            | created session returned identically by findById              |
+| T-06  | Op-2  | bench        | Safeguard: startSession p95 ≤ 200ms @ 1k cards        | src/modules/study/__tests__/study.service.bench.ts               | p95 ≤ 200ms                                                   |
 
 Each row references a Gherkin scenario (by name), an AC (by id), or a Safeguard. Untraceable rows are not allowed — every test must justify its existence by referencing the spec.
+
+The `Op` column anchors each test to the Operation that introduces it, so per-Operation skills (`/test-setup US-NNN Op-X`, `/spec-implementation US-NNN Op-X`, `/spec-implementation-verification US-NNN Op-X`) can filter the table deterministically. Multiple rows may share the same `Op`. Every row MUST have an `Op` value; rows with no Operation owner are flagged by `/plan-writing-verification`.
 
 ---
 
@@ -188,5 +190,6 @@ After all Operations are GREEN:
 - **Reference, don't restate.** Architecture goes in `specs/ARCHITECTURE.md`. STORY.md owns the User Story. PLAN.md lives in the *gap* between them: how to actually do this story.
 - **Operations ≤ 6 by default.** If a story needs more, suspect the INVEST `S` check missed something — surface it back to `/spec-writing` for a split.
 - **Test Plan rows must be traceable.** Every row points to a scenario, an AC, or a Safeguard. No untraceable tests.
+- **Every Test Plan row MUST have an `Op` value** matching one of the Operations defined above. The per-Operation skills filter the table by this column — rows with no Operation owner can never be picked up by `/test-setup US-NNN Op-X`.
 - **Safeguards are non-negotiable.** They override the Test Plan in case of conflict — if a Safeguard is violated by an otherwise-passing implementation, the implementation is wrong.
 - **The plan is the durable artifact.** When reality diverges, fix the plan first, then the code.
