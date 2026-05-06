@@ -1,8 +1,8 @@
 # spec-implementation
 
-> Autonomous GREEN-phase execution of pre-existing implementation plans for a **specific version** (V0, V1, ...) against pre-written failing tests, Gherkin .feature files, UI wireframes, and ARCHITECTURE.md.
+> Per-Operation GREEN-phase executor with story-end wrap-up gates. Implements one Operation at a time (`/spec-implementation US-NNN Op-X`); when every Op is GREEN, runs Simplify + Code Review + Verify and flips the story to `green`.
 
-**Version:** 1.0.0 · **License:** MIT · **Part of:** [`claude-dev-skill`](../../README.md)
+**Version:** 3.0.0 · **License:** MIT · **Part of:** [`claude-dev-skill`](../../README.md)
 
 ## Install
 

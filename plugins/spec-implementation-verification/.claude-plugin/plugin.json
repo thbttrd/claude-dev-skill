@@ -1,0 +1,10 @@
+{
+  "name": "spec-implementation-verification",
+  "version": "1.0.0",
+  "description": "Per-Operation verification of /spec-implementation output for GREEN-state compliance, no over-implementation, architecture alignment, and zero regressions in earlier ops. Spawns a fresh agent to audit ONE Operation's implementation diff: only that Op's tests pass, the impl doesn't exceed Op-X's scope (no logic only justified by future ops), files Op-X touched respect ARCHITECTURE.md module boundaries, and earlier Ops' tests still pass. The Op-X arg is optional; with no Op-X, the skill auto-picks the most recently GREEN'd Op that hasn't been audited yet from state.json. With no Op-X AND all ops are GREEN AND quality gates have passed, the skill runs a story-end full audit (every Op's tests pass, every gate passed, story is ready for /verification-and-validation). Produces a per-Op or story-end compliance report. Use after /spec-implementation US-NNN Op-X (Op-X is GREEN), or after /spec-implementation US-NNN finishes the story-end gates. Triggers on: \"verify Op-X\", \"audit the GREEN state\", \"is Op-2 implemented correctly\", \"check the story implementation\", \"/spec-implementation-verification US-NNN\", \"/spec-implementation-verification US-NNN Op-X\".",
+  "author": {
+    "name": "thbttrd"
+  },
+  "homepage": "https://github.com/thbttrd/claude-dev-skill",
+  "license": "MIT"
+}

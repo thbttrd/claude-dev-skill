@@ -1,8 +1,8 @@
 # test-setup-verification
 
-> Verifies the output of /test-setup for completeness, correctness, and RED-state compliance for a specific version (V0, V1, ...).
+> Per-Operation audit of /test-setup output. Confirms one Operation's tests are real, RED, and complete. Quality gate between `/test-setup US-NNN Op-X` and `/spec-implementation US-NNN Op-X`.
 
-**Version:** 1.0.0 · **License:** MIT · **Part of:** [`claude-dev-skill`](../../README.md)
+**Version:** 3.0.0 · **License:** MIT · **Part of:** [`claude-dev-skill`](../../README.md)
 
 ## Install
 

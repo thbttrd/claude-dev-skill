@@ -1,7 +1,7 @@
 {
   "name": "test-setup",
-  "version": "2.0.0",
-  "description": "Per-story RED-phase scaffolder. For ONE story (US-NNN) at a time, writes all BDD step definitions and unit/integration tests prescribed by the story's PLAN.md (REASONS canvas Test Plan), plus the minimal source stubs required for tests to compile. Tests are real \u2014 they call actual API endpoints, service methods, and functions \u2014 but those implementations are empty stubs, so tests fail at assertion time, not because of missing imports or empty test.todo() placeholders. Operates after /plan-writing US-NNN, before /spec-implementation US-NNN. Triggers on: \"set up tests for US-NNN\", \"scaffold the tests for the story\", \"create failing tests\", \"RED phase for US-NNN\", \"/test-setup US-NNN\".",
+  "version": "3.0.0",
+  "description": "Per-Operation RED-phase scaffolder. For ONE Operation of ONE story (US-NNN Op-X) at a time, writes the BDD step definitions and unit/integration tests prescribed by that Operation's row(s) in PLAN.md (REASONS canvas Test Plan), plus the minimal source stubs the new tests need to compile. Tests are real — they call actual API endpoints, service methods, and functions — but those implementations are empty stubs, so tests fail at assertion time, not because of missing imports. Operates after /plan-writing US-NNN, before /spec-implementation US-NNN Op-X. The Op-X arg is optional; with no Op-X, the skill auto-picks the next pending Operation from state.json. Triggers on: \"set up tests for US-NNN\", \"RED Op-2 of US-001\", \"scaffold the next failing test\", \"/test-setup US-NNN\", \"/test-setup US-NNN Op-X\".",
   "author": {
     "name": "thbttrd"
   },
