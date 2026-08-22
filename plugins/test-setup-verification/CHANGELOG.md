@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [3.1.0] — 2026-08-22
+
+### Changed
+
+- Repositioned as an **opt-in deep audit**, no longer a mandatory pipeline stage. The default RED gate is `/test-setup`'s built-in self-review checklist. Recommended for `US-000` (whose Ops build shared test infrastructure) and full-rigor Ops with tricky fakes or fixtures. Light-rigor stories skip it by design.
+
 ## [3.0.0] — 2026-05-06
 
 ### Changed

@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-08-22
+
+### Changed
+
+- Repositioned as an **opt-in deep audit**, no longer a mandatory pipeline stage. The default gate is `/repo-initialization`'s built-in checklist, and `US-000` exercises the scaffold end-to-end immediately afterwards.
+
 ## [2.0.0] — 2026-05-03
 
 ### Changed

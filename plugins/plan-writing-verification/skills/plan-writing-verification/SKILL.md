@@ -1,6 +1,6 @@
 ---
 name: plan-writing-verification
-version: 2.0.0
+version: 2.1.0
 description: >
   Per-story verification of the output of /plan-writing for completeness,
   REASONS-canvas compliance, TDD prescription, Test Plan traceability, and
@@ -10,7 +10,10 @@ description: >
   REASONS section is populated, every Operation prescribes RED-A → RED-B →
   GREEN → REFACTOR, every Test Plan row is traceable to a scenario / AC /
   safeguard, and module assignments respect ARCHITECTURE.md. Produces a
-  structured compliance report. Use this skill after running /plan-writing
+  structured compliance report. This is an OPT-IN deep audit, not a mandatory
+  pipeline stage — the default gate is /plan-writing's built-in self-review
+  checklist. Run it for US-000 and high-stakes full-rigor stories, or when a
+  plan feels off. Use this skill after running /plan-writing
   US-NNN, before /test-setup US-NNN. Triggers on: "verify the plan", "check
   plan quality", "audit the plan", "is the plan ready", "validate plan
   before test-setup", "/plan-writing-verification US-NNN".
@@ -18,7 +21,7 @@ description: >
 
 # Plan Writing Verification (per story)
 
-Audits the implementation plan for **one story** and produces a compliance report. Quality gate between `/plan-writing` and `/test-setup`.
+Audits the implementation plan for **one story** and produces a compliance report. This is an **opt-in deep audit**, not a mandatory pipeline stage — the default quality gates are `/plan-writing`'s built-in self-review checklist and the story-end `/verification-and-validation` E2E pass. Reach for it for `US-000`, for high-stakes full-rigor stories, or when a plan feels off. Light-rigor stories skip it by design.
 
 The verification runs in a **fresh agent** so the review has no context bias from the planning session. The auditor reads the plan, the spec, the architecture, and checks compliance from scratch.
 

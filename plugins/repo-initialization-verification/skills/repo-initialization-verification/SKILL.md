@@ -1,6 +1,6 @@
 ---
 name: repo-initialization-verification
-version: 2.0.0
+version: 2.1.0
 description: >
   Verifies the output of /repo-initialization for completeness and correctness.
   Spawns a fresh agent to audit the scaffolded repository against
@@ -9,7 +9,10 @@ description: >
   hooks are configured, CLAUDE.md and README.md are present and complete, and
   the full quality gate suite passes. Produces a structured compliance report
   with pass/fail verdicts and actionable recommendations (fix or proceed to
-  /test-setup US-000). Use this skill after running /repo-initialization, before
+  /test-setup US-000). This is an OPT-IN deep audit, not a mandatory pipeline
+  stage — the default gate is /repo-initialization's built-in checklist, and the
+  Foundation Story's own tests exercise the scaffold end-to-end immediately
+  afterwards. Use this skill after running /repo-initialization, before
   starting /test-setup or /spec-implementation. Also triggers on: "verify the
   scaffold", "check repo setup", "audit the project structure", "is the repo
   ready", "validate repo before implementation", or any request to review
@@ -18,7 +21,7 @@ description: >
 
 # Repo Initialization Verification (story-based)
 
-Audits the scaffolded repository produced by `/repo-initialization` and produces a compliance report. This is a **quality gate** between scaffolding and the Foundation Story's RED phase (`/test-setup US-000`).
+Audits the scaffolded repository produced by `/repo-initialization` and produces a compliance report. This is an **opt-in deep audit**, not a mandatory pipeline stage — the default gate is `/repo-initialization`'s built-in checklist, and the Foundation Story (`US-000`) exercises the scaffold end-to-end immediately afterwards, which catches most scaffold defects the honest way: by running them.
 
 The verification runs in a **fresh agent** so the review has no context bias from the scaffolding session. The auditor inspects the actual file system, runs the actual quality commands, and compares everything against `specs/ARCHITECTURE.md`.
 

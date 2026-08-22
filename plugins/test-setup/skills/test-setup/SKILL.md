@@ -1,6 +1,6 @@
 ---
 name: test-setup
-version: 3.0.0
+version: 3.1.0
 description: >
   Per-Operation RED-phase scaffolder. For ONE Operation of ONE story (US-NNN
   Op-X) at a time, writes the BDD step definitions and unit/integration tests
@@ -233,7 +233,16 @@ Fix and re-run. Then update `state.json`:
 
 **On every other invocation:** no `stories.json` write. State churn lives in `state.json`.
 
-### Phase 7 — Report and offer next step
+### Phase 7 — Self-Review, Report and offer next step
+
+**Self-review (mandatory).** Before reporting, verify and print as a compact checked list:
+
+- [ ] Every test written for Op-X maps to a Test Plan row tagged `Op-X` — no orphan tests, no skipped rows
+- [ ] Every test calls real code paths (actual imports, actual endpoints) — no placeholder bodies, no `test.todo`, no tautological assertions
+- [ ] The suite was actually run: Op-X's tests fail **at assertion time** (not import errors, not missing files); earlier Ops' tests still pass
+- [ ] Stubs are lazy — files and exports exist, bodies are empty; no accidental implementation
+
+Fix failures before proceeding. This is the default RED gate; `/test-setup-verification` is an opt-in deep audit on top of it.
 
 Output a short summary:
 
@@ -249,8 +258,8 @@ US-NNN — Op-X RED'd
 Use `AskUserQuestion`:
 
 - **Header: "Next"** — "Op-X is RED. What's next?"
-  - "Verify the RED state — run /test-setup-verification US-NNN Op-X" (Recommended)
-  - "Move to GREEN — run /spec-implementation US-NNN Op-X"
+  - "Move to GREEN — run /spec-implementation US-NNN Op-X" (Recommended)
+  - "Deep-audit the RED state — /test-setup-verification US-NNN Op-X" (opt-in; worth it for `US-000` and full-rigor Ops with tricky test infrastructure)
   - "RED the next Op — /test-setup US-NNN" (auto-picks next pending op)
   - "Done for now"
 

@@ -6,6 +6,17 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [3.1.0] — 2026-08-22
+
+### Added
+
+- Phase 5 (per-Op) now starts with a mandatory printed self-review checklist: Op tests pass with the full per-story suite re-run, implementation stays inside Op scope, module boundaries respected, lint + typecheck clean. This is the default GREEN gate.
+
+### Changed
+
+- Per-Op next-step recommendation is now "move to the next Op"; `/spec-implementation-verification US-NNN Op-X` is offered as an opt-in deep audit.
+- Story-completion recommendation is now `/verification-and-validation US-NNN` (the one mandatory gate); the story-end `/spec-implementation-verification` full audit is opt-in on top of the Simplify / Code Review / Verify gates.
+
 ## [3.0.0] — 2026-05-06
 
 ### Changed

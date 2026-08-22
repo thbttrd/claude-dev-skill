@@ -1,6 +1,6 @@
 ---
 name: plan-writing
-version: 2.1.0
+version: 2.2.0
 description: >
   Plans the implementation of one **user story** at a time (US-NNN) — not a
   release, not a wave. Reads the story's STORY.md + features + the project-wide
@@ -58,6 +58,20 @@ There is no separate `00-foundation.md`, no `WN-…md`, no `DAG.md`, no `impleme
 - Regenerate `specs/STORIES.md` from the updated tracker
 
 NEVER delete or overwrite fields owned by another skill.
+
+---
+
+## Rigor: Compact Mode for Light Stories
+
+Read the story's `rigor` tier from `specs/stories.json` (`stories[i].rigor`; missing means `full`). For **light** stories, produce a **compact plan** — same file, same section order, less ceremony:
+
+- **R — Requirements** and **A — Approach** and **O — Operations**: full treatment, as below. These carry the plan.
+- **E — Entities, S — Structure, N — Norms, S — Safeguards**: one bullet line each (light stories introduce no new entities or modules by definition — if one appears, that's a re-tier signal). An empty section states `—` with a half-line reason, never silence.
+- **Test Strategy**: a single line — "Inherits `specs/ARCHITECTURE.md` Testing Strategy; no story-specific overrides" — unless there IS an override, which gets its usual row.
+- **Test Plan**: never compacted. Full row-per-test table with `Op` tags, exactly as Phase 4 — this is what `/test-setup` and `/spec-implementation` execute from.
+- **Operations count**: a light story should need ≤ 3. If you land on more, stop and offer via `AskUserQuestion` to either re-tier the story to `full` (write it back to `stories[i].rigor`) or split it.
+
+Compact mode typically runs in the same session as `/spec-writing` (light stories chain here directly), so the inputs below are often already in context — re-read only what isn't.
 
 ---
 
@@ -174,18 +188,24 @@ Regenerate `specs/STORIES.md` so the kanban shows the new phase.
 
 ---
 
-## Phase 7: Report
+## Phase 7: Self-Review & Report
 
-1. Verify `PLAN.md` exists and is non-empty.
+1. **Self-review (mandatory).** Walk this checklist against the `PLAN.md` you just wrote and print the result as a compact checked list; fix failures before reporting. This is the default quality gate — the `/plan-writing-verification` deep audit is opt-in.
+   - [ ] Every REASONS section present (compact-mode sections may be one line, never absent)
+   - [ ] Every Operation prescribes RED-A → RED-B → GREEN → REFACTOR with concrete file paths and commit messages
+   - [ ] Every Test Plan row has an id, an `Op` value, a type, a traceable Asserts reference, and a file path
+   - [ ] Every Gherkin scenario has ≥ 1 BDD row; every AC has ≥ 1 row; every observable Safeguard has a row
+   - [ ] No code in the plan; module assignments match `specs/ARCHITECTURE.md`
+   - [ ] Operations count within budget (≤ 6 full, ≤ 3 light) or explicitly resolved with the user
 2. Report to the user:
-   - Story: US-NNN — title
+   - Story: US-NNN — title (+ rigor tier)
    - Operations count
    - Test Plan row count (BDD / unit / integration / bench breakdown)
    - Files to be created / modified
 3. Use `AskUserQuestion`:
-   - **Header: "Next"** — "Plan for US-NNN is ready. What's next?"
-     - "Run plan verification (Recommended)" — `/plan-writing-verification US-NNN`
-     - "Move to /test-setup US-NNN" — start the RED phase
+   - **Header: "Next"** — "Plan for US-NNN is ready and self-reviewed. What's next?"
+     - "Move to /test-setup US-NNN (Recommended)" — start the RED phase
+     - "Run the deep audit — /plan-writing-verification US-NNN" — opt-in fresh-agent audit; recommended for `US-000` and other full-rigor, high-stakes stories, skippable otherwise
      - "Adjust the plan" — describe changes; loop back
      - "Plan another story" — pick a new story
 

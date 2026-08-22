@@ -6,6 +6,17 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.2.0] — 2026-08-22
+
+### Added
+
+- Compact mode for light-rigor stories: full R / A / O sections and full Test Plan, one-liner E / S / N / S sections, single-line Test Strategy unless overridden, and an Operations budget of ≤ 3 (exceeding it triggers a re-tier-or-split question). Typically runs in the same session as `/spec-writing`.
+- Phase 7 now starts with a mandatory printed self-review checklist (REASONS completeness, RED-A→REFACTOR prescription, Test Plan traceability, `Op` tags, no code, module alignment, Operations budget) — the default quality gate for this phase.
+
+### Changed
+
+- Phase 7 next-step recommendation is now "/test-setup US-NNN"; `/plan-writing-verification` is offered as an opt-in deep audit for `US-000` and high-stakes full-rigor stories.
+
 ## [2.1.0] — 2026-05-06
 
 ### Added

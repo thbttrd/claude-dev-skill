@@ -6,6 +6,18 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-08-22
+
+### Changed
+
+- Phase 0 INVEST gate is now rigor-aware: light stories get a single-batch confirmation (auto-checked six-letter table, one `AskUserQuestion`); full stories keep the fully interactive gate. Oversized light stories are offered a re-tier to `full`.
+- Phase 3 renamed to "Self-Review & Handoff": walking the Writing Quality Checklist is now a mandatory printed step before any handoff, and it is the default quality gate for this phase.
+- Handoff options are rigor-aware: light stories chain straight into `/plan-writing US-NNN` compact mode in the same session (recommended); full stories default to "/plan-writing" with `/spec-writing-verification` offered as an opt-in deep audit for `US-000` and high-stakes stories.
+
+### Removed
+
+- The inline Opus spec-review agent in Phase 3 — it duplicated `/spec-writing-verification`. The fresh-agent deep audit now lives exclusively in that (opt-in) skill, so each quality layer exists exactly once.
+
 ## [2.0.0] — 2026-05-03
 
 ### Added

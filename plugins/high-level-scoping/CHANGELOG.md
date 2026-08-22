@@ -6,6 +6,14 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.2.0] — 2026-08-22
+
+### Added
+
+- Rigor tiers: every story now carries `rigor: "light" | "full"` in `specs/stories.json`, assigned in a new Phase 2 Step 5 and confirmed per epic via `AskUserQuestion`. `US-000` is always `full`; the light heuristic is ≤ ~3 expected Operations, no new module/entity, no security/payment/data surface. Light stories get a single-batch INVEST confirmation, chain from `/spec-writing` straight into `/plan-writing` compact mode, and skip the opt-in deep audits.
+- `references/stories-json-schema.md` gains a "Rigor tiers" section documenting the field, the tier behaviours, and the layered-gates model (self-review checklist → opt-in deep audit → mandatory `/verification-and-validation`). Missing `rigor` is treated as `full` downstream.
+- Update mode offers re-tiering of pre-existing stories.
+
 ## [2.1.0] — 2026-05-04
 
 ### Added

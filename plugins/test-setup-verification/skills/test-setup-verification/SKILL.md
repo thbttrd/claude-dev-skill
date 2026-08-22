@@ -1,6 +1,6 @@
 ---
 name: test-setup-verification
-version: 3.0.0
+version: 3.1.0
 description: >
   Per-Operation verification of /test-setup output for completeness, RED-state
   compliance, and Test Plan traceability. Spawns a fresh agent to audit ONE
@@ -12,6 +12,9 @@ description: >
   Operation's coverage of the Test Plan is complete. The Op-X arg is optional;
   with no Op-X, the skill auto-picks the most recently RED'd Operation that
   hasn't been audited yet from state.json. Produces a per-Op compliance report.
+  This is an OPT-IN deep audit, not a mandatory pipeline stage — the default RED
+  gate is /test-setup's built-in self-review checklist. Run it for US-000 and
+  full-rigor Ops with tricky test infrastructure, or when a RED state feels off.
   Use after /test-setup US-NNN Op-X, before /spec-implementation US-NNN Op-X.
   Triggers on: "verify the tests for Op-X", "audit Op-2", "check the RED state",
   "is Op-X RED-ready", "/test-setup-verification US-NNN", "/test-setup-verification
@@ -20,7 +23,7 @@ description: >
 
 # Test Setup Verification (per Operation)
 
-Audits the artifacts produced by `/test-setup` for **one Operation of one story** (`US-NNN Op-X`) and produces a compliance report. Quality gate between `/test-setup US-NNN Op-X` and `/spec-implementation US-NNN Op-X`.
+Audits the artifacts produced by `/test-setup` for **one Operation of one story** (`US-NNN Op-X`) and produces a compliance report. This is an **opt-in deep audit**, not a mandatory pipeline stage — the default RED gate is `/test-setup`'s built-in self-review checklist. Reach for it on `US-000` (whose Operations build the test infrastructure every later story leans on), on full-rigor Ops with tricky fakes or fixtures, or when a RED state feels off. Light-rigor stories skip it by design.
 
 The verification runs in a **fresh agent** so the review has no context bias. The audit is scoped to a single Operation: only the test files Op-X created/modified, only the Test Plan rows tagged `Op = Op-X`, only the stubs Op-X imports that didn't exist before. Earlier Ops' tests are not re-audited (they have their own `red_audit` records); later Ops' tests are not yet expected.
 

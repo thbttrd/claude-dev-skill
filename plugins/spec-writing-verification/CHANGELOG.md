@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-08-22
+
+### Changed
+
+- Repositioned as an **opt-in deep audit**, no longer a mandatory pipeline stage. The default gates are `/spec-writing`'s built-in self-review checklist and the story-end `/verification-and-validation` E2E pass. Recommended for `US-000`, full-rigor stories touching security / payments / data migration, or specs that feel off. Light-rigor stories skip it by design.
+
 ## [2.0.0] — 2026-05-03
 
 ### Changed

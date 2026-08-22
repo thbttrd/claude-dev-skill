@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-08-22
+
+### Added
+
+- Step 12 gains a mandatory printed structural checklist (module-map directory tree, six passing verification commands, Claude hooks firing, CLAUDE.md / README.md / .gitignore completeness). This is the default quality gate; `/repo-initialization-verification` is an opt-in deep audit on top, with `US-000`'s own tests exercising the scaffold right after.
+
 ## [2.0.0] — 2026-05-03
 
 ### Changed
