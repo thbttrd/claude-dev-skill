@@ -6,26 +6,35 @@ A Claude Code plugin **marketplace** of custom dev skills for **story-based, spe
 
 A project is a backlog of [INVEST](https://en.wikipedia.org/wiki/INVEST_(mnemonic)) stories. The **story is the unit of planning, audit, and shipping**; the **Operation is the unit of execution**. All artifacts live under `specs/story-NNN-slug/` plus a few project-wide docs at `specs/`. There are no version directories — a "version" is the set of stories whose `phase` is `verified`. The first story (`US-000`) is the **Foundation Story** — a walking skeleton that proves the architecture end-to-end. Every subsequent story is a vertical slice that adds value on top of what is already verified.
 
-The plan for each story is a **structured prompt in the [REASONS canvas](https://martinfowler.com/articles/structured-prompt-driven/) format** — Requirements, Entities, Approach, Structure, Operations, Norms, Safeguards — plus an explicit Test Strategy and Test Plan. Each Operation prescribes RED-A → RED-B → GREEN → REFACTOR. Per-Operation skills (`/test-setup`, `/test-setup-verification`, `/spec-implementation`, `/spec-implementation-verification`) walk one Operation at a time so the test you just wrote pins down the design choice you're about to implement, instead of writing every test up-front and every implementation later.
+The plan for each story is a **structured prompt in the [REASONS canvas](https://martinfowler.com/articles/structured-prompt-driven/) format** — Requirements, Entities, Approach, Structure, Operations, Norms, Safeguards — plus an explicit Test Strategy and Test Plan. Each Operation prescribes RED-A → RED-B → GREEN → REFACTOR. Per-Operation skills (`/test-setup`, `/spec-implementation`) walk one Operation at a time so the test you just wrote pins down the design choice you're about to implement, instead of writing every test up-front and every implementation later.
+
+**Ceremony scales with risk.** Every story carries a `rigor` tier (`light` or `full`, assigned at scoping). Light stories — small, low-risk, no new module or entity — get a single-batch INVEST confirmation and chain from `/spec-writing` straight into a compact plan in one sitting. And quality checking is layered so you only pay for what the story warrants: every producing skill ends with a **mandatory self-review checklist**; the `*-verification` skills are **opt-in deep audits** (fresh-agent reviews for `US-000`, security/payment/data-migration stories, or anything that feels off); and `/verification-and-validation` — the E2E pass against the running app — is the **one mandatory gate** every story must clear. Running software audits the chain more honestly than any document review, so that's where the non-negotiable gate lives.
 
 The full rationale and design doc lives in [`PROPOSAL-story-based-workflow.md`](./PROPOSAL-story-based-workflow.md).
 
 ### Per-Operation cycle
 
-For each story, after `/plan-writing US-NNN` produces a PLAN.md with N Operations, the loop is:
+For each story, after `/plan-writing US-NNN` produces a PLAN.md with N Operations, the happy-path loop is:
 
 ```
 for Op in Op-1 .. Op-N:
-    /test-setup US-NNN Op                 # RED: failing tests + lazy stubs for Op
-    /test-setup-verification US-NNN Op    # audit RED
-    /spec-implementation US-NNN Op        # GREEN + optional REFACTOR
-    /spec-implementation-verification US-NNN Op   # audit GREEN
+    /test-setup US-NNN Op                 # RED: failing tests + lazy stubs + self-review checklist
+    /spec-implementation US-NNN Op        # GREEN + optional REFACTOR + self-review checklist
 
 # once every Op is GREEN
 /spec-implementation US-NNN               # story-end gates: Simplify + Code Review + Verify
-/spec-implementation-verification US-NNN  # story-end audit
-/verification-and-validation US-NNN       # E2E walkthrough; flips phase to verified
+/verification-and-validation US-NNN       # MANDATORY E2E walkthrough; flips phase to verified
 ```
+
+The `*-verification` skills are **opt-in deep audits**, layered on top whenever the stakes warrant a fresh-agent review — `US-000`, full-rigor stories touching security / payments / data rules, or any output that feels off:
+
+```
+/test-setup-verification US-NNN Op            # deep-audit one Op's RED state
+/spec-implementation-verification US-NNN Op   # deep-audit one Op's GREEN state
+/spec-implementation-verification US-NNN      # story-end deep audit
+```
+
+For **light-rigor** stories the front of the pipeline compresses too: `/spec-writing US-NNN` runs a single-batch INVEST confirmation and chains directly into `/plan-writing` compact mode, taking the story from `scoped` to `planned` in one sitting.
 
 Every per-Operation skill takes an optional `Op-X` arg. If omitted, the skill picks the next pending Operation by reading `specs/story-NNN-slug/state.json`, so in the happy path you can keep typing `/test-setup US-001` and `/spec-implementation US-001` and the cursor advances itself.
 
@@ -66,12 +75,12 @@ The skills are organised into **project-wide** (one-time / re-runnable) and **pe
 
 | Skill                                       | Version | What it does |
 | ------------------------------------------- | ------- | ------------ |
-| `high-level-scoping`                        | 2.1.0   | Personas, epics, INVEST story backlog, story DAG anchored on `US-000` (Foundation Story). Produces `specs/stories.json` + `specs/STORIES.md` + `specs/PROJECT.md` + lightweight `specs/ARCHITECTURE.md`. |
-| `research-and-architecture`                 | 2.0.0   | Project-wide `specs/ARCHITECTURE.md` following [MIM AA](./plugins/research-and-architecture/skills/research-and-architecture/references/mim-architecture.md). Evolves additively as new stories require new modules. |
-| `research-and-architecture-verification`    | 2.0.0   | Audits the architecture for MIM AA compliance, template completeness, and consistency with `stories.json`. |
+| `high-level-scoping`                        | 2.2.0   | Personas, epics, INVEST story backlog, story DAG anchored on `US-000` (Foundation Story), and a `rigor` tier (`light`/`full`) per story. Produces `specs/stories.json` + `specs/STORIES.md` + `specs/PROJECT.md` + lightweight `specs/ARCHITECTURE.md`. |
+| `research-and-architecture`                 | 2.1.0   | Project-wide `specs/ARCHITECTURE.md` following [MIM AA](./plugins/research-and-architecture/skills/research-and-architecture/references/mim-architecture.md). Evolves additively as new stories require new modules. Ends with a mandatory self-review checklist. |
+| `research-and-architecture-verification`    | 2.1.0   | **Opt-in deep audit** of the architecture for MIM AA compliance, template completeness, and consistency with `stories.json`. The most worthwhile of the deep audits — run it at least once before `US-000` is implemented. |
 | `ui-specs` (`--design-system`)              | 2.0.0   | Project-wide `specs/DESIGN.md` (Google-Stitch / VoltAgent 9-section format). One-time, re-runnable to swap brand. |
-| `repo-initialization`                       | 2.0.0   | Scaffolds the repo from `specs/ARCHITECTURE.md` + `specs/PROJECT.md` + the Foundation Story (`US-000`). Tooling, hooks, CLAUDE.md, README.md. |
-| `repo-initialization-verification`          | 2.0.0   | Audits the scaffold against `specs/ARCHITECTURE.md`. |
+| `repo-initialization`                       | 2.1.0   | Scaffolds the repo from `specs/ARCHITECTURE.md` + `specs/PROJECT.md` + the Foundation Story (`US-000`). Tooling, hooks, CLAUDE.md, README.md. Ends with a mandatory self-review checklist. |
+| `repo-initialization-verification`          | 2.1.0   | **Opt-in deep audit** of the scaffold against `specs/ARCHITECTURE.md` — `US-000`'s own tests exercise the scaffold right after, so audit only when something feels off. |
 
 ### Per-story loop
 
@@ -79,16 +88,16 @@ Run this loop for every story (the Foundation Story `US-000` first, then each su
 
 | #   | Skill                                  | Version | What it does |
 | --- | -------------------------------------- | ------- | ------------ |
-| 1   | `spec-writing`                         | 2.0.0   | Per-story `STORY.md` (User Story + INVEST + AC + Rules) + Cucumber-compatible `.feature` files. Runs an INVEST gate before generating. |
-| 1.5 | `spec-writing-verification`            | 2.0.0   | Audits the story spec for INVEST + Gherkin completeness. |
+| 1   | `spec-writing`                         | 2.1.0   | Per-story `STORY.md` (User Story + INVEST + AC + Rules) + Cucumber-compatible `.feature` files. Rigor-aware INVEST gate (single-batch for light stories, fully interactive for full); light stories chain straight into `/plan-writing` compact mode. Ends with a mandatory self-review checklist. |
+| 1.5 | `spec-writing-verification`            | 2.1.0   | **Opt-in deep audit** of the story spec for INVEST + Gherkin completeness. For `US-000` and high-stakes full-rigor stories. |
 | 1.6 | `ui-specs US-NNN`                      | 2.0.0   | Per-story HTML mockups + screen specs (only for stories with UI). 2-3 variants side-by-side, user picks one. Auto-invoked by `/spec-writing` when a story has UI. |
-| 2   | `plan-writing`                         | 2.1.0   | Per-story `PLAN.md` in REASONS canvas + Test Strategy + Test Plan. Each Operation prescribes RED-A → RED-B → GREEN → REFACTOR. Test Plan rows are tagged with the Operation that owns them (`Op` column) so per-Operation skills can filter the table deterministically. |
-| 2.5 | `plan-writing-verification`            | 2.0.0   | Audits the plan for REASONS-canvas compliance, TDD prescription, Test Plan traceability, and architecture alignment. |
-| 3   | `test-setup`                           | 3.0.0   | **Per-Operation** RED phase. Takes `US-NNN [Op-X]`; with no `Op-X`, auto-picks the next pending Op from `state.json`. Writes only that Op's failing BDD steps + unit tests + lazy stubs. |
-| 3.5 | `test-setup-verification`              | 3.0.0   | **Per-Operation** RED audit. Confirms one Op's tests are real, RED at assertion time, and traceable to PLAN.md's Test Plan rows tagged with that Op. |
-| 4   | `spec-implementation`                  | 3.0.0   | **Per-Operation** GREEN phase, with story-end wrap-up gates. Per-op invocation writes the minimum impl + optional REFACTOR for one Op. When invoked without `Op-X` after every Op is GREEN, runs Simplify / Code Review / Verify and flips story phase to `green`. |
-| 4.5 | `spec-implementation-verification`     | 1.0.0   | **Per-Operation** GREEN audit. Confirms one Op's impl is in scope, architecture-compliant, and didn't regress earlier Ops. Story-end mode (no `Op-X`, all gates passed) runs a full-story audit before `/verification-and-validation`. |
-| 5   | `verification-and-validation`          | 2.0.0   | E2E verification — runs the full test suite, starts the app, exercises every endpoint with `curl`, walks every UI scenario via Playwright MCP, and FIXES deviations. Flips story phase to `verified`. |
+| 2   | `plan-writing`                         | 2.2.0   | Per-story `PLAN.md` in REASONS canvas + Test Strategy + Test Plan. Compact mode for light-rigor stories (full R/A/O + Test Plan, one-liner E/S/N/S). Each Operation prescribes RED-A → RED-B → GREEN → REFACTOR. Test Plan rows are tagged with the Operation that owns them (`Op` column). Ends with a mandatory self-review checklist. |
+| 2.5 | `plan-writing-verification`            | 2.1.0   | **Opt-in deep audit** of the plan for REASONS-canvas compliance, TDD prescription, Test Plan traceability, and architecture alignment. For `US-000` and high-stakes full-rigor stories. |
+| 3   | `test-setup`                           | 3.1.0   | **Per-Operation** RED phase. Takes `US-NNN [Op-X]`; with no `Op-X`, auto-picks the next pending Op from `state.json`. Writes only that Op's failing BDD steps + unit tests + lazy stubs. Ends with a mandatory self-review checklist (real tests, RED at assertion time, traceable). |
+| 3.5 | `test-setup-verification`              | 3.1.0   | **Opt-in deep audit** of one Op's RED state. For `US-000` and full-rigor Ops with tricky test infrastructure. |
+| 4   | `spec-implementation`                  | 3.1.0   | **Per-Operation** GREEN phase, with story-end wrap-up gates. Per-op invocation writes the minimum impl + optional REFACTOR for one Op, ending with a mandatory self-review checklist. When invoked without `Op-X` after every Op is GREEN, runs Simplify / Code Review / Verify and flips story phase to `green`. |
+| 4.5 | `spec-implementation-verification`     | 1.1.0   | **Opt-in deep audit** of one Op's GREEN state (scope, architecture compliance, no regressions), or of the whole story in story-end mode. For `US-000` and full-rigor Ops touching security / data rules / invariants. |
+| 5   | `verification-and-validation`          | 2.0.1   | **The one mandatory gate.** E2E verification — runs the full test suite, starts the app, exercises every endpoint with `curl`, walks every UI scenario via Playwright MCP, and FIXES deviations. Flips story phase to `verified`. Every story passes it, light or full rigor. |
 
 ### Orthogonal tooling
 

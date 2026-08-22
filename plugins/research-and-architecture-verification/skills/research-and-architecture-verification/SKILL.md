@@ -1,13 +1,17 @@
 ---
 name: research-and-architecture-verification
-version: 2.0.0
+version: 2.1.0
 description: >
   Verifies the output of /research-and-architecture for MIM AA compliance, template
   completeness, and consistency with the project's specs/stories.json and
   specs/PROJECT.md. Spawns a fresh agent to audit specs/ARCHITECTURE.md against
   the MIM AA reference, the architecture template, and the story backlog. Produces
   a structured compliance report with pass/fail verdicts, specific violations, and
-  actionable recommendations (fix or proceed to next phase). Use this skill after
+  actionable recommendations (fix or proceed to next phase). This is an OPT-IN
+  deep audit — the default gate is /research-and-architecture's built-in
+  checklist — but of all the deep audits it is the one most worth running:
+  architecture mistakes are the costliest to retrofit, so run it at least once
+  before the Foundation Story is implemented. Use this skill after
   running /research-and-architecture, before running /repo-initialization. Also
   triggers on: "verify the architecture", "check architecture quality", "audit
   ARCHITECTURE.md", "is the architecture ready", "validate architecture before
@@ -17,7 +21,7 @@ description: >
 
 # Research & Architecture Verification
 
-Audits `specs/ARCHITECTURE.md` produced by `/research-and-architecture` and produces a compliance report. This is a **quality gate** between architecture definition and repo initialisation.
+Audits `specs/ARCHITECTURE.md` produced by `/research-and-architecture` and produces a compliance report. This is an **opt-in deep audit** — the default gate is `/research-and-architecture`'s built-in checklist — but of all the deep audits it is the one most worth running: module boundaries are the single costliest thing to retrofit, so run it at least once before the Foundation Story (`US-000`) is implemented, and again after any architecture re-pass that adds modules.
 
 The verification runs in a **fresh agent** so the review has no context bias from the generation session. The auditor reads the artifacts, the MIM AA reference, the template, and the story backlog — then checks compliance from scratch.
 

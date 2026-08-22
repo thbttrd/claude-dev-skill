@@ -1,6 +1,6 @@
 ---
 name: spec-implementation
-version: 3.0.0
+version: 3.1.0
 description: >
   Per-Operation GREEN-phase executor with story-end wrap-up gates. For ONE
   Operation of ONE story (US-NNN Op-X) at a time, writes the minimal
@@ -194,7 +194,16 @@ After GREEN (and optional REFACTOR):
 - For every `test_plan_rows[T-N]` where `op = "Op-X"`: set `passing = true`
 - Advance `current_operation` to the next op where `operation_phase = "red"`, or `null` if every Op is now GREEN
 
-### Phase 5 — Report and offer next step
+### Phase 5 — Self-Review, Report and offer next step
+
+**Self-review (mandatory).** Before reporting, verify and print as a compact checked list:
+
+- [ ] Op-X's tests all pass, and the full per-story suite was re-run — earlier Ops' tests still pass
+- [ ] The implementation stays inside Op-X's scope — no logic justified only by a future Op
+- [ ] Every file touched sits in the module PLAN.md assigns it to; no cross-module imports
+- [ ] Lint + typecheck clean
+
+Fix failures before proceeding. This is the default GREEN gate; `/spec-implementation-verification` is an opt-in deep audit on top of it.
 
 ```
 US-NNN — Op-X GREEN
@@ -208,8 +217,8 @@ US-NNN — Op-X GREEN
 Use `AskUserQuestion`:
 
 - **Header: "Next"** — "Op-X is GREEN. What's next?"
-  - "Verify Op-X — run /spec-implementation-verification US-NNN Op-X" (Recommended)
-  - "Move to next op — /test-setup US-NNN" (auto-picks next pending op for RED)
+  - "Move to next op — /test-setup US-NNN" (Recommended; auto-picks next pending op for RED)
+  - "Deep-audit Op-X — /spec-implementation-verification US-NNN Op-X" (opt-in; worth it for `US-000` and full-rigor Ops touching security, data rules, or tricky invariants)
   - "Run story-end gates" (only shown when every op is GREEN — Simplify + Code Review + Verify)
   - "Done for now"
 
@@ -284,8 +293,8 @@ When all three `quality_gates.{simplified, reviewed, verified}` are `true`:
 5. Emit `<promise>IMPLEMENTATION_COMPLETE_US-NNN</promise>` for ralph-loop detection.
 6. Use `AskUserQuestion`:
    - **Header: "Done"** — "US-NNN is GREEN. What's next?"
-     - "Run /spec-implementation-verification US-NNN" — story-end full audit (Recommended)
-     - "Run /verification-and-validation US-NNN" — final E2E pass that flips `phase` to `verified`
+     - "Run /verification-and-validation US-NNN (Recommended)" — the mandatory final E2E pass that flips `phase` to `verified`
+     - "Run /spec-implementation-verification US-NNN" — opt-in story-end deep audit on top of the three gates just passed; worth it for `US-000` and high-stakes full-rigor stories
      - "Pick the next story" — based on `stories.json`, propose stories whose dependencies are now satisfied
      - "Done for now"
 

@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.0.1] — 2026-08-22
+
+### Changed
+
+- Documentation: explicitly designated as **the one mandatory quality gate** of the per-story pipeline — every story, light or full rigor, must pass it; the `*-verification` deep audits are opt-in precisely because this gate exists. No behavioural change.
+
 ## [2.0.0] — 2026-05-03
 
 ### Changed

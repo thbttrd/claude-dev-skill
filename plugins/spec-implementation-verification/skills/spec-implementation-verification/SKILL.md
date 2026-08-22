@@ -1,6 +1,6 @@
 ---
 name: spec-implementation-verification
-version: 1.0.0
+version: 1.1.0
 description: >
   Per-Operation verification of /spec-implementation output for GREEN-state
   compliance, no over-implementation, architecture alignment, and zero
@@ -13,7 +13,11 @@ description: >
   With no Op-X AND all ops are GREEN AND quality gates have passed, the
   skill runs a story-end full audit (every Op's tests pass, every gate
   passed, story is ready for /verification-and-validation). Produces a
-  per-Op or story-end compliance report. Use after /spec-implementation
+  per-Op or story-end compliance report. This is an OPT-IN deep audit, not a
+  mandatory pipeline stage — the default GREEN gates are /spec-implementation's
+  built-in self-review checklist and its story-end Simplify / Code Review /
+  Verify gates. Run it for US-000 and full-rigor Ops touching security, data
+  rules, or tricky invariants. Use after /spec-implementation
   US-NNN Op-X (Op-X is GREEN), or after /spec-implementation US-NNN
   finishes the story-end gates. Triggers on: "verify Op-X", "audit the
   GREEN state", "is Op-2 implemented correctly", "check the story
@@ -23,7 +27,7 @@ description: >
 
 # Spec Implementation Verification (per Operation, with story-end mode)
 
-Audits the artifacts produced by `/spec-implementation` for **one Operation of one story** (`US-NNN Op-X`) — or, in story-end mode, the entire implementation of the story before `/verification-and-validation`. Quality gate either between `/spec-implementation US-NNN Op-X` and the next Op, or between `/spec-implementation US-NNN` (story-end gates) and `/verification-and-validation US-NNN`.
+Audits the artifacts produced by `/spec-implementation` for **one Operation of one story** (`US-NNN Op-X`) — or, in story-end mode, the entire implementation of the story before `/verification-and-validation`. This is an **opt-in deep audit**, not a mandatory pipeline stage — the default GREEN gates are `/spec-implementation`'s built-in self-review checklist (per Op) and its story-end Simplify / Code Review / Verify gates, with `/verification-and-validation` as the mandatory story-end E2E pass. Reach for this audit on `US-000`, on full-rigor Ops touching security, data rules, or tricky invariants, or when a GREEN state feels off. Light-rigor stories skip it by design.
 
 The verification runs in a **fresh agent** so the review has no context bias. The audit is scoped narrowly to a single Operation in per-op mode (only files Op-X touched, only Op-X's tests, only Op-X's diff range). Story-end mode performs a full-story audit instead.
 

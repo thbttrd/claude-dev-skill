@@ -6,6 +6,16 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [3.1.0] — 2026-08-22
+
+### Added
+
+- Phase 7 now starts with a mandatory printed self-review checklist: every Op test maps to an `Op`-tagged Test Plan row, tests call real code, the suite was actually run and fails at assertion time (earlier Ops still green), stubs are lazy. This is the default RED gate.
+
+### Changed
+
+- Phase 7 next-step recommendation is now "/spec-implementation US-NNN Op-X"; `/test-setup-verification` is offered as an opt-in deep audit for `US-000` and full-rigor Ops with tricky test infrastructure.
+
 ## [3.0.0] — 2026-05-06
 
 ### Changed

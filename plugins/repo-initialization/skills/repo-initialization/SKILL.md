@@ -1,6 +1,6 @@
 ---
 name: repo-initialization
-version: 2.0.0
+version: 2.1.0
 description: >
   Scaffolds a new project repository from `specs/ARCHITECTURE.md`,
   `specs/PROJECT.md`, and the Foundation Story
@@ -283,6 +283,15 @@ git commit -m "chore: initial project scaffolding with quality gates"
 ```
 
 If the commit succeeds, the hooks are working correctly.
+
+Then walk this structural checklist and print the result as a compact checked list; fix failures before moving on. This is the default quality gate for this skill — `/repo-initialization-verification` is an opt-in deep audit on top of it, and `US-000`'s own tests exercise the scaffold end-to-end right after.
+
+- [ ] Directory tree matches `specs/ARCHITECTURE.md`'s module map — one directory per module, no extras
+- [ ] All six commands above passed (typecheck, lint, format, test, dev-server start, hooked commit)
+- [ ] Claude hooks configured and firing on file edits
+- [ ] CLAUDE.md states the project rules (module boundaries, TDD cycle, commit conventions)
+- [ ] README.md covers setup, commands, and the `specs/` workflow
+- [ ] `.gitignore` covers build output, env files, and editor noise
 
 ---
 

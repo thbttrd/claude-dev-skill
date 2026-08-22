@@ -115,6 +115,7 @@ Common rules:
         "checked_at": "string — ISO date | null"
       },
       "phase": "backlog | scoped | specced | planned | red | green | verified",
+      "rigor": "light | full",
       "artifacts": {
         "story_doc": "specs/story-NNN-slug/STORY.md | null",
         "plan": "specs/story-NNN-slug/PLAN.md | null",
@@ -345,12 +346,24 @@ A story can move backwards if scope changes (e.g., re-scoping after dependency c
 
 Recorded under `stories[i].invest`. A story SHOULD have all six flags `true` before transitioning past `scoped`. The flags are advisory at the schema level; `/spec-writing`'s INVEST gate enforces them interactively.
 
+## Rigor tiers
+
+Recorded under `stories[i].rigor`, assigned by `/high-level-scoping` (and re-assessable at any later phase via update mode). Rigor scales the ceremony a story walks through — it never changes *what* is built, only how much process surrounds it.
+
+| Rigor  | When                                                                                                                                       | Effect downstream                                                                                                                                                                                                                     |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `full`  | Default. Mandatory for `US-000` (Foundation Story) and for stories touching security, payments, data migration, or a new architecture module. | Full interactive INVEST gate in `/spec-writing`; full REASONS canvas in `/plan-writing`; the opt-in deep audits (`*-verification`) are recommended at spec, plan, and story-end.                                                        |
+| `light` | Small, low-risk stories: ≤ ~3 expected Operations, no new module, no new entity, no security/payment/data-rule surface.                      | Single-batch INVEST confirmation; `/spec-writing` chains straight into `/plan-writing` compact mode in the same session; deep audits are skipped (each skill's built-in self-review checklist suffices); `/verification-and-validation` still runs in full. |
+
+Deep audits (`spec-writing-verification`, `plan-writing-verification`, `test-setup-verification`, `spec-implementation-verification`, and the project-wide `research-and-architecture-verification` / `repo-initialization-verification`) are **opt-in at every tier** — the mandatory quality gates are each producing skill's self-review checklist plus the per-story `/verification-and-validation` E2E pass. Rigor only changes whether the deep audits are *recommended* in the next-step prompts.
+
 ## Rules
 
 - Every story MUST have at least 2 acceptance criteria.
 - Every epic MUST be linked to at least one persona.
 - Every story MUST belong to exactly one epic (`epic_id` required).
-- The Foundation Story (`US-000`) MUST exist, MUST have `is_foundation: true`, and MUST have `depends_on_story_ids: []`.
+- The Foundation Story (`US-000`) MUST exist, MUST have `is_foundation: true`, MUST have `depends_on_story_ids: []`, and MUST have `rigor: "full"`.
+- Every story MUST have a `rigor` value (`light` or `full`). Stories written before this field existed default to `full` — downstream skills treat a missing `rigor` as `full`.
 - A story's `depends_on_story_ids` MUST reference only ids that exist in `stories[]`. The DAG MUST be acyclic. Workflow timing — *when* during the lifecycle a dependency must be `verified` — is enforced by each skill's Pre-Flight (`/plan-writing`, `/test-setup`, `/spec-implementation`, `/verification-and-validation`), not by this schema. The current convention is that each of those skills requires every dependency to be `verified` (or `is_foundation: true`) before it will run on a downstream story; teams that want to relax that — e.g., allow `/test-setup` to run on a story whose dep is still `green` — change the skill's Pre-Flight, not the schema.
 - Every path stored in this file MUST live under `specs/`. Paths under `docs/V*/` are forbidden — if detected, the skill MUST hard-stop with the legacy-layout error and a pointer to `scripts/migrate-tracking.mjs`.
 - `phase` MUST progress in order; backwards transitions are allowed but MUST be logged in `history` with a note.

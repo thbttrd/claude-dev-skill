@@ -1,14 +1,14 @@
 ---
 name: spec-writing
-version: 2.0.0
-description: Story-based spec-writing skill that produces, for one user story at a time, a `STORY.md` (INVEST-shaped User Story + Acceptance Criteria + Rules) plus one or more Cucumber-compatible `.feature` files with full Gherkin scenarios. Runs an INVEST gate (Phase 0) before any spec generation. Output lives at `specs/story-NNN-slug/`. Use this skill whenever the user wants to spec a specific story, define behaviour for a feature, capture acceptance criteria, or says things like "spec story US-001", "/spec-writing US-NNN", "let's spec out the auth story", "write the Gherkin for this feature". Also trigger when the user wants to update or refine an existing story's spec, add new rules, or audit acceptance-criteria coverage.
+version: 2.1.0
+description: Story-based spec-writing skill that produces, for one user story at a time, a `STORY.md` (INVEST-shaped User Story + Acceptance Criteria + Rules) plus one or more Cucumber-compatible `.feature` files with full Gherkin scenarios. Runs an INVEST gate (Phase 0) before any spec generation, scaled by the story's rigor tier (light stories get a single-batch confirmation and chain straight into /plan-writing compact mode; full stories get the full interactive gate). Ends with a mandatory self-review checklist walk. Output lives at `specs/story-NNN-slug/`. Use this skill whenever the user wants to spec a specific story, define behaviour for a feature, capture acceptance criteria, or says things like "spec story US-001", "/spec-writing US-NNN", "let's spec out the auth story", "write the Gherkin for this feature". Also trigger when the user wants to update or refine an existing story's spec, add new rules, or audit acceptance-criteria coverage.
 ---
 
 # Spec Writing Skill (story-based)
 
 Produce, for **one story at a time**, the human-readable spec (`STORY.md`) and the executable Gherkin (`.feature` files). The unit of work is **always one story** — the skill takes a `US-NNN` argument (or asks for one) and operates exclusively in that story's directory.
 
-The skill works in four phases: **Phase 0 — INVEST Gate** (interactive, non-skippable), **Phase 1 — Discovery** (understand and clarify), **Phase 2 — Generation** (produce STORY.md + feature files), **Phase 3 — Review** (validate completeness).
+The skill works in four phases: **Phase 0 — INVEST Gate** (non-skippable; single-batch for light stories, fully interactive for full ones), **Phase 1 — Discovery** (understand and clarify), **Phase 2 — Generation** (produce STORY.md + feature files), **Phase 3 — Self-Review & Handoff** (mandatory checklist walk, then rigor-aware next step — light stories chain straight into `/plan-writing` compact mode).
 
 There are **no project-wide spec documents owned by this skill**. The project overview (NFRs, glossary, tech stack pointer) lives in `specs/PROJECT.md`, owned by `/high-level-scoping`. The architecture lives in `specs/ARCHITECTURE.md`, owned by `/research-and-architecture`. UI design + per-story screens are owned by `/ui-specs`.
 
@@ -29,11 +29,17 @@ Run these checks before any work:
 
 The story id chosen here is the only story this invocation modifies.
 
+**Read the story's `rigor` tier** from `specs/stories.json` (`stories[i].rigor`; a missing value means `full`). Rigor scales the ceremony of this invocation — see the tier behaviours in Phase 0 and Phase 3. It never changes what gets specified, only how much process surrounds it.
+
 ---
 
-## Phase 0 — INVEST Gate (mandatory, interactive)
+## Phase 0 — INVEST Gate (mandatory)
 
-Before any discovery or generation, run the INVEST checklist for the chosen story. The gate is interactive — every check is asked via `AskUserQuestion` so the user is the source of truth, not the model.
+Before any discovery or generation, run the INVEST checklist for the chosen story.
+
+**Light stories (`rigor: "light"`)** get a single-batch gate: run the auto-checks for all six letters yourself, then present the results in ONE `AskUserQuestion` (preview: the filled six-letter table with a one-line note each) asking the user to confirm or flag letters to rework. Only letters the user flags get the full interactive treatment below. If the auto-checks reveal the story is bigger than its tier (more than ~3 expected Operations, a new entity, a new module), say so and offer to re-tier it to `full` — write the new tier back to `stories[i].rigor`.
+
+**Full stories** run the gate interactively — every check is asked via `AskUserQuestion` so the user is the source of truth, not the model.
 
 For each letter, present the current state, ask the user to confirm or correct, and record the result in both `STORY.md`'s INVEST table and `specs/stories.json`'s `stories[i].invest`.
 
@@ -175,38 +181,40 @@ When `STORY.md` already exists for the chosen story:
 
 ---
 
-## Phase 3 — Post-Generation Review
+## Phase 3 — Self-Review & Handoff
 
-After writing the spec, ask the user what to do next:
+### Step 1: Self-Review (mandatory)
 
-- **Header: "Next step"** — "The spec for US-NNN has been written. What would you like to do?"
+Walk the **Writing Quality Checklist** below item by item against the files you just wrote and print the result as a compact checked list. Fix any failing item before proceeding — do not present a spec to the user with open checklist items. This checklist is the default quality gate for this phase; the separate `/spec-writing-verification` deep audit is opt-in (see Step 2).
+
+### Step 2: Handoff
+
+Ask the user what to do next. The recommended option depends on the story's rigor:
+
+**Light stories** — chain straight into planning:
+
+- **Header: "Next step"** — "The spec for US-NNN (light) has been written and self-reviewed. What would you like to do?"
   - Options:
-    - "Launch spec review agent (Recommended)" — A separate Opus agent reviews STORY.md + .feature files for completeness, coherence, and quality.
+    - "Continue into the compact plan (Recommended)" — Invoke `/plan-writing US-NNN` now, in this same session, in compact mode (the plan-writing skill reads the rigor tier itself). Same-session chaining is the point of the light tier: one sitting takes the story from `scoped` to `planned`.
+    - "Accept the spec and stop here" — Spec is final; plan later.
+    - "Add or rework parts" — Loop back into Phase 2.
+
+**Full stories:**
+
+- **Header: "Next step"** — "The spec for US-NNN has been written and self-reviewed. What would you like to do?"
+  - Options:
+    - "Move to /plan-writing (Recommended)" — Run `/plan-writing US-NNN` next.
+    - "Run the deep audit — /spec-writing-verification US-NNN" — An opt-in fresh-agent audit of STORY.md + feature files. Recommended for `US-000` and for stories touching security, payments, or data migration; otherwise the self-review above suffices.
     - "Accept as-is" — Spec is final.
-    - "Add or rework parts" — User describes changes; loop back into Phase 2.
-    - "Move to /plan-writing" — Run `/plan-writing US-NNN` next.
+    - "Add or rework parts" — Loop back into Phase 2.
 
-### If the user picks "Launch spec review agent"
-
-Spawn a fresh Claude Opus agent (Agent tool with `model: "opus"`) to perform an end-to-end review of the story's spec. The agent's prompt instructs it to:
-
-1. **Template compliance** — STORY.md follows `references/story-md-template.md`; feature files follow `references/feature-file-template.md`. Every required field is present.
-2. **Completeness** — Every Rule has happy + sad-path scenarios; every AC has at least one scenario; edge cases covered.
-3. **Coherence** — Rules in STORY.md match `Rule:` blocks in `.feature`; AC don't contradict; glossary terms used consistently with `specs/PROJECT.md`.
-
-The agent returns PASS / MINOR / MAJOR with specific findings + proposed fixes (in actual Gherkin or markdown).
-
-After the agent completes, present findings via `AskUserQuestion`: apply all, pick which, ignore, or re-run after edits.
-
-### If the user picks "Move to /plan-writing"
-
-Hand off to `/plan-writing US-NNN`.
+There is no inline review agent in this skill any more — the fresh-agent deep audit lives exclusively in `/spec-writing-verification`, so there is exactly one of each layer: self-review checklist (mandatory, here) → deep audit (opt-in, separate skill) → `/verification-and-validation` (mandatory, story-end, E2E).
 
 ---
 
 ## Writing Quality Checklist
 
-Before declaring the story specced:
+Walked in Phase 3 Step 1 — every item must pass before the story is declared specced:
 
 **STORY.md:**
 

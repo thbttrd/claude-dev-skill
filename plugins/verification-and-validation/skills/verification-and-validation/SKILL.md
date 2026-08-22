@@ -1,13 +1,16 @@
 ---
 name: verification-and-validation
-version: 2.0.0
+version: 2.0.1
 description: >
   Per-story end-to-end verification of a completed implementation. Runs the
   full automated test suite, starts the application, exercises every API
   endpoint with curl, walks every UI scenario via Playwright MCP, and FIXES
   any deviation found. Operates on ONE story (US-NNN) at a time; when
   everything passes, flips the story's phase to verified and writes the QA
-  report to specs/story-NNN-slug/verification/qa-report.md. Use after
+  report to specs/story-NNN-slug/verification/qa-report.md. This is the ONE
+  MANDATORY quality gate of the per-story pipeline — every story, light or
+  full rigor, must pass it; the *-verification deep audits are opt-in, this
+  is not. Use after
   /spec-implementation US-NNN (story phase = green). Optional --all-pending
   flag to walk every green story in turn. Triggers on: "verify the app",
   "validate US-NNN", "run E2E verification for the story", "test the
@@ -20,6 +23,8 @@ description: >
 Performs a real end-to-end verification of **one story** by exercising the running application — not just running automated tests, but actually using the app as a real user would. Tests APIs with `curl` and UI with Playwright MCP. **Fixes any deviation on the spot** before moving on.
 
 The core principle: **the running app must match the story's spec**. Every Gherkin scenario must be reproducible by hand. If the app deviates, fix it immediately — don't just log it.
+
+This skill is the **one mandatory quality gate** of the per-story pipeline. Every story — light or full rigor — must pass it to reach `verified`. The `*-verification` deep audits upstream are opt-in precisely because this gate exists: running software audits the whole chain more honestly than any document review.
 
 ## Pre-Flight
 

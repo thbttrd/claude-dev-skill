@@ -1,6 +1,6 @@
 ---
 name: high-level-scoping
-version: 2.1.0
+version: 2.2.0
 description: Agile project scoping skill that produces personas, epics, an INVEST-shaped story backlog, a high-level architecture diagram (via the d2-architect skill), and a story DAG anchored on a Foundation Story (US-000) — the walking skeleton. Outputs `specs/stories.json` (machine-readable tracker), `specs/STORIES.md` (human-readable kanban), `specs/PROJECT.md` (project overview), and `specs/ARCHITECTURE.md` (lightweight, later enriched by /research-and-architecture). Use this skill when the user wants to scope a new project, define epics and user stories, plan a backlog, do agile discovery, or says things like "let's scope this out", "plan this project", "what should we build first", "create a backlog", "/high-level-scoping". Also trigger when the user mentions Kanban, Scrum, sprints, epics, user stories, or a story DAG in the context of starting a new project.
 ---
 
@@ -147,6 +147,15 @@ Present stories per epic via `AskUserQuestion` with previews. Read `references/s
 
 Present the full prioritised backlog for final validation. Use MoSCoW (`must-have`, `should-have`, `could-have`, `wont-have`) and `business_impact` (`high`, `medium`, `low`).
 
+### Step 5: Assign Rigor Tiers
+
+Every story gets a `rigor` tier (`light` or `full`) that scales the ceremony it walks through downstream (see `references/stories-json-schema.md` § Rigor tiers). Propose a tier per story using this heuristic, then confirm per epic via `AskUserQuestion` (preview: the epic's stories with proposed tiers):
+
+- **`full` (default)** — mandatory for `US-000`, and for any story touching security, payments, data migration, or a new architecture module.
+- **`light`** — small, low-risk stories: ≤ ~3 expected Operations, no new module, no new entity, no security/payment/data-rule surface. Light stories get a single-batch INVEST confirmation, a compact plan generated in the same `/spec-writing` session, and skip the opt-in deep audits (their self-review checklists + `/verification-and-validation` still apply in full).
+
+When in doubt, pick `full` — a light story that grows during spec-writing can be re-tiered there.
+
 ---
 
 ## Phase 3: High-Level Architecture
@@ -292,6 +301,7 @@ Read `references/stories-json-schema.md` for the exact schema and write the JSON
 - The Foundation Story (`US-000`) must exist with `is_foundation: true` and `depends_on_story_ids: []`
 - Every non-foundation story must have a non-empty `depends_on_story_ids`
 - Every story starts in `phase: "scoped"` (not `backlog`) — INVEST has been informally checked at this point
+- Every story must carry the `rigor` tier confirmed in Phase 2 Step 5; `US-000` is always `rigor: "full"`
 - The `architecture.diagram_path` must point to `specs/architecture.png`
 - Initialise each story's `invest` flags to `false` (the rigorous gate runs in `/spec-writing`)
 
@@ -385,7 +395,8 @@ When `specs/stories.json` already exists:
 
 - Read it completely
 - Summarise what's there
-- Ask what the user wants to change (add story, reprioritise, add epic, adjust DAG, add persona)
+- Ask what the user wants to change (add story, reprioritise, re-tier rigor, add epic, adjust DAG, add persona)
+- Stories predating the `rigor` field get `rigor: "full"` by default — offer to re-tier obviously light ones while you're in the file
 - Make targeted changes — don't regenerate everything
 - Increment `project.updated_at`
 - Re-render `specs/STORIES.md` from the updated JSON
@@ -401,7 +412,8 @@ Before finalising, verify:
 - [ ] Every epic has a unique ID (`E-NNN`), a description, and is linked to personas
 - [ ] Every epic lists its stories under `story_ids`
 - [ ] Every story has a unique global ID (`US-NNN`), follows "As a / I want / So that", has priority + business_impact + at least 2 acceptance criteria
-- [ ] The Foundation Story (`US-000`) exists with `is_foundation: true` and `depends_on_story_ids: []`
+- [ ] The Foundation Story (`US-000`) exists with `is_foundation: true`, `depends_on_story_ids: []`, and `rigor: "full"`
+- [ ] Every story has a `rigor` tier, confirmed with the user (light stories match the heuristic: ≤ ~3 Ops, no new module/entity, no security/payment/data surface)
 - [ ] Every non-foundation story has a non-empty `depends_on_story_ids`
 - [ ] The DAG is acyclic
 - [ ] Architecture modules have unique IDs (`M-NNN`) and clear responsibilities

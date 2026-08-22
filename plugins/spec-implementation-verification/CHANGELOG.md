@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-08-22
+
+### Changed
+
+- Repositioned as an **opt-in deep audit**, no longer a mandatory pipeline stage. The default GREEN gates are `/spec-implementation`'s per-Op self-review checklist and its story-end Simplify / Code Review / Verify gates, with `/verification-and-validation` as the mandatory story-end E2E pass. Recommended for `US-000` and full-rigor Ops touching security, data rules, or tricky invariants. Light-rigor stories skip it by design.
+
 ## [1.0.0] — 2026-05-06
 
 ### Added

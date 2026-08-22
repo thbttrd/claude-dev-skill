@@ -1,21 +1,23 @@
 ---
 name: spec-writing-verification
-version: 2.0.0
+version: 2.1.0
 description: >
   Per-story verification of the output of /spec-writing for completeness, coherence,
   INVEST compliance, and template fidelity. Spawns a fresh agent to audit
   specs/story-NNN-slug/STORY.md + specs/story-NNN-slug/features/*.feature against
   the spec-writing skill's templates and rules. Produces a structured compliance
   report with pass/fail verdicts, specific findings, and actionable recommendations
-  (fix or proceed to /plan-writing). Use this skill after running /spec-writing for
-  a specific story, before running /plan-writing for that same story. Also triggers
+  (fix or proceed to /plan-writing). This is an OPT-IN deep audit, not a mandatory
+  pipeline stage — the default gate is /spec-writing's built-in self-review checklist.
+  Run it when stakes are high: the Foundation Story (US-000), full-rigor stories
+  touching security / payments / data migration, or a spec that feels off. Also triggers
   on: "verify the spec for US-NNN", "audit the story spec", "check INVEST compliance",
   "are the specs ready", "validate spec before planning".
 ---
 
 # Spec Writing Verification (per story)
 
-Audits the artifacts produced by `/spec-writing` for **one story at a time** and produces a compliance report. This is a **quality gate** between spec-writing and plan-writing for that story.
+Audits the artifacts produced by `/spec-writing` for **one story at a time** and produces a compliance report. This is an **opt-in deep audit**, not a mandatory pipeline stage — the default quality gates are `/spec-writing`'s built-in self-review checklist and the story-end `/verification-and-validation` E2E pass. Reach for it when stakes are high (the Foundation Story `US-000`; full-rigor stories touching security, payments, or data migration) or when a generated spec feels off. Light-rigor stories skip it by design.
 
 The verification runs in a **fresh agent** (via the Agent tool) so the review has no context bias from the generation session.
 

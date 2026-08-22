@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-08-22
+
+### Added
+
+- Mandatory Self-Review Checklist (module mapping, acyclic dependencies, story↔module coverage, researched versions, ADR completeness, data ownership, testing strategy, regenerated diagram, tracker update) walked and printed before finishing. This is the default quality gate; `/research-and-architecture-verification` is an opt-in deep audit on top — still the most worthwhile one to run before `US-000` is implemented.
+
 ## [2.0.0] — 2026-05-03
 
 ### Changed

@@ -1,6 +1,6 @@
 ---
 name: research-and-architecture
-version: 2.0.0
+version: 2.1.0
 description: "Research tech stacks and produce a project-wide `specs/ARCHITECTURE.md` following MIM AA (Module Infrastructure-Module). Reads `specs/stories.json` (the story-based tracker) for the backlog and the personas. Produces a single ARCHITECTURE.md that evolves additively as new stories require new modules — no version directories, no snapshots. Use this skill whenever the user wants to define architecture after scoping, asks to research tech stacks, wants architecture decisions documented, mentions MIM or modular architecture, or runs /research-and-architecture. Also trigger when the user mentions 'architecture', 'tech stack research', 'stack validation', or 'module design', or when an existing ARCHITECTURE.md needs to be extended for a new story."
 ---
 
@@ -273,6 +273,22 @@ Read the existing file, merge in:
 - `architecture.detailed_at` — today's date
 - If high-level modules were modified: update `architecture.modules` accordingly
 - Update `project.updated_at`
+
+---
+
+## Self-Review Checklist (mandatory)
+
+Walk this checklist against the `ARCHITECTURE.md` you just wrote and print the result as a compact checked list; fix failures before finishing. This is the default quality gate for this skill — `/research-and-architecture-verification` is an opt-in deep audit on top of it (though of all the deep audits it is the one most worth running, since module boundaries are the costliest thing to retrofit; run it at least once before `US-000` is implemented).
+
+- [ ] Every high-level module from scoping maps to at least one detailed MIM module (`maps_to_high_level`)
+- [ ] Module dependency graph is acyclic and every dependency is declared
+- [ ] Every story in `stories.json` can name the module(s) it will live in — no orphan stories, no orphan modules
+- [ ] Tech stack entries carry researched versions, not guesses
+- [ ] Every ADR states context, decision, and consequences; ADRs are append-only
+- [ ] Data ownership: every entity has exactly one owning module
+- [ ] Testing Strategy section exists and is concrete enough for `/plan-writing` to anchor on
+- [ ] The detailed diagram (`architecture-detailed.png`) was regenerated and matches the module tables
+- [ ] `specs/stories.json`'s `architecture` block was updated (Step 3) and `project.updated_at` bumped
 
 ---
 
