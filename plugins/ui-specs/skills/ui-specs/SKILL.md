@@ -1,6 +1,6 @@
 ---
 name: ui-specs
-version: 2.0.0
+version: 2.1.0
 description: Produces a project's design system + per-story UI mockups and screen specs. The design system (`specs/DESIGN.md` — Google-Stitch / VoltAgent 9-section format) is project-wide and re-runnable; the mockups and screen specs are per-story under `specs/story-NNN-slug/{mockups,ui}/`. Drives the design system through three branches the user picks from — copy a brand DESIGN.md from the VoltAgent awesome-design-md catalog (`npx getdesign@latest add <brand>`), start from one and tweak it, or build from scratch via realtimecolors.com aesthetic discovery. For each UI story, proposes 2-3 HTML mockup variants side-by-side (rendered + screenshotted via Playwright MCP), the user picks one, then iterates to acceptance. Use this skill whenever the user wants to define a design system, write UI specs, generate mockups, pick brand colors/fonts, draw screen layouts, or says "design system", "DESIGN.md", "ui specs", "mockups", "wireframes", "/ui-specs". Auto-invoked by `/spec-writing US-NNN` whenever a story has a user-facing screen. Triggers also when the user wants to tweak the project-wide DESIGN.md, swap brand inspiration, or redo the screens for an existing story.
 ---
 
@@ -23,12 +23,13 @@ The skill operates in two modes:
 
 ## Pre-Flight
 
-| Check                                       | Action                                                                                                                                          |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/V*/` directory exists                 | Hard-stop with the migration command.                                                                                                           |
-| `specs/stories.json` does not exist         | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                |
-| `specs/DESIGN.md` exists + per-story arg    | Skip Phase A; go straight to Phase B for the target story.                                                                                      |
-| `specs/DESIGN.md` does not exist            | Run Phase A first regardless of mode.                                                                                                           |
+| Check                                                              | Action                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/V*/` directory exists                                        | Hard-stop with the migration command.                                                                                                                                                                                                                                      |
+| `specs/stories.json` does not exist                                | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                                                                                                                                            |
+| `specs/DESIGN.md` exists + per-story arg                           | Skip Phase A; go straight to Phase B for the target story.                                                                                                                                                                                                                 |
+| `specs/DESIGN.md` does not exist                                   | Run Phase A first regardless of mode.                                                                                                                                                                                                                                      |
+| `specs/autopilot.json` has `"active": true` (or env `AUTOPILOT=1`) | Follow `references/autopilot-contract.md` §1–2 for this whole invocation: no `AskUserQuestion`, take the _(Recommended)_ option, journal decisions and gates, stop only on the contract's hard conditions. Journaling (§3) and toolchain resolution (§4) apply regardless. |
 
 ---
 
@@ -59,6 +60,8 @@ Before any UI work:
 ### Always Use `AskUserQuestion`
 
 Every interactive question goes through `AskUserQuestion` — never plain text. Same rules as the legacy skill: batched, concrete options, multiSelect, short headers, recommended option first, descriptions, previews.
+
+Under autopilot (contract §2) no question is asked: design-system branch = "start from scratch with neutral defaults" unless `DESIGN.md` exists; screens to mock = every screen the feature files name; the mockup variant picked = variant 1. Each pick is journaled.
 
 ---
 
@@ -101,6 +104,7 @@ Ask for the path, read it, validate it has the 9 sections, copy it to `specs/DES
 ### Update Mode (re-runs)
 
 When `specs/DESIGN.md` already exists, you're in update mode. Ask whether to:
+
 - Tweak tokens in place (no source change),
 - Swap brand inspiration (re-runs A.1 from a new brand),
 - Rebuild from scratch (re-runs A.3).
@@ -116,6 +120,7 @@ For each UI screen identified in Setup, produce 2-3 mockup variants, pick one, i
 ### B.0 — Loop Over the Story's Screens
 
 Process one screen at a time. The order can be:
+
 - The order screens appear in the story's `.feature` files.
 - Or — if the story has a clear hub screen — start there.
 
@@ -198,6 +203,8 @@ If the user picks the review option, spawn a separate Opus agent to audit:
 - Per-screen markdown specs reference real `.html` files that exist on disk
 - Mobile variants exist for every desktop mockup
 
+At the end of a per-story invocation (whether reached from `/spec-writing` or standalone `/ui-specs US-NNN`), under autopilot skip the question and emit `<promise>UI_SPECS_COMPLETE_US-NNN</promise>`.
+
 ---
 
 ## Integration with `specs/stories.json`
@@ -233,14 +240,14 @@ After Phase C, update `specs/stories.json` (read-merge-write, never overwrite):
 
 ## Tools You'll Use
 
-| Tool | Purpose |
-| --- | --- |
-| `AskUserQuestion` | Every interactive prompt |
-| `WebFetch` | Pull the VoltAgent README catalog; fall back to `getdesign.md/<brand>/design-md.md` |
-| `Bash` | Run `npx getdesign@latest add <brand>`; move/rename mockup files |
-| Playwright MCP (`browser_navigate`, `browser_resize`, `browser_take_screenshot`) | Render HTML mockups + realtimecolors.com previews |
-| `Read` / `Write` / `Edit` | All file I/O |
-| `Agent` (Opus) | Optional Phase D review pass |
+| Tool                                                                             | Purpose                                                                             |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `AskUserQuestion`                                                                | Every interactive prompt                                                            |
+| `WebFetch`                                                                       | Pull the VoltAgent README catalog; fall back to `getdesign.md/<brand>/design-md.md` |
+| `Bash`                                                                           | Run `npx getdesign@latest add <brand>`; move/rename mockup files                    |
+| Playwright MCP (`browser_navigate`, `browser_resize`, `browser_take_screenshot`) | Render HTML mockups + realtimecolors.com previews                                   |
+| `Read` / `Write` / `Edit`                                                        | All file I/O                                                                        |
+| `Agent` (Opus)                                                                   | Optional Phase D review pass                                                        |
 
 ---
 
@@ -249,6 +256,7 @@ After Phase C, update `specs/stories.json` (read-merge-write, never overwrite):
 Before declaring the skill done:
 
 **`specs/DESIGN.md` (project-wide):**
+
 - [ ] All 9 sections present with non-placeholder content
 - [ ] Color palette has hex values and clearly labeled roles
 - [ ] Typography defines display / heading / body / mono families with sources
@@ -261,6 +269,7 @@ Before declaring the skill done:
 - [ ] Agent Prompt Guide reads as a tight one-paragraph briefing
 
 **HTML mockups (per story):**
+
 - [ ] One `.html` per UI screen plus matching `*-mobile.html`
 - [ ] Self-contained — opens correctly via `file://`
 - [ ] All four states stacked as labeled panels
@@ -269,6 +278,7 @@ Before declaring the skill done:
 - [ ] Mobile reflow tested at 390×844 viewport
 
 **Per-screen specs (per story):**
+
 - [ ] One `.md` per UI screen
 - [ ] Links to the `.feature` file, `specs/DESIGN.md`, and `.html` mockup all resolve
 - [ ] Component inventory maps each component to DESIGN.md tokens
@@ -277,6 +287,7 @@ Before declaring the skill done:
 - [ ] Accessibility notes specific to the screen, not generic
 
 **`specs/stories.json`:**
+
 - [ ] Per-story `ui` block added
 - [ ] `design_system` project-level block added (Phase A)
 - [ ] `project.updated_at` bumped

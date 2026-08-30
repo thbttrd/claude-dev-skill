@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-08-30
+
+### Added
+
+- Pipeline contract; autopilot defaults for design-system branch, screen list and mockup variant; UI_SPECS_COMPLETE sentinel.
+
 ## [2.0.0] — 2026-05-03
 
 ### Changed
