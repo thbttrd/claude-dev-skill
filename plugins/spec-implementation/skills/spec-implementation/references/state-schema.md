@@ -33,12 +33,11 @@ After **every** Operation has reached `operation_phase ∈ {green, refactored}`,
   "verified": false,
   "review_findings": [],
   "verification_results": {
-    "tests_passed": null,
-    "bdd_passed": null,
+    "tests_regressions": null,
+    "bdd_regressions": null,
     "lint_passed": null,
     "types_passed": null,
-    "app_boots": null,
-    "e2e_flows_passed": null
+    "architecture_ok": null
   }
 }
 ```
