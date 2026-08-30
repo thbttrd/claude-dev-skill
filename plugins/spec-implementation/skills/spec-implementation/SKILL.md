@@ -199,9 +199,8 @@ After GREEN (and optional REFACTOR):
 - `implementation.last_commit = <sha>`
 - `implementation.ops_completed.append("Op-X")`
 - `implementation.started_at = <now>` (only on the very first GREEN; do not overwrite if already set)
-- For every `test_plan_rows[T-N]` where `op = "Op-X"`: set `passing = true`
+- For every `test_plan_rows[T-N]` where `op = "Op-X"` and `type ≠ "manual"`: set `passing = true`.
 - Advance `current_operation` to the first Op whose `operation_phase ∉ {green, refactored}`, or `null` if every Op is now GREEN.
-- `test_plan_rows[T-N].passing = true` only for rows whose `type ≠ "manual"`.
 
 ### Phase 5 — Self-Review, Report and offer next step
 
@@ -214,7 +213,7 @@ After GREEN (and optional REFACTOR):
 
 Fix failures before proceeding. This is the default GREEN gate; `/spec-implementation-verification` is an opt-in deep audit on top of it.
 
-Journal the self-review: `node "$LEDGER" log --kind gate --gate self-review --verdict <PASS|PASS_WITH_WARNINGS> --story US-NNN --op Op-X --stage spec-implementation --summary "<n>/4 checks"` (contract §3, §5). Any unchecked item not fixed → `ledger backlog add`.
+Journal the self-review: `node "$LEDGER" log --kind gate --gate self-review --verdict <PASS|PASS_WITH_WARNINGS> --story US-NNN --op Op-X --stage spec-implementation --summary "<n>/4 checks"` (contract §3, §5). Any unchecked item not fixed → `node "$LEDGER" backlog add`.
 
 ```
 US-NNN — Op-X GREEN
@@ -257,7 +256,7 @@ git diff --name-only $BASE_SHA..HEAD | grep -v '^specs/'
 
 `BASE_SHA` is the parent of the first `test(US-NNN):` commit (the very first commit of `/test-setup US-NNN Op-1`). Re-run the full per-story suite (`<TEST> -t "@US-NNN"` + `<BDD>` story filter) afterwards; everything must still pass. If Simplify made commits, also run the unfiltered suite to confirm no other regressions.
 
-Update `state.json.quality_gates.simplified = true`. Journal the gate: `ledger log --kind gate --gate simplify --verdict PASS --summary "<n> files simplified"`. Every simplification deliberately not applied → `ledger backlog add --kind simplification --severity info`.
+Update `state.json.quality_gates.simplified = true`. Journal the gate: `node "$LEDGER" log --kind gate --gate simplify --verdict PASS --summary "<n> files simplified"`. Every simplification deliberately not applied → `node "$LEDGER" backlog add --kind simplification --severity info`.
 
 ### Gate 2 — Code Review
 
@@ -270,7 +269,7 @@ The reviewer audits the whole story's diff for:
 - Safeguards compliance (invariants, performance, security, data rules from PLAN.md's second S section).
 - Code quality (no obvious bugs, no missed edge cases, no over-implementation beyond Op scope).
 
-Act on critical findings. Every warning not acted on → `ledger backlog add --kind <bug|refactor|…> --severity warning --gate code-review --report <path>`; persist the ids in `state.json.quality_gates.review_findings[]`. Journal the gate verdict. Update `state.json.quality_gates.reviewed = true`.
+Act on critical findings. Every warning not acted on → `node "$LEDGER" backlog add --kind <bug|refactor|…> --severity warning --gate code-review --report <path>`; persist the ids in `state.json.quality_gates.review_findings[]`. Journal the gate verdict. Update `state.json.quality_gates.reviewed = true`.
 
 ### Gate 3 — Story Verification (end-to-end)
 
