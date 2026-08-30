@@ -42,7 +42,7 @@ Before any discovery or generation, run the INVEST checklist for the chosen stor
 
 **Under autopilot (contract §2):** run the six auto-checks yourself for any tier and take the result as final — every letter ✅ → continue (`node "$LEDGER" log --kind gate --gate invest --verdict PASS --summary "6/6 letters pass"`); a letter ❌ that a re-tier fixes (`S` with ≤ 3 Ops → `light`, > 3 → `full`) → write `stories[i].rigor`, `node "$LEDGER" log --kind decision --summary "re-tiered to <tier>: <reason>"`, continue; any other ❌ → `node "$LEDGER" log --kind gate --gate invest --verdict FAIL --summary "<letter> failed: <reason>"` and hard stop `split_required` (for `S`/`I`) or `spec_contradiction` (for `N`/`V`/`E`/`T`). `/autopilot` (Plan 2) replaces the auto-checks with the `invest-assessor` agent; the verdict handling stays as written here.
 
-**Full stories** run the gate interactively — every check is asked via `AskUserQuestion` so the user is the source of truth, not the model.
+**Outside autopilot, full stories** run the gate interactively — every check is asked via `AskUserQuestion` so the user is the source of truth, not the model.
 
 For each letter, present the current state, ask the user to confirm or correct, and record the result in both `STORY.md`'s INVEST table and `specs/stories.json`'s `stories[i].invest`.
 

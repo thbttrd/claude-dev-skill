@@ -269,9 +269,8 @@ Run each verification and fix any issues before committing. Commands resolve per
 # 2. Linter passes
 <LINT>
 
-# 3. Formatter passes — the project's own `format:check` script, run through the
-#    same resolved package manager as <TEST>/<LINT> (§4)
-<format:check>
+# 3. Formatter passes — run the project's own format:check script
+#    (same package manager as above, per §4)
 
 # 4. Test runner works (0 tests is OK)
 <TEST>
