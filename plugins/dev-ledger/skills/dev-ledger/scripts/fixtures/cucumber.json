@@ -1,0 +1,34 @@
+[
+  {
+    "uri": "specs/story-001-x/features/F-001.feature",
+    "name": "F-001",
+    "elements": [
+      {
+        "type": "scenario",
+        "name": "Happy path",
+        "steps": [
+          { "result": { "status": "passed" } },
+          { "result": { "status": "passed" } }
+        ]
+      },
+      {
+        "type": "scenario",
+        "name": "Sad path",
+        "steps": [
+          { "result": { "status": "passed" } },
+          { "result": { "status": "failed" } }
+        ]
+      },
+      {
+        "type": "scenario",
+        "name": "Undefined path",
+        "steps": [{ "result": { "status": "undefined" } }]
+      },
+      {
+        "type": "background",
+        "name": "",
+        "steps": [{ "result": { "status": "passed" } }]
+      }
+    ]
+  }
+]

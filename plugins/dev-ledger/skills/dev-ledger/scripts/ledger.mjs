@@ -322,6 +322,92 @@ export function formatBacklog(items) {
   );
 }
 
+// ---- Failures & Regress ---------------------------------------------------
+const rel = (p, root) =>
+  root && p.startsWith(root + "/") ? p.slice(root.length + 1) : p;
+
+export function failuresFromVitest(json, root) {
+  const r = JSON.parse(json);
+  const out = [];
+  for (const f of r.testResults ?? [])
+    for (const a of f.assertionResults ?? [])
+      if (a.status === "failed")
+        out.push(`${rel(f.name, root)}::${a.fullName}`);
+  return out.sort();
+}
+
+const BAD_STEP = new Set(["failed", "undefined", "ambiguous", "pending"]);
+export function failuresFromCucumber(json, root) {
+  const out = [];
+  for (const feat of JSON.parse(json))
+    for (const el of feat.elements ?? []) {
+      if (el.type !== "scenario") continue;
+      if ((el.steps ?? []).some((s) => BAD_STEP.has(s.result?.status)))
+        out.push(`${rel(feat.uri, root)}::${el.name}`);
+    }
+  return out.sort();
+}
+
+export function failuresFromLines(text) {
+  return text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .sort();
+}
+
+const PARSERS = {
+  vitest: failuresFromVitest,
+  cucumber: failuresFromCucumber,
+  lines: (t) => failuresFromLines(t),
+};
+
+function runFailures(cwd, cmd, runner, reportFile) {
+  must(
+    PARSERS[runner],
+    `--runner must be one of ${Object.keys(PARSERS).join("|")}`,
+  );
+  const r = spawnSync("sh", ["-c", cmd], {
+    cwd,
+    encoding: "utf8",
+    maxBuffer: 1 << 28,
+    env: { ...process.env, CI: "1", FORCE_COLOR: "0" },
+  });
+  const text = reportFile
+    ? readFileSync(join(cwd, reportFile), "utf8")
+    : r.stdout;
+  return PARSERS[runner](text, cwd);
+}
+
+export function regress({ root, base, cmd, runner, reportFile }) {
+  must(base && cmd, "--base and --cmd are required");
+  const head = runFailures(root, cmd, runner, reportFile);
+  const wt = mkdtempSync(join(tmpdir(), "ledger-regress-"));
+  execFileSync("git", ["worktree", "add", "--detach", "-f", wt, base], {
+    cwd: root,
+    stdio: "ignore",
+  });
+  try {
+    if (
+      existsSync(join(root, "node_modules")) &&
+      !existsSync(join(wt, "node_modules"))
+    )
+      symlinkSync(join(root, "node_modules"), join(wt, "node_modules"), "dir");
+    const baseFailures = runFailures(wt, cmd, runner, reportFile);
+    const baseSet = new Set(baseFailures);
+    return {
+      base: baseFailures,
+      head,
+      regressions: head.filter((id) => !baseSet.has(id)),
+    };
+  } finally {
+    execFileSync("git", ["worktree", "remove", "--force", wt], {
+      cwd: root,
+      stdio: "ignore",
+    });
+  }
+}
+
 // ---- CLI -------------------------------------------------------------------
 export function main(argv) {
   const opts = parseArgs(argv);
@@ -381,6 +467,34 @@ export function main(argv) {
         "usage: ledger backlog <add|list|resolve BL-NNN|wontfix BL-NNN>\n",
       );
       return 2;
+    }
+    case "failures": {
+      const text = opts["report-file"]
+        ? readFileSync(opts["report-file"], "utf8")
+        : readFileSync(0, "utf8");
+      must(
+        PARSERS[opts.runner],
+        `--runner must be one of ${Object.keys(PARSERS).join("|")}`,
+      );
+      process.stdout.write(
+        PARSERS[opts.runner](text, process.cwd()).join("\n") + "\n",
+      );
+      return 0;
+    }
+    case "regress": {
+      const r = regress({
+        root: dirname(specs),
+        base: opts.base,
+        cmd: opts.cmd,
+        runner: opts.runner,
+        reportFile: opts["report-file"],
+      });
+      if (opts.json) process.stdout.write(JSON.stringify(r, null, 2) + "\n");
+      else
+        process.stdout.write(
+          `base failures: ${r.base.length}\nhead failures: ${r.head.length}\nregressions:  ${r.regressions.length}\n${r.regressions.map((x) => "  " + x).join("\n")}${r.regressions.length ? "\n" : ""}`,
+        );
+      return r.regressions.length ? 1 : 0;
     }
     default:
       process.stderr.write(

@@ -1,0 +1,18 @@
+{
+  "numTotalTests": 3,
+  "testResults": [
+    {
+      "name": "/repo/src/a.test.ts",
+      "status": "failed",
+      "assertionResults": [
+        { "fullName": "@US-001 @Op-1 does x", "status": "passed" },
+        { "fullName": "@US-001 @Op-2 does y", "status": "failed" }
+      ]
+    },
+    {
+      "name": "/repo/tests/unit/b.test.ts",
+      "status": "failed",
+      "assertionResults": [{ "fullName": "parses z", "status": "failed" }]
+    }
+  ]
+}

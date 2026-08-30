@@ -19,6 +19,10 @@ import {
   backlogList,
   backlogResolve,
   backlogWontfix,
+  failuresFromVitest,
+  failuresFromCucumber,
+  failuresFromLines,
+  regress,
 } from "./ledger.mjs";
 
 export function fixtureProject() {
@@ -360,4 +364,70 @@ test("backlog list filters; resolve and wontfix update status and journal an act
   const actions = readJournal(specs).filter((e) => e.kind === "action");
   assert.equal(actions.length, 2);
   assert.equal(actions[0].backlog_id, "BL-001");
+});
+
+test("failuresFromVitest lists failed assertions as root-relative ids, sorted", () => {
+  const fx = (n) =>
+    readFileSync(new URL(`./fixtures/${n}`, import.meta.url), "utf8");
+  assert.deepEqual(failuresFromVitest(fx("vitest.json"), "/repo"), [
+    "src/a.test.ts::@US-001 @Op-2 does y",
+    "tests/unit/b.test.ts::parses z",
+  ]);
+});
+
+test("failuresFromCucumber lists scenarios with any failed/undefined step; skips backgrounds", () => {
+  const fx = (n) =>
+    readFileSync(new URL(`./fixtures/${n}`, import.meta.url), "utf8");
+  assert.deepEqual(failuresFromCucumber(fx("cucumber.json"), "/repo"), [
+    "specs/story-001-x/features/F-001.feature::Sad path",
+    "specs/story-001-x/features/F-001.feature::Undefined path",
+  ]);
+});
+
+test("failuresFromLines trims, drops blanks, sorts", () => {
+  assert.deepEqual(failuresFromLines(" b \n\na\n"), ["a", "b"]);
+});
+
+test("regress diffs failures of the working tree against a base sha via a worktree", () => {
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  writeFileSync(join(root, "failures.txt"), "a\nb\n");
+  git("add", ".");
+  git("commit", "-qm", "base");
+  writeFileSync(join(root, "failures.txt"), "a\nc\n"); // working tree: b fixed, c new
+  const r = regress({
+    root,
+    base: "HEAD",
+    cmd: "cat failures.txt",
+    runner: "lines",
+  });
+  assert.deepEqual(r.base, ["a", "b"]);
+  assert.deepEqual(r.head, ["a", "c"]);
+  assert.deepEqual(r.regressions, ["c"]);
+  assert.equal(git("worktree", "list").split("\n").length, 1); // temp worktree removed
+});
+
+test("regress reads a report file when --report-file is given", () => {
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  writeFileSync(join(root, "gen.sh"), 'printf "x\\n" > out.txt');
+  git("add", ".");
+  git("commit", "-qm", "base");
+  writeFileSync(join(root, "gen.sh"), 'printf "x\\ny\\n" > out.txt');
+  const r = regress({
+    root,
+    base: "HEAD",
+    cmd: "sh gen.sh",
+    runner: "lines",
+    reportFile: "out.txt",
+  });
+  assert.deepEqual(r.regressions, ["y"]);
 });
