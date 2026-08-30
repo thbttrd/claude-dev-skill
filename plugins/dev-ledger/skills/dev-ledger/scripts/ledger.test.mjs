@@ -6,10 +6,12 @@ import {
   writeFileSync,
   readFileSync,
   readdirSync,
+  symlinkSync,
 } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   findSpecsDir,
   parseArgs,
@@ -471,8 +473,9 @@ test("regress leaves nothing behind when git worktree add fails", () => {
   writeFileSync(join(root, "f.txt"), "a\n");
   git("add", ".");
   git("commit", "-qm", "base");
-  const before = readdirSync(tmpdir())
-    .filter((n) => n.startsWith("ledger-regress-")).length;
+  const before = readdirSync(tmpdir()).filter((n) =>
+    n.startsWith("ledger-regress-"),
+  ).length;
   assert.throws(
     () =>
       regress({
@@ -483,8 +486,9 @@ test("regress leaves nothing behind when git worktree add fails", () => {
       }),
     /not-a-real-sha-xyz|fatal/,
   );
-  const after = readdirSync(tmpdir())
-    .filter((n) => n.startsWith("ledger-regress-")).length;
+  const after = readdirSync(tmpdir()).filter((n) =>
+    n.startsWith("ledger-regress-"),
+  ).length;
   assert.equal(
     after,
     before,
@@ -517,4 +521,30 @@ test("regress throws with diagnostic on unparseable runner output", () => {
       }),
     /not parseable|echo not-json/,
   );
+});
+
+test("CLI entry works when invoked through a symlink", () => {
+  const root = fixtureProject();
+  const real = fileURLToPath(new URL("./ledger.mjs", import.meta.url));
+  const link = join(root, "ledger-link.mjs");
+  symlinkSync(real, link);
+  const specs = join(root, "specs");
+  const r = spawnSync(
+    process.execPath,
+    [
+      link,
+      "log",
+      "--kind",
+      "decision",
+      "--summary",
+      "via symlink",
+      "--specs",
+      specs,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /"kind":"decision"/);
+  const journal = readFileSync(join(specs, "journal.jsonl"), "utf8");
+  assert.match(journal, /"summary":"via symlink"/);
 });

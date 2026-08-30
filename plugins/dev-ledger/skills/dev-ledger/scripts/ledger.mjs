@@ -6,6 +6,7 @@ import {
   existsSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -516,14 +517,19 @@ export function main(argv) {
   }
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
+if (process.argv[1]) {
+  let invoked;
   try {
-    process.exit(main(process.argv.slice(2)));
-  } catch (err) {
-    process.stderr.write(`ledger: ${err.message}\n`);
-    process.exit(1);
+    invoked = pathToFileURL(realpathSync(process.argv[1])).href;
+  } catch {
+    invoked = pathToFileURL(process.argv[1]).href;
+  }
+  if (import.meta.url === invoked) {
+    try {
+      process.exit(main(process.argv.slice(2)));
+    } catch (err) {
+      process.stderr.write(`ledger: ${err.message}\n`);
+      process.exit(1);
+    }
   }
 }
