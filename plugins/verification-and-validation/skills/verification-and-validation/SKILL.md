@@ -195,7 +195,7 @@ Record results in state.
 
 ## Step 4.5: Manual Test Plan rows
 
-For every `test_plan_rows[T-N]` with `type = "manual"` (from `state.json`): perform the check the PLAN.md row's Asserts column describes (SSH, `curl` from another host, `dig`, reading a unit file, observing a notification…). Record in `qa-report.md` under "Manual checks": row id, what was done (the exact command or observation), outcome PASS/FAIL, evidence (output excerpt or screenshot path). Set `test_plan_rows[T-N].passing = true` on PASS. A FAIL is fixed like any other deviation; if it cannot be fixed from this repo (host-side change), file it: `ledger backlog add --kind bug --severity error --story US-NNN --op <op> --report specs/story-NNN-slug/verification/qa-report.md` and treat the story as **not** verified until resolved.
+For every `test_plan_rows[T-N]` with `type = "manual"` (from `state.json`): perform the check the PLAN.md row's Asserts column describes (SSH, `curl` from another host, `dig`, reading a unit file, observing a notification…). Record in `qa-report.md` under "Manual checks": row id, what was done (the exact command or observation), outcome PASS/FAIL, evidence (output excerpt or screenshot path). Set `test_plan_rows[T-N].passing = true` on PASS. A FAIL is fixed like any other deviation; if it cannot be fixed from this repo (host-side change), file it: `node "$LEDGER" backlog add --kind bug --severity error --story US-NNN --op <op> --report specs/story-NNN-slug/verification/qa-report.md` and treat the story as **not** verified until resolved.
 
 ---
 
@@ -288,13 +288,15 @@ Journal: `node "$LEDGER" log --kind gate --gate v-and-v --verdict PASS --report 
 VERIFICATION_COMPLETE_US-NNN
 ```
 
-Use `AskUserQuestion`:
+Outside autopilot, use `AskUserQuestion`:
 
 - **Header: "Done"** — "US-NNN is verified. What's next?"
   - "Verify the next story (Recommended if any are green)" — picks the next `green` story whose deps are all `verified`
   - "Pick a new story to plan" — list stories with all deps `verified` and `phase = scoped|backlog`
   - "Open a release / deploy" — outside this skill's scope; the user handles it
   - "Done for now"
+
+Under autopilot (contract §2), skip the question and emit `VERIFICATION_COMPLETE_US-NNN` (the completion signal the orchestrator reads).
 
 ---
 
