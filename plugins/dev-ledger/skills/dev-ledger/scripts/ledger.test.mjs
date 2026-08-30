@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  readdirSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
@@ -430,4 +436,85 @@ test("regress reads a report file when --report-file is given", () => {
     reportFile: "out.txt",
   });
   assert.deepEqual(r.regressions, ["y"]);
+});
+
+test("regress honours absolute report file paths", () => {
+  const reportDir = mkdtempSync(join(tmpdir(), "report-"));
+  const reportPath = join(reportDir, "results.txt");
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  writeFileSync(join(root, "gen.sh"), `printf "x\\n" > ${reportPath}`);
+  git("add", ".");
+  git("commit", "-qm", "base");
+  writeFileSync(join(root, "gen.sh"), `printf "x\\ny\\n" > ${reportPath}`);
+  const r = regress({
+    root,
+    base: "HEAD",
+    cmd: "sh gen.sh",
+    runner: "lines",
+    reportFile: reportPath,
+  });
+  assert.deepEqual(r.regressions, ["y"]);
+});
+
+test("regress leaves nothing behind when git worktree add fails", () => {
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  writeFileSync(join(root, "f.txt"), "a\n");
+  git("add", ".");
+  git("commit", "-qm", "base");
+  const before = readdirSync(tmpdir())
+    .filter((n) => n.startsWith("ledger-regress-")).length;
+  assert.throws(
+    () =>
+      regress({
+        root,
+        base: "not-a-real-sha-xyz",
+        cmd: "echo",
+        runner: "lines",
+      }),
+    /not-a-real-sha-xyz|fatal/,
+  );
+  const after = readdirSync(tmpdir())
+    .filter((n) => n.startsWith("ledger-regress-")).length;
+  assert.equal(
+    after,
+    before,
+    "temp dir should be cleaned up on git worktree add failure",
+  );
+  assert.equal(
+    git("worktree", "list").split("\n").length,
+    1,
+    "only main worktree should exist",
+  );
+});
+
+test("regress throws with diagnostic on unparseable runner output", () => {
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  writeFileSync(join(root, "f.txt"), "a\n");
+  git("add", ".");
+  git("commit", "-qm", "base");
+  assert.throws(
+    () =>
+      regress({
+        root,
+        base: "HEAD",
+        cmd: "echo not-json",
+        runner: "vitest",
+      }),
+    /not parseable|echo not-json/,
+  );
 });

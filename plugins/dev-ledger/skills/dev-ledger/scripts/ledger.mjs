@@ -6,6 +6,7 @@ import {
   existsSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -373,21 +374,31 @@ function runFailures(cwd, cmd, runner, reportFile) {
     maxBuffer: 1 << 28,
     env: { ...process.env, CI: "1", FORCE_COLOR: "0" },
   });
+  if (r.error)
+    throw new Error(
+      `ledger regress: could not run \`${cmd}\` in ${cwd}: ${r.error.message}`,
+    );
   const text = reportFile
-    ? readFileSync(join(cwd, reportFile), "utf8")
+    ? readFileSync(resolve(cwd, reportFile), "utf8")
     : r.stdout;
-  return PARSERS[runner](text, cwd);
+  try {
+    return PARSERS[runner](text, cwd);
+  } catch (err) {
+    throw new Error(
+      `ledger regress: ${runner} output of \`${cmd}\` in ${cwd} is not parseable (${err.message}). stderr tail: ${(r.stderr ?? "").slice(-500)}`,
+    );
+  }
 }
 
 export function regress({ root, base, cmd, runner, reportFile }) {
   must(base && cmd, "--base and --cmd are required");
   const head = runFailures(root, cmd, runner, reportFile);
   const wt = mkdtempSync(join(tmpdir(), "ledger-regress-"));
-  execFileSync("git", ["worktree", "add", "--detach", "-f", wt, base], {
-    cwd: root,
-    stdio: "ignore",
-  });
   try {
+    execFileSync("git", ["worktree", "add", "--detach", "-f", wt, base], {
+      cwd: root,
+      stdio: "ignore",
+    });
     if (
       existsSync(join(root, "node_modules")) &&
       !existsSync(join(wt, "node_modules"))
@@ -401,10 +412,11 @@ export function regress({ root, base, cmd, runner, reportFile }) {
       regressions: head.filter((id) => !baseSet.has(id)),
     };
   } finally {
-    execFileSync("git", ["worktree", "remove", "--force", wt], {
+    spawnSync("git", ["worktree", "remove", "--force", wt], {
       cwd: root,
       stdio: "ignore",
     });
+    rmSync(wt, { recursive: true, force: true });
   }
 }
 
