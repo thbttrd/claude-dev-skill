@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.2.0] — 2026-08-30
+
+### Added
+
+- Pipeline contract; toolchain placeholders for the quality-gate verification; journal/backlog tracked in the scaffold; REPO_INIT_COMPLETE sentinel.
+
 ## [2.1.0] — 2026-08-22
 
 ### Added
