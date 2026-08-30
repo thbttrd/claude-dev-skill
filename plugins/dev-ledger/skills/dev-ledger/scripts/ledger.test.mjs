@@ -349,6 +349,14 @@ test("backlog list filters; resolve and wontfix update status and journal an act
     () => backlogResolve(specs, "BL-999", { sha: "x", resolution: "y" }),
     /BL-999 not found/,
   );
+  assert.throws(
+    () => backlogWontfix(specs, "BL-001", { reason: "x" }),
+    /BL-001 is already done/,
+  );
+  assert.throws(
+    () => backlogResolve(specs, "BL-001", { sha: "y", resolution: "z" }),
+    /BL-001 is already done/,
+  );
   const actions = readJournal(specs).filter((e) => e.kind === "action");
   assert.equal(actions.length, 2);
   assert.equal(actions[0].backlog_id, "BL-001");

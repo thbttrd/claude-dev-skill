@@ -231,9 +231,6 @@ export function backlogAdd(specs, opts, now = new Date()) {
     resolved_sha: null,
     resolution: null,
   };
-  data.items.push(item);
-  data.next_id += 1;
-  writeBacklog(specs, data);
   log(
     specs,
     {
@@ -247,6 +244,9 @@ export function backlogAdd(specs, opts, now = new Date()) {
     },
     now,
   );
+  data.items.push(item);
+  data.next_id += 1;
+  writeBacklog(specs, data);
   return item;
 }
 
@@ -263,8 +263,11 @@ function updateItem(specs, id, patch, summary, now) {
   const data = readBacklog(specs);
   const item = data.items.find((i) => i.id === id);
   must(item, `${id} not found`);
+  must(
+    item.status === "open" || item.status === "in-progress",
+    `${id} is already ${item.status}`,
+  );
   Object.assign(item, patch);
-  writeBacklog(specs, data);
   log(
     specs,
     {
@@ -277,6 +280,7 @@ function updateItem(specs, id, patch, summary, now) {
     },
     now,
   );
+  writeBacklog(specs, data);
   return item;
 }
 
