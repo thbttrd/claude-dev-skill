@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-08-30
+
+### Added
+
+- Toolchain placeholders; manual Test Plan rows walked and recorded in qa-report.md; regression baseline via ledger regress; pipeline contract + journaling; Co-Authored-By rule removed.
+
 ## [2.0.1] — 2026-08-22
 
 ### Changed

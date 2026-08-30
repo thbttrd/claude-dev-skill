@@ -1,6 +1,6 @@
 ---
 name: verification-and-validation
-version: 2.0.1
+version: 2.1.0
 description: >
   Per-story end-to-end verification of a completed implementation. Runs the
   full automated test suite, starts the application, exercises every API
@@ -28,12 +28,13 @@ This skill is the **one mandatory quality gate** of the per-story pipeline. Ever
 
 ## Pre-Flight
 
-| Check                                                | Action                                                                                                                                          |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/V*/` directory exists                          | Hard-stop with the migration command.                                                                                                           |
-| `specs/stories.json` does not exist                  | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                |
-| Target story id missing AND no `--all-pending` flag  | Ask via `AskUserQuestion` (default: stories whose `phase = green`).                                                                            |
-| Story's `phase` is not `green`                       | Hard-stop. Print: `Story US-NNN must be green before verification. Run /spec-implementation US-NNN first.`                                     |
+| Check                                                              | Action                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/V*/` directory exists                                        | Hard-stop with the migration command.                                                                                                                                                                                                                                      |
+| `specs/stories.json` does not exist                                | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                                                                                                                                            |
+| Target story id missing AND no `--all-pending` flag                | Ask via `AskUserQuestion` (default: stories whose `phase = green`).                                                                                                                                                                                                        |
+| Story's `phase` is not `green`                                     | Hard-stop. Print: `Story US-NNN must be green before verification. Run /spec-implementation US-NNN first.`                                                                                                                                                                 |
+| `specs/autopilot.json` has `"active": true` (or env `AUTOPILOT=1`) | Follow `references/autopilot-contract.md` §1–2 for this whole invocation: no `AskUserQuestion`, take the _(Recommended)_ option, journal decisions and gates, stop only on the contract's hard conditions. Journaling (§3) and toolchain resolution (§4) apply regardless. |
 
 ### `--all-pending` mode
 
@@ -55,16 +56,16 @@ Each loop iteration picks up where the last left off by reading `specs/story-NNN
 
 ### Input Documents
 
-| Document          | Purpose                                                       | Location                                              |
-| ----------------- | ------------------------------------------------------------- | ----------------------------------------------------- |
-| STORY.md          | Acceptance criteria, Rules                                    | `specs/story-NNN-slug/STORY.md`                       |
-| `*.feature` files | Gherkin scenarios — behavioural specs                         | `specs/story-NNN-slug/features/`                      |
-| PLAN.md           | Test Plan, Verification checklist                             | `specs/story-NNN-slug/PLAN.md`                        |
-| ARCHITECTURE.md   | Module structure, API routes, dependency rules                | `specs/ARCHITECTURE.md`                               |
-| DESIGN.md         | Design system tokens (UI stories)                             | `specs/DESIGN.md`                                     |
-| Mockups           | Per-screen visual ground truth (UI stories)                   | `specs/story-NNN-slug/mockups/`                       |
-| State file        | Per-story verification progress                               | `specs/story-NNN-slug/state.json`                     |
-| Tracker           | Project-level progress                                        | `specs/stories.json`                                  |
+| Document          | Purpose                                        | Location                          |
+| ----------------- | ---------------------------------------------- | --------------------------------- |
+| STORY.md          | Acceptance criteria, Rules                     | `specs/story-NNN-slug/STORY.md`   |
+| `*.feature` files | Gherkin scenarios — behavioural specs          | `specs/story-NNN-slug/features/`  |
+| PLAN.md           | Test Plan, Verification checklist              | `specs/story-NNN-slug/PLAN.md`    |
+| ARCHITECTURE.md   | Module structure, API routes, dependency rules | `specs/ARCHITECTURE.md`           |
+| DESIGN.md         | Design system tokens (UI stories)              | `specs/DESIGN.md`                 |
+| Mockups           | Per-screen visual ground truth (UI stories)    | `specs/story-NNN-slug/mockups/`   |
+| State file        | Per-story verification progress                | `specs/story-NNN-slug/state.json` |
+| Tracker           | Project-level progress                         | `specs/stories.json`              |
 
 ---
 
@@ -80,7 +81,12 @@ Each loop iteration picks up where the last left off by reading `specs/story-NNN
     "automated_suite": { "status": "passed", "completed_at": "..." },
     "app_running": true,
     "api_verification": { "scenarios_tested": 5, "passed": 5, "failed": 0 },
-    "ui_verification": { "scenarios_tested": 3, "passed": 3, "failed": 0, "screenshots": ["..."] },
+    "ui_verification": {
+      "scenarios_tested": 3,
+      "passed": 3,
+      "failed": 0,
+      "screenshots": ["..."]
+    },
     "issues_fixed": [{ "scenario": "...", "fix_commit": "<sha>" }],
     "completed_at": null
   }
@@ -93,7 +99,7 @@ Each loop iteration picks up where the last left off by reading `specs/story-NNN
 2. Read `state.json` — must exist (`/test-setup` and `/spec-implementation` created/updated it).
 3. If `phase_local = "green"` → transition to `"verifying"`, initialise the `verification` block, proceed.
 4. If `phase_local = "verifying"` → resume from where the last iteration left off.
-5. If `phase_local = "verified"` → output `VERIFICATION_COMPLETE_US-NNN` and stop.
+5. If `phase_local = "verified"` → emit `VERIFICATION_COMPLETE_US-NNN` (autopilot's completion sentinel, contract §2) and stop.
 
 Update `state.json` after every significant action (scenario verified, issue fixed, step completed).
 
@@ -104,13 +110,20 @@ Update `state.json` after every significant action (scenario verified, issue fix
 Run the full automated suite filtered to this story (and stories already `verified`, to catch regressions):
 
 ```bash
-bun test
-bun run bdd
-bun lint
-bunx tsc --noEmit
+<TEST>
+<BDD>
+<LINT>
+<TYPES>
 ```
 
-All must pass before proceeding. If any fails, **fix the issue first**, re-run, and only continue once everything is green.
+`$BASE_SHA` is the parent of the story's first `test(US-NNN):` commit (same definition Gate 1 of `/spec-implementation` uses). Evaluate through the regression baseline (contract §4):
+
+```bash
+node "$LEDGER" regress --base $BASE_SHA --runner vitest   --cmd "<TEST> --reporter=json --outputFile=/tmp/ledger-vitest.json" --report-file /tmp/ledger-vitest.json
+node "$LEDGER" regress --base $BASE_SHA --runner cucumber --cmd "<BDD> --format json:/tmp/ledger-bdd.json"                    --report-file /tmp/ledger-bdd.json
+```
+
+Zero regressions; lint and types clean. If any fails, **fix the issue first**, re-run, and only continue once everything is green.
 
 Update state: `verification.automated_suite.status = "passed"`.
 
@@ -119,10 +132,10 @@ Update state: `verification.automated_suite.status = "passed"`.
 ## Step 2: Start the Application
 
 ```bash
-bun dev &
+<DEV> &
 ```
 
-Wait for the server to be ready. Update state: `verification.app_running = true`.
+Wait for the server to be ready (bind per project convention — read the port from the dev script or `.env`). Update state: `verification.app_running = true`.
 
 ---
 
@@ -180,6 +193,12 @@ Record results in state.
 
 ---
 
+## Step 4.5: Manual Test Plan rows
+
+For every `test_plan_rows[T-N]` with `type = "manual"` (from `state.json`): perform the check the PLAN.md row's Asserts column describes (SSH, `curl` from another host, `dig`, reading a unit file, observing a notification…). Record in `qa-report.md` under "Manual checks": row id, what was done (the exact command or observation), outcome PASS/FAIL, evidence (output excerpt or screenshot path). Set `test_plan_rows[T-N].passing = true` on PASS. A FAIL is fixed like any other deviation; if it cannot be fixed from this repo (host-side change), file it: `ledger backlog add --kind bug --severity error --story US-NNN --op <op> --report specs/story-NNN-slug/verification/qa-report.md` and treat the story as **not** verified until resolved.
+
+---
+
 ## Step 5: README check (only when verifying the LAST story in DAG order)
 
 When the story being verified is the highest-id story whose dependencies are all `verified`, run a README completeness check. (Skipped for intermediate stories — the README is updated story-by-story, but the full audit happens once a release-worthy state is reached.)
@@ -205,30 +224,30 @@ Write `specs/story-NNN-slug/verification/qa-report.md`:
 
 ## Test Suite
 
-| Suite              | Result | Time   |
-| ------------------ | ------ | ------ |
-| Unit + integration | ✅ N/N | <Ns>   |
-| BDD (@US-NNN)      | ✅ N/N | <Ns>   |
-| BDD (regression)   | ✅ N/N | <Ns>   |
-| Lint               | ✅      |        |
-| Typecheck          | ✅      |        |
+| Suite              | Result | Time |
+| ------------------ | ------ | ---- |
+| Unit + integration | ✅ N/N | <Ns> |
+| BDD (@US-NNN)      | ✅ N/N | <Ns> |
+| BDD (regression)   | ✅ N/N | <Ns> |
+| Lint               | ✅     |      |
+| Typecheck          | ✅     |      |
 
 ## Scenarios Verified
 
-| Scenario                                  | API (curl) | UI (Playwright) | Notes |
-| ----------------------------------------- | ---------- | --------------- | ----- |
-| <Scenario name>                           | ✅         | ✅              |       |
+| Scenario        | API (curl) | UI (Playwright) | Notes |
+| --------------- | ---------- | --------------- | ----- |
+| <Scenario name> | ✅         | ✅              |       |
 
 ## Issues Found and Fixed
 
-| Issue                          | Fix Commit | Notes |
-| ------------------------------ | ---------- | ----- |
-| <description>                  | <sha>      |       |
+| Issue         | Fix Commit | Notes |
+| ------------- | ---------- | ----- |
+| <description> | <sha>      |       |
 
 ## Screenshots
 
-| Scenario | File |
-| -------- | ---- |
+| Scenario | File                                  |
+| -------- | ------------------------------------- |
 | <name>   | `verification/screenshots/<file>.png` |
 
 ## Verdict
@@ -236,11 +255,16 @@ Write `specs/story-NNN-slug/verification/qa-report.md`:
 PASS — Story US-NNN matches its spec end-to-end.
 ```
 
+Journal: `node "$LEDGER" log --kind gate --gate v-and-v --verdict PASS --report specs/story-NNN-slug/verification/qa-report.md --story US-NNN --stage verification-and-validation --summary "<scenarios> scenarios, <fixes> fixes"` (contract §3, §5).
+
 ### Update state and tracker
 
 1. `state.json`:
    ```json
-   { "phase_local": "verified", "verification": { "...": "...", "completed_at": "<ISO>" } }
+   {
+     "phase_local": "verified",
+     "verification": { "...": "...", "completed_at": "<ISO>" }
+   }
    ```
 2. `specs/stories.json`:
    ```json
@@ -276,6 +300,8 @@ Use `AskUserQuestion`:
 
 ## Autonomous Loop Execution
 
+Unattended runs are driven by `/autopilot` (see `references/autopilot-contract.md`). The legacy `claude -p` bash loop still works: it just needs `AUTOPILOT=1` in the environment.
+
 ```bash
 #!/bin/bash
 STORY="${1:-US-001}"
@@ -284,7 +310,7 @@ ITERATION=0
 
 while [ $ITERATION -lt $MAX_ITERATIONS ]; do
   ITERATION=$((ITERATION + 1))
-  OUTPUT=$(claude -p "Use the verification-and-validation skill for $STORY. \
+  OUTPUT=$(AUTOPILOT=1 claude -p "Use the verification-and-validation skill for $STORY. \
     Read specs/story-${STORY:3}-*/state.json to determine where you left off. \
     Follow: automated suite → start app → curl → Playwright → fix any deviation \
     → write qa-report.md → update stories.json." \
@@ -311,8 +337,6 @@ fix(US-003): align card layout with mockup grid spec
 docs: finalize README with complete onboarding guide
 ```
 
-NEVER add a `Co-Authored-By` trailer.
-
 ---
 
 ## Decision Rules
@@ -320,12 +344,12 @@ NEVER add a `Co-Authored-By` trailer.
 ### When to fix vs. when to flag
 
 - **Always fix** — this skill's mandate is to leave the app matching its spec.
-- **Flag only** if the spec itself seems wrong (contradictory scenarios, impossible AC). Log it in `state.json.verification.issues` and note that the spec needs review — but still implement the best interpretation.
+- **Flag only** if the spec itself seems wrong (contradictory scenarios, impossible AC). Log it in `state.json.verification.issues` and note that the spec needs review — but still implement the best interpretation. Under autopilot, the "flag only" case is hard stop `spec_contradiction` (contract §2) after journaling the contradiction and filing it as `node "$LEDGER" backlog add --kind spec-gap --severity error`.
 
 ### When to ask the user
 
-- Ralph-loop mode: never — make a decision, fix the issue, document in state.
-- Outside the loop:
+- Under autopilot: never (contract §2).
+- Outside autopilot:
   - Ask when a spec seems contradictory.
   - Ask when a fix would require an architecture change (re-invoke `/research-and-architecture` for an ADR).
 
