@@ -157,7 +157,7 @@ Build a row-per-test table. Each row:
 
 - Has an id (`T-01`, `T-02`, …)
 - Has an `Op` value (`Op-1`, `Op-2`, …) matching one of the Operations defined above
-- Names the test type (`BDD | unit | integration | bench`)
+- Names the test type (`BDD | unit | integration | bench | manual`)
 - References a Gherkin scenario, an AC id, or a Safeguard — the Asserts column makes the link concrete
 - Names the file path where the test lives
 
