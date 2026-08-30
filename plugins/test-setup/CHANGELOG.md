@@ -11,6 +11,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 ### Added
 
 - Toolchain placeholders from package.json (no more hardcoded bun); Op selection by scenario name, never editing feature files; manual Test Plan rows; unified cursor rule; pipeline contract + journaling; Co-Authored-By rule removed.
+- state-schema migration note uses the unified cursor rule.
 
 ## [3.1.0] — 2026-08-22
 

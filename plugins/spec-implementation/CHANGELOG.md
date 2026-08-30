@@ -11,6 +11,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 ### Added
 
 - Toolchain placeholders; shared cursor rule; regression baseline via ledger regress; Gate 3 slimmed to suite/lint/types/boundaries (live-app checks live in V&V only); warnings → backlog; pipeline contract + journaling; Co-Authored-By rule removed.
+- Backlog templates carry the required `--title`.
 
 ## [3.1.0] — 2026-08-22
 
