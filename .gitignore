@@ -3,5 +3,5 @@
 *.backup-*
 node_modules/
 .tmp/
-docs/
+docs/*
 !docs/superpowers/
