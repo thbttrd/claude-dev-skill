@@ -1,6 +1,6 @@
 ---
 name: spec-writing
-version: 2.1.0
+version: 2.2.0
 description: Story-based spec-writing skill that produces, for one user story at a time, a `STORY.md` (INVEST-shaped User Story + Acceptance Criteria + Rules) plus one or more Cucumber-compatible `.feature` files with full Gherkin scenarios. Runs an INVEST gate (Phase 0) before any spec generation, scaled by the story's rigor tier (light stories get a single-batch confirmation and chain straight into /plan-writing compact mode; full stories get the full interactive gate). Ends with a mandatory self-review checklist walk. Output lives at `specs/story-NNN-slug/`. Use this skill whenever the user wants to spec a specific story, define behaviour for a feature, capture acceptance criteria, or says things like "spec story US-001", "/spec-writing US-NNN", "let's spec out the auth story", "write the Gherkin for this feature". Also trigger when the user wants to update or refine an existing story's spec, add new rules, or audit acceptance-criteria coverage.
 ---
 
@@ -18,14 +18,15 @@ There are **no project-wide spec documents owned by this skill**. The project ov
 
 Run these checks before any work:
 
-| Check                                       | Action                                                                                                                                                                                       |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/project-tracking.json` exists         | Hard-stop. Print: `Legacy layout detected. Run: node scripts/migrate-tracking.mjs --input docs/project-tracking.json --out specs/`. Do not write any files.                                  |
-| `docs/V*/` directory exists                 | Hard-stop with the same migration command.                                                                                                                                                   |
-| `specs/stories.json` does not exist         | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                                                              |
-| Story argument provided (`/spec-writing US-NNN`) | Use it as the target story. Validate the id exists in `specs/stories.json`.                                                                                                              |
-| No story argument                            | Use `AskUserQuestion` to list stories whose `phase ∈ { scoped }` and ask which one to spec. Stories already in `specced` or beyond enter **update mode**.                                |
-| Target story's `phase` is `backlog`          | Hard-stop. Print: `Story US-NNN is still in backlog. Run /high-level-scoping in update mode to INVEST-check it and advance phase to "scoped" before specing.` This guards stories pulled in by the migration script (which defaults unknown phases to "backlog") from being specced without the lightweight INVEST sanity pass. |
+| Check                                                              | Action                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/project-tracking.json` exists                                | Hard-stop. Print: `Legacy layout detected. Run: node scripts/migrate-tracking.mjs --input docs/project-tracking.json --out specs/`. Do not write any files.                                                                                                                                                                     |
+| `docs/V*/` directory exists                                        | Hard-stop with the same migration command.                                                                                                                                                                                                                                                                                      |
+| `specs/stories.json` does not exist                                | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                                                                                                                                                                                                 |
+| Story argument provided (`/spec-writing US-NNN`)                   | Use it as the target story. Validate the id exists in `specs/stories.json`.                                                                                                                                                                                                                                                     |
+| No story argument                                                  | Use `AskUserQuestion` to list stories whose `phase ∈ { scoped }` and ask which one to spec. Stories already in `specced` or beyond enter **update mode**.                                                                                                                                                                       |
+| Target story's `phase` is `backlog`                                | Hard-stop. Print: `Story US-NNN is still in backlog. Run /high-level-scoping in update mode to INVEST-check it and advance phase to "scoped" before specing.` This guards stories pulled in by the migration script (which defaults unknown phases to "backlog") from being specced without the lightweight INVEST sanity pass. |
+| `specs/autopilot.json` has `"active": true` (or env `AUTOPILOT=1`) | Follow `references/autopilot-contract.md` §1–2 for this whole invocation: no `AskUserQuestion`, take the _(Recommended)_ option, journal decisions and gates, stop only on the contract's hard conditions. Journaling (§3) and toolchain resolution (§4) apply regardless.                                                      |
 
 The story id chosen here is the only story this invocation modifies.
 
@@ -39,18 +40,20 @@ Before any discovery or generation, run the INVEST checklist for the chosen stor
 
 **Light stories (`rigor: "light"`)** get a single-batch gate: run the auto-checks for all six letters yourself, then present the results in ONE `AskUserQuestion` (preview: the filled six-letter table with a one-line note each) asking the user to confirm or flag letters to rework. Only letters the user flags get the full interactive treatment below. If the auto-checks reveal the story is bigger than its tier (more than ~3 expected Operations, a new entity, a new module), say so and offer to re-tier it to `full` — write the new tier back to `stories[i].rigor`.
 
+**Under autopilot (contract §2):** run the six auto-checks yourself for any tier and take the result as final — every letter ✅ → continue (`node "$LEDGER" log --kind gate --gate invest --verdict PASS --summary "6/6 letters pass"`); a letter ❌ that a re-tier fixes (`S` with ≤ 3 Ops → `light`, > 3 → `full`) → write `stories[i].rigor`, `node "$LEDGER" log --kind decision --summary "re-tiered to <tier>: <reason>"`, continue; any other ❌ → `node "$LEDGER" log --kind gate --gate invest --verdict FAIL --summary "<letter> failed: <reason>"` and hard stop `split_required` (for `S`/`I`) or `spec_contradiction` (for `N`/`V`/`E`/`T`). `/autopilot` (Plan 2) replaces the auto-checks with the `invest-assessor` agent; the verdict handling stays as written here.
+
 **Full stories** run the gate interactively — every check is asked via `AskUserQuestion` so the user is the source of truth, not the model.
 
 For each letter, present the current state, ask the user to confirm or correct, and record the result in both `STORY.md`'s INVEST table and `specs/stories.json`'s `stories[i].invest`.
 
-| Letter | Question to the user                                                                                                                                       | Auto-check                                                                       | Failure handling                                                                                                  |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| **I**ndependent | "Does this story unavoidably depend on a story that is NOT yet `verified` and NOT in its `depends_on_story_ids`?"                                | Cross-check `depends_on_story_ids` vs. each AC.                                  | Surface the missing dependency and use `AskUserQuestion` to add it or merge stories.                              |
-| **N**egotiable  | "Does the story prescribe a UI click sequence, a specific tech, or a specific implementation?"                                                   | Heuristic scan for technical jargon ("click", "POST /…", framework names).        | Suggest rephrasing toward outcomes; ask the user to confirm the new wording.                                      |
-| **V**aluable    | "Is the 'So that …' clause a real user benefit, not a filler?"                                                                                   | Required field; not empty; not a tautology.                                       | Block until the user supplies a real benefit.                                                                     |
-| **E**stimable   | "Are the AC concrete enough that you could roughly size the work?"                                                                                | ≥ 2 AC; no AC contains "etc." / "and so on" / "various"; each AC is observable.   | Ask for tighter AC.                                                                                               |
-| **S**mall       | "Will this fit in a single agent loop (rough thumb: ≤ ~6 operations of work)?"                                                                   | Heuristic on AC count + complexity. The skill estimates and lets the user override. | Offer to split into N stories. If accepted, generate the new story stubs in `specs/stories.json` (advancing the next free `US-NNN` ids) and update the current story's `depends_on_story_ids` to point at the splits where appropriate. |
-| **T**estable    | "Can each AC be turned into at least one Gherkin scenario? Want me to draft one for each?"                                                       | Walk AC list; draft a Gherkin skeleton for each.                                  | Block until each AC has a draftable scenario.                                                                     |
+| Letter          | Question to the user                                                                                              | Auto-check                                                                          | Failure handling                                                                                                                                                                                                                        |
+| --------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **I**ndependent | "Does this story unavoidably depend on a story that is NOT yet `verified` and NOT in its `depends_on_story_ids`?" | Cross-check `depends_on_story_ids` vs. each AC.                                     | Surface the missing dependency and use `AskUserQuestion` to add it or merge stories.                                                                                                                                                    |
+| **N**egotiable  | "Does the story prescribe a UI click sequence, a specific tech, or a specific implementation?"                    | Heuristic scan for technical jargon ("click", "POST /…", framework names).          | Suggest rephrasing toward outcomes; ask the user to confirm the new wording.                                                                                                                                                            |
+| **V**aluable    | "Is the 'So that …' clause a real user benefit, not a filler?"                                                    | Required field; not empty; not a tautology.                                         | Block until the user supplies a real benefit.                                                                                                                                                                                           |
+| **E**stimable   | "Are the AC concrete enough that you could roughly size the work?"                                                | ≥ 2 AC; no AC contains "etc." / "and so on" / "various"; each AC is observable.     | Ask for tighter AC.                                                                                                                                                                                                                     |
+| **S**mall       | "Will this fit in a single agent loop (rough thumb: ≤ ~6 operations of work)?"                                    | Heuristic on AC count + complexity. The skill estimates and lets the user override. | Offer to split into N stories. If accepted, generate the new story stubs in `specs/stories.json` (advancing the next free `US-NNN` ids) and update the current story's `depends_on_story_ids` to point at the splits where appropriate. |
+| **T**estable    | "Can each AC be turned into at least one Gherkin scenario? Want me to draft one for each?"                        | Walk AC list; draft a Gherkin skeleton for each.                                    | Block until each AC has a draftable scenario.                                                                                                                                                                                           |
 
 If a story fails any letter and the user does not want to fix it now, **stop the skill** with an explanatory note. Do NOT silently bypass INVEST.
 
@@ -59,7 +62,15 @@ When all six checks are `true`, write the result back to `specs/stories.json`:
 ```json
 {
   "id": "US-NNN",
-  "invest": { "i": true, "n": true, "v": true, "e": true, "s": true, "t": true, "checked_at": "<today>" }
+  "invest": {
+    "i": true,
+    "n": true,
+    "v": true,
+    "e": true,
+    "s": true,
+    "t": true,
+    "checked_at": "<today>"
+  }
 }
 ```
 
@@ -70,6 +81,8 @@ When all six checks are `true`, write the result back to `specs/stories.json`:
 Eliminate ambiguity before writing a single line of spec. A vague spec produces vague software.
 
 **If `specs/stories.json` already provides sufficient context** (story description, AC, dependencies, persona), you may shorten discovery — go straight to confirming scope with the user, then move to generation. Only probe areas where the JSON lacks detail.
+
+Under autopilot there is no discovery conversation: derive everything from `stories.json` (AC, so_that, persona), `PROJECT.md` and `ARCHITECTURE.md`; every interpretation you make is journaled as a decision (`node "$LEDGER" log --kind decision --summary "<interpretation>"`).
 
 ### Always Use the AskUserQuestion Tool
 
@@ -185,11 +198,11 @@ When `STORY.md` already exists for the chosen story:
 
 ### Step 1: Self-Review (mandatory)
 
-Walk the **Writing Quality Checklist** below item by item against the files you just wrote and print the result as a compact checked list. Fix any failing item before proceeding — do not present a spec to the user with open checklist items. This checklist is the default quality gate for this phase; the separate `/spec-writing-verification` deep audit is opt-in (see Step 2).
+Walk the **Writing Quality Checklist** below item by item against the files you just wrote and print the result as a compact checked list. Fix any failing item before proceeding — do not present a spec to the user with open checklist items. This checklist is the default quality gate for this phase; the separate `/spec-writing-verification` deep audit is opt-in (see Step 2). Journal the result: `node "$LEDGER" log --kind gate --gate self-review --verdict PASS|PASS_WITH_WARNINGS|FAIL --summary "N/M checks"`.
 
 ### Step 2: Handoff
 
-Ask the user what to do next. The recommended option depends on the story's rigor:
+Outside autopilot, ask the user what to do next. The recommended option depends on the story's rigor:
 
 **Light stories** — chain straight into planning:
 
@@ -209,6 +222,8 @@ Ask the user what to do next. The recommended option depends on the story's rigo
     - "Add or rework parts" — Loop back into Phase 2.
 
 There is no inline review agent in this skill any more — the fresh-agent deep audit lives exclusively in `/spec-writing-verification`, so there is exactly one of each layer: self-review checklist (mandatory, here) → deep audit (opt-in, separate skill) → `/verification-and-validation` (mandatory, story-end, E2E).
+
+Under autopilot, skip the question and emit `<promise>SPEC_COMPLETE_US-NNN</promise>`.
 
 ---
 

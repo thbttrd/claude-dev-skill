@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.2.0] — 2026-08-30
+
+### Added
+
+- Autopilot: INVEST auto-checks are final, no discovery conversation, SPEC_COMPLETE sentinel; pipeline contract; self-review journaled.
+
 ## [2.1.0] — 2026-08-22
 
 ### Changed
