@@ -63,6 +63,16 @@ for plugin_dir in "$ROOT/plugins/"*/; do
   fi
 
   ok "  $name @ $pj_version"
+
+  # extra skills bundled in the same plugin: frontmatter name must match dir, version must match plugin
+  for extra in "$plugin_dir/skills/"*/; do
+    extra="${extra%/}"; ename="$(basename "$extra")"
+    [ "$ename" = "$name" ] && continue
+    esm="$extra/SKILL.md"
+    [ -f "$esm" ] || { fail "  $name: extra skill $ename has no SKILL.md"; continue; }
+    [ "$(skill_field "$esm" name)" = "$ename" ] || fail "  $name: extra skill $ename frontmatter name mismatch"
+    [ "$(skill_field "$esm" version)" = "$pj_version" ] || fail "  $name: extra skill $ename version ≠ plugin version"
+  done
 done
 
 # 4. marketplace.json plugin entries all map to existing dirs

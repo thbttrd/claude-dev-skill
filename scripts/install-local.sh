@@ -68,11 +68,13 @@ for name in "${PLUGINS[@]}"; do
   plugin_dir="$ROOT/plugins/$name"
   [ -d "$plugin_dir" ] || { warn "skip: plugins/$name not found"; continue; }
 
-  skill_src="$plugin_dir/skills/$name"
-  [ -d "$skill_src" ] || { warn "skip: $skill_src not found"; continue; }
+  [ -d "$plugin_dir/skills/$name" ] || { warn "skip: $plugin_dir/skills/$name not found"; continue; }
 
   info "installing $name"
-  link_into "$skill_src" "$HOME/.claude/skills/$name"
+  for skill_src in "$plugin_dir/skills/"*/; do
+    skill_src="${skill_src%/}"
+    link_into "$skill_src" "$HOME/.claude/skills/$(basename "$skill_src")"
+  done
 
   if [ -d "$plugin_dir/agents" ]; then
     for agent in "$plugin_dir/agents/"*.md; do
