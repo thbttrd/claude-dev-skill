@@ -1,6 +1,6 @@
 ---
 name: spec-writing-verification
-version: 2.1.0
+version: 2.2.0
 description: >
   Per-story verification of the output of /spec-writing for completeness, coherence,
   INVEST compliance, and template fidelity. Spawns a fresh agent to audit
@@ -23,12 +23,13 @@ The verification runs in a **fresh agent** (via the Agent tool) so the review ha
 
 ## Pre-Flight
 
-| Check                                       | Action                                                                                                                                          |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/V*/` directory exists                 | Hard-stop with the migration command.                                                                                                           |
-| `specs/stories.json` does not exist         | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                |
-| Target story id missing                     | Ask the user which story to verify (default: stories whose `phase = specced`).                                                                  |
-| `specs/story-NNN-slug/STORY.md` not found   | Hard-stop. Print: `Story US-NNN has no STORY.md yet. Run /spec-writing US-NNN first.`                                                          |
+| Check                                                              | Action                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/V*/` directory exists                                        | Hard-stop with the migration command.                                                                                                                                                                                                                                      |
+| `specs/stories.json` does not exist                                | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                                                                                                                                            |
+| Target story id missing                                            | Ask the user which story to verify (default: stories whose `phase = specced`).                                                                                                                                                                                             |
+| `specs/story-NNN-slug/STORY.md` not found                          | Hard-stop. Print: `Story US-NNN has no STORY.md yet. Run /spec-writing US-NNN first.`                                                                                                                                                                                      |
+| `specs/autopilot.json` has `"active": true` (or env `AUTOPILOT=1`) | Follow `references/autopilot-contract.md` §1–2 for this whole invocation: no `AskUserQuestion`, take the _(Recommended)_ option, journal decisions and gates, stop only on the contract's hard conditions. Journaling (§3) and toolchain resolution (§4) apply regardless. |
 
 ## When to Run
 
@@ -38,10 +39,10 @@ The verification runs in a **fresh agent** (via the Agent tool) so the review ha
 
 ## What Gets Verified
 
-| Artifact      | Expected Location                                              |
-| ------------- | -------------------------------------------------------------- |
-| STORY.md      | `specs/story-NNN-slug/STORY.md`                                |
-| Feature files | `specs/story-NNN-slug/features/F-NNN-*.feature`                |
+| Artifact      | Expected Location                                                      |
+| ------------- | ---------------------------------------------------------------------- |
+| STORY.md      | `specs/story-NNN-slug/STORY.md`                                        |
+| Feature files | `specs/story-NNN-slug/features/F-NNN-*.feature`                        |
 | stories.json  | `specs/stories.json` — for cross-checking the INVEST flags and `phase` |
 
 UI artifacts (`specs/DESIGN.md`, `specs/story-NNN-slug/ui/UI-F-NNN-*.md`, `specs/story-NNN-slug/mockups/*.html`) are produced by `/ui-specs` and verified by its own review pass — out of scope here.
@@ -200,9 +201,10 @@ FAIL = critical issues that must be fixed before /plan-writing
 ### After the Agent Returns
 
 1. Present the report to the user.
-2. If **FAIL**: list critical issues; ask if they want to fix now (loops back into `/spec-writing US-NNN` update mode).
-3. If **PASS WITH WARNINGS**: show warnings; ask whether to address or proceed.
-4. If **PASS**: confirm readiness and suggest running `/plan-writing US-NNN`.
+2. Journal the verdict: `node "$LEDGER" log --kind gate --gate spec-verification --verdict <PASS|PASS_WITH_WARNINGS|FAIL> --report <report path> --story US-NNN --summary "<one line>"`.
+3. **FAIL**: list critical issues. Outside autopilot ask whether to fix now (loops back into `/spec-writing US-NNN` with `--force`). Under autopilot: hard stop `verifier_fail` (contract §2).
+4. **PASS_WITH_WARNINGS**: file every warning — `node "$LEDGER" backlog add --title "<warning>" --severity warning --kind <spec-gap|test-gap|refactor|doc|bug> --gate spec-verification --report <report path> --story US-NNN` — print the ids, then proceed as PASS. Outside autopilot you may instead offer to address them now.
+5. **PASS**: confirm readiness and suggest running `/plan-writing US-NNN`.
 
 ## What This Skill Does NOT Do
 
