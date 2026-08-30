@@ -369,6 +369,7 @@ function runFailures(cwd, cmd, runner, reportFile) {
     PARSERS[runner],
     `--runner must be one of ${Object.keys(PARSERS).join("|")}`,
   );
+  if (reportFile) rmSync(resolve(cwd, reportFile), { force: true });
   const r = spawnSync("sh", ["-c", cmd], {
     cwd,
     encoding: "utf8",

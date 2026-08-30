@@ -195,7 +195,7 @@ Record results in state.
 
 ## Step 4.5: Manual Test Plan rows
 
-For every `test_plan_rows[T-N]` with `type = "manual"` (from `state.json`): perform the check the PLAN.md row's Asserts column describes (SSH, `curl` from another host, `dig`, reading a unit file, observing a notification…). Record in `qa-report.md` under "Manual checks": row id, what was done (the exact command or observation), outcome PASS/FAIL, evidence (output excerpt or screenshot path). Set `test_plan_rows[T-N].passing = true` on PASS. A FAIL is fixed like any other deviation; if it cannot be fixed from this repo (host-side change), file it: `node "$LEDGER" backlog add --kind bug --severity error --story US-NNN --op <op> --report specs/story-NNN-slug/verification/qa-report.md` and treat the story as **not** verified until resolved.
+For every `test_plan_rows[T-N]` with `type = "manual"` (from `state.json`): perform the check the PLAN.md row's Asserts column describes (SSH, `curl` from another host, `dig`, reading a unit file, observing a notification…). Record in `qa-report.md` under "Manual checks": row id, what was done (the exact command or observation), outcome PASS/FAIL, evidence (output excerpt or screenshot path). Set `test_plan_rows[T-N].passing = true` on PASS. A FAIL is fixed like any other deviation; if it cannot be fixed from this repo (host-side change), file it: `node "$LEDGER" backlog add --title "<one line>" --kind bug --severity error --story US-NNN --op <op> --report specs/story-NNN-slug/verification/qa-report.md` and treat the story as **not** verified until resolved.
 
 ---
 
@@ -346,7 +346,7 @@ docs: finalize README with complete onboarding guide
 ### When to fix vs. when to flag
 
 - **Always fix** — this skill's mandate is to leave the app matching its spec.
-- **Flag only** if the spec itself seems wrong (contradictory scenarios, impossible AC). Log it in `state.json.verification.issues` and note that the spec needs review — but still implement the best interpretation. Under autopilot, the "flag only" case is hard stop `spec_contradiction` (contract §2) after journaling the contradiction and filing it as `node "$LEDGER" backlog add --kind spec-gap --severity error`.
+- **Flag only** if the spec itself seems wrong (contradictory scenarios, impossible AC). Log it in `state.json.verification.issues` and note that the spec needs review — but still implement the best interpretation. Under autopilot, the "flag only" case is hard stop `spec_contradiction` (contract §2) after journaling the contradiction and filing it as `node "$LEDGER" backlog add --title "<one line>" --kind spec-gap --severity error`.
 
 ### When to ask the user
 

@@ -264,7 +264,7 @@ mv specs/story-NNN-slug/state.json.tmp specs/story-NNN-slug/state.json
 - After Op-X's RED-A is committed → `Op-X.operation_phase = "red_a"`, `tests_status = "in_progress"`.
 - After Op-X's RED-B is committed → `Op-X.operation_phase = "red_b"`, `tests_status = "in_progress"`.
 - After every test file is written → append to `test_plan_rows` with `written: true, passing: false, op: "Op-X"`.
-- When Op-X is fully RED → `Op-X.operation_phase = "red"`, `tests_status = "red"`, `stub_status = "created"`, advance `current_operation` to the next pending op; rows typed manual are recorded but never written.
+- When Op-X is fully RED → `Op-X.operation_phase = "red"`, `tests_status = "red"`, `stub_status = "created"`, advance `current_operation` to the first Op whose `operation_phase ∉ {green, refactored}` (or `null` if every Op is GREEN); rows typed manual are recorded but never written.
 - When **every** Op has reached `operation_phase = "red"` → flip `phase_local` to `"executing"` (handoff to `/spec-implementation`).
 - After every error encountered → append to `errors[]`.
 

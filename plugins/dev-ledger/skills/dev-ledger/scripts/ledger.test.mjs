@@ -194,6 +194,7 @@ test("gitCommits turns conventional commits with a US-NNN scope into commit entr
   git("init", "-q");
   git("config", "user.email", "t@t");
   git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
   git("add", ".");
   git("commit", "-qm", "feat(US-001): implement Op-1 — thing");
   git("commit", "-q", "--allow-empty", "-m", "chore: unrelated");
@@ -239,6 +240,7 @@ test("gitCommits normalizes non-UTC timestamps to UTC and sorts correctly", () =
   git("init", "-q");
   git("config", "user.email", "t@t");
   git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
   git("add", ".");
   const env = {
     ...process.env,
@@ -403,6 +405,7 @@ test("regress diffs failures of the working tree against a base sha via a worktr
   git("init", "-q");
   git("config", "user.email", "t@t");
   git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
   writeFileSync(join(root, "failures.txt"), "a\nb\n");
   git("add", ".");
   git("commit", "-qm", "base");
@@ -426,6 +429,7 @@ test("regress reads a report file when --report-file is given", () => {
   git("init", "-q");
   git("config", "user.email", "t@t");
   git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
   writeFileSync(join(root, "gen.sh"), 'printf "x\\n" > out.txt');
   git("add", ".");
   git("commit", "-qm", "base");
@@ -449,6 +453,7 @@ test("regress honours absolute report file paths", () => {
   git("init", "-q");
   git("config", "user.email", "t@t");
   git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
   writeFileSync(join(root, "gen.sh"), `printf "x\\n" > ${reportPath}`);
   git("add", ".");
   git("commit", "-qm", "base");
@@ -463,6 +468,35 @@ test("regress honours absolute report file paths", () => {
   assert.deepEqual(r.regressions, ["y"]);
 });
 
+test("regress fails closed when the base run doesn't write its report file (stale head report must not be reused)", () => {
+  const reportDir = mkdtempSync(join(tmpdir(), "report-"));
+  const reportPath = join(reportDir, "results.txt");
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
+  // base commit's gen.sh writes nothing at all
+  writeFileSync(join(root, "gen.sh"), "true\n");
+  git("add", ".");
+  git("commit", "-qm", "base");
+  // working tree's gen.sh writes the shared absolute report file
+  writeFileSync(join(root, "gen.sh"), `printf "x\\ny\\n" > ${reportPath}`);
+  assert.throws(
+    () =>
+      regress({
+        root,
+        base: "HEAD",
+        cmd: "sh gen.sh",
+        runner: "lines",
+        reportFile: reportPath,
+      }),
+    /not parseable|could not run|ENOENT/i,
+  );
+});
+
 test("regress leaves nothing behind when git worktree add fails", () => {
   const root = fixtureProject();
   const git = (...a) =>
@@ -470,6 +504,7 @@ test("regress leaves nothing behind when git worktree add fails", () => {
   git("init", "-q");
   git("config", "user.email", "t@t");
   git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
   writeFileSync(join(root, "f.txt"), "a\n");
   git("add", ".");
   git("commit", "-qm", "base");
@@ -508,6 +543,7 @@ test("regress throws with diagnostic on unparseable runner output", () => {
   git("init", "-q");
   git("config", "user.email", "t@t");
   git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
   writeFileSync(join(root, "f.txt"), "a\n");
   git("add", ".");
   git("commit", "-qm", "base");

@@ -42,7 +42,7 @@ Fields:
 - `kind ∈ {stage_start, stage_end, decision, action, gate, finding, commit, stop}`
 - `gate` entries carry `{"gate":"self-review|simplify|code-review|verify|invest|spec-verification|plan-verification|red-audit|green-audit|v-and-v","verdict":"PASS|PASS_WITH_WARNINGS|FAIL","report":"path"}`
 - `finding` entries carry the `BL-NNN` id they produced
-- `commit` entries are written by a `post-commit` git hook installed by `/repo-initialization`
+- `commit` entries come from skills logging `ledger log --kind commit` after each commit; independently, `ledger journal` merges `git log` entries whose conventional-commit scope is `(US-NNN)`, so commits are visible even when a skill forgets to log.
 
 ### Backlog — `specs/backlog.json`
 
@@ -83,7 +83,7 @@ Fields:
 ## CLI
 
 ```bash
-LEDGER="$(find "$HOME/.claude/skills" "$HOME/.claude/plugins" -path '*/dev-ledger/scripts/ledger.mjs' -not -path '*archive*' 2>/dev/null | head -1)"
+LEDGER="$(find -L "$HOME/.claude/skills" "$HOME/.claude/plugins" -path '*/dev-ledger/scripts/ledger.mjs' -not -path '*archive*' 2>/dev/null | head -1)"
 node "$LEDGER" log      --kind decision|action|gate|finding|commit|stage_start|stage_end|stop --summary "…" [--story US-NNN] [--op Op-X] [--stage s] [--ref p]… [--sha h] [--gate g --verdict PASS|PASS_WITH_WARNINGS|FAIL --report p] [--backlog-id BL-NNN]
 node "$LEDGER" journal  [--story US-NNN] [--op Op-X] [--kind k] [--since YYYY-MM-DD] [--json] [--no-git]
 node "$LEDGER" backlog  add --title "…" --severity info|warning|error --kind bug|simplification|refactor|test-gap|spec-gap|doc|perf|security [--file p]… [--report p] [--detail "…"]

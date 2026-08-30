@@ -16,7 +16,7 @@ The audit trail of the story-based pipeline. Two tracker files, one CLI, no depe
 The rules for _when_ skills log are in `references/autopilot-contract.md` §3 (canonical copy lives here). The CLI:
 
 ```bash
-LEDGER="$(find "$HOME/.claude/skills" "$HOME/.claude/plugins" -path '*/dev-ledger/scripts/ledger.mjs' -not -path '*archive*' 2>/dev/null | head -1)"
+LEDGER="$(find -L "$HOME/.claude/skills" "$HOME/.claude/plugins" -path '*/dev-ledger/scripts/ledger.mjs' -not -path '*archive*' 2>/dev/null | head -1)"
 node "$LEDGER" log      --kind decision|action|gate|finding|commit|stage_start|stage_end|stop --summary "…" [--story US-NNN] [--op Op-X] [--stage s] [--ref p]… [--sha h] [--gate g --verdict PASS|PASS_WITH_WARNINGS|FAIL --report p] [--backlog-id BL-NNN]
 node "$LEDGER" journal  [--story US-NNN] [--op Op-X] [--kind k] [--since YYYY-MM-DD] [--json] [--no-git]
 node "$LEDGER" backlog  add --title "…" --severity info|warning|error --kind bug|simplification|refactor|test-gap|spec-gap|doc|perf|security [--file p]… [--report p] [--detail "…"]

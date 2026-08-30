@@ -256,7 +256,7 @@ git diff --name-only $BASE_SHA..HEAD | grep -v '^specs/'
 
 `BASE_SHA` is the parent of the first `test(US-NNN):` commit (the very first commit of `/test-setup US-NNN Op-1`). Re-run the full per-story suite (`<TEST> -t "@US-NNN"` + `<BDD>` story filter) afterwards; everything must still pass. If Simplify made commits, also run the unfiltered suite to confirm no other regressions.
 
-Update `state.json.quality_gates.simplified = true`. Journal the gate: `node "$LEDGER" log --kind gate --gate simplify --verdict PASS --summary "<n> files simplified"`. Every simplification deliberately not applied → `node "$LEDGER" backlog add --kind simplification --severity info`.
+Update `state.json.quality_gates.simplified = true`. Journal the gate: `node "$LEDGER" log --kind gate --gate simplify --verdict PASS --summary "<n> files simplified"`. Every simplification deliberately not applied → `node "$LEDGER" backlog add --title "<one line>" --kind simplification --severity info`.
 
 ### Gate 2 — Code Review
 
@@ -269,7 +269,7 @@ The reviewer audits the whole story's diff for:
 - Safeguards compliance (invariants, performance, security, data rules from PLAN.md's second S section).
 - Code quality (no obvious bugs, no missed edge cases, no over-implementation beyond Op scope).
 
-Act on critical findings. Every warning not acted on → `node "$LEDGER" backlog add --kind <bug|refactor|…> --severity warning --gate code-review --report <path>`; persist the ids in `state.json.quality_gates.review_findings[]`. Journal the gate verdict. Update `state.json.quality_gates.reviewed = true`.
+Act on critical findings. Every warning not acted on → `node "$LEDGER" backlog add --title "<one line>" --kind <bug|refactor|…> --severity warning --gate code-review --report <path>`; persist the ids in `state.json.quality_gates.review_findings[]`. Journal the gate verdict. Update `state.json.quality_gates.reviewed = true`.
 
 ### Gate 3 — Story Verification (end-to-end)
 
