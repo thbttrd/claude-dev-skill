@@ -14,6 +14,11 @@ import {
   gitCommits,
   formatTable,
   KINDS,
+  readBacklog,
+  backlogAdd,
+  backlogList,
+  backlogResolve,
+  backlogWontfix,
 } from "./ledger.mjs";
 
 export function fixtureProject() {
@@ -246,4 +251,105 @@ test("gitCommits normalizes non-UTC timestamps to UTC and sorts correctly", () =
   const lines = table.trim().split("\n");
   assert.match(lines[0], /13:05.*feat\(US-001\)/);
   assert.match(lines[1], /14:00.*later/);
+});
+
+test("backlog add assigns BL-NNN ids, persists, and journals a finding", () => {
+  const specs = join(fixtureProject(), "specs");
+  assert.deepEqual(readBacklog(specs), { next_id: 1, items: [] });
+  const now = new Date("2026-08-30T12:00:00Z");
+  const a = backlogAdd(
+    specs,
+    {
+      title: "Extract helper",
+      severity: "warning",
+      kind: "simplification",
+      file: ["a.ts"],
+      story: "US-008",
+      op: "Op-1",
+      stage: "spec-implementation",
+      gate: "code-review",
+      report: "r.md",
+      detail: "d",
+    },
+    now,
+  );
+  assert.equal(a.id, "BL-001");
+  assert.equal(a.status, "open");
+  assert.equal(a.created_at, "2026-08-30");
+  assert.deepEqual(a.source, {
+    stage: "spec-implementation",
+    gate: "code-review",
+    story: "US-008",
+    op: "Op-1",
+    report: "r.md",
+  });
+  assert.deepEqual(a.files, ["a.ts"]);
+  assert.equal(a.resolved_sha, null);
+  const b = backlogAdd(
+    specs,
+    { title: "Second", severity: "info", kind: "doc" },
+    now,
+  );
+  assert.equal(b.id, "BL-002");
+  assert.equal(readBacklog(specs).next_id, 3);
+  const j = readJournal(specs);
+  assert.equal(j.length, 2);
+  assert.equal(j[0].kind, "finding");
+  assert.equal(j[0].backlog_id, "BL-001");
+  assert.equal(j[0].story, "US-008");
+});
+
+test("backlog add validates severity and kind", () => {
+  const specs = join(fixtureProject(), "specs");
+  assert.throws(
+    () => backlogAdd(specs, { title: "t", severity: "huge", kind: "bug" }),
+    /--severity/,
+  );
+  assert.throws(
+    () => backlogAdd(specs, { title: "t", severity: "info", kind: "vibe" }),
+    /--kind/,
+  );
+  assert.throws(
+    () => backlogAdd(specs, { severity: "info", kind: "bug" }),
+    /--title/,
+  );
+});
+
+test("backlog list filters; resolve and wontfix update status and journal an action", () => {
+  const specs = join(fixtureProject(), "specs");
+  backlogAdd(specs, {
+    title: "a",
+    severity: "error",
+    kind: "bug",
+    story: "US-001",
+  });
+  backlogAdd(specs, {
+    title: "b",
+    severity: "info",
+    kind: "doc",
+    story: "US-002",
+  });
+  assert.equal(backlogList(specs, {}).length, 2);
+  assert.equal(backlogList(specs, { story: "US-001" })[0].title, "a");
+  assert.equal(backlogList(specs, { severity: "info" })[0].id, "BL-002");
+  const r = backlogResolve(
+    specs,
+    "BL-001",
+    { sha: "abc1234", resolution: "fixed in shared helper" },
+    new Date("2026-09-01T00:00:00Z"),
+  );
+  assert.equal(r.status, "done");
+  assert.equal(r.resolved_sha, "abc1234");
+  assert.equal(r.resolved_at, "2026-09-01");
+  const w = backlogWontfix(specs, "BL-002", { reason: "not worth it" });
+  assert.equal(w.status, "wontfix");
+  assert.equal(w.resolution, "not worth it");
+  assert.equal(backlogList(specs, { status: "open" }).length, 0);
+  assert.throws(
+    () => backlogResolve(specs, "BL-999", { sha: "x", resolution: "y" }),
+    /BL-999 not found/,
+  );
+  const actions = readJournal(specs).filter((e) => e.kind === "action");
+  assert.equal(actions.length, 2);
+  assert.equal(actions[0].backlog_id, "BL-001");
 });

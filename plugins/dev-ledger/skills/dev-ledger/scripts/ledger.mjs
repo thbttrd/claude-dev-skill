@@ -182,6 +182,142 @@ export function formatTable(entries) {
   );
 }
 
+// ---- Backlog ---------------------------------------------------------------
+function backlogPath(specs) {
+  return join(specs, "backlog.json");
+}
+
+export function readBacklog(specs) {
+  return existsSync(backlogPath(specs))
+    ? JSON.parse(readFileSync(backlogPath(specs), "utf8"))
+    : { next_id: 1, items: [] };
+}
+
+function writeBacklog(specs, data) {
+  writeFileSync(backlogPath(specs), JSON.stringify(data, null, 2) + "\n");
+}
+
+const day = (d) => d.toISOString().slice(0, 10);
+
+export function backlogAdd(specs, opts, now = new Date()) {
+  must(typeof opts.title === "string" && opts.title, "--title is required");
+  must(
+    SEVERITIES.includes(opts.severity),
+    `--severity must be one of ${SEVERITIES.join("|")}`,
+  );
+  must(
+    BACKLOG_KINDS.includes(opts.kind),
+    `--kind must be one of ${BACKLOG_KINDS.join("|")}`,
+  );
+  const ctx = autopilotContext(specs);
+  const data = readBacklog(specs);
+  const item = {
+    id: `BL-${String(data.next_id).padStart(3, "0")}`,
+    title: opts.title,
+    detail: opts.detail ?? "",
+    source: {
+      stage: opts.stage ?? ctx.stage ?? null,
+      gate: opts.gate ?? null,
+      story: opts.story ?? ctx.story ?? null,
+      op: opts.op ?? ctx.op ?? null,
+      report: opts.report ?? null,
+    },
+    severity: opts.severity,
+    kind: opts.kind,
+    files: opts.file ?? [],
+    status: "open",
+    created_at: day(now),
+    resolved_at: null,
+    resolved_sha: null,
+    resolution: null,
+  };
+  data.items.push(item);
+  data.next_id += 1;
+  writeBacklog(specs, data);
+  log(
+    specs,
+    {
+      kind: "finding",
+      summary: `${item.id}: ${item.title}`,
+      story: item.source.story,
+      op: item.source.op,
+      stage: item.source.stage,
+      ref: item.source.report ? [item.source.report] : [],
+      "backlog-id": item.id,
+    },
+    now,
+  );
+  return item;
+}
+
+export function backlogList(specs, f = {}) {
+  return readBacklog(specs).items.filter(
+    (i) =>
+      (!f.status || i.status === f.status) &&
+      (!f.story || i.source.story === f.story) &&
+      (!f.severity || i.severity === f.severity),
+  );
+}
+
+function updateItem(specs, id, patch, summary, now) {
+  const data = readBacklog(specs);
+  const item = data.items.find((i) => i.id === id);
+  must(item, `${id} not found`);
+  Object.assign(item, patch);
+  writeBacklog(specs, data);
+  log(
+    specs,
+    {
+      kind: "action",
+      summary,
+      story: item.source.story,
+      op: item.source.op,
+      sha: patch.resolved_sha ?? null,
+      "backlog-id": id,
+    },
+    now,
+  );
+  return item;
+}
+
+export function backlogResolve(
+  specs,
+  id,
+  { sha, resolution },
+  now = new Date(),
+) {
+  must(sha && resolution, "--sha and --resolution are required");
+  return updateItem(
+    specs,
+    id,
+    { status: "done", resolved_at: day(now), resolved_sha: sha, resolution },
+    `${id} resolved: ${resolution}`,
+    now,
+  );
+}
+
+export function backlogWontfix(specs, id, { reason }, now = new Date()) {
+  must(reason, "--reason is required");
+  return updateItem(
+    specs,
+    id,
+    { status: "wontfix", resolved_at: day(now), resolution: reason },
+    `${id} wontfix: ${reason}`,
+    now,
+  );
+}
+
+export function formatBacklog(items) {
+  return (
+    items
+      .map(
+        (i) =>
+          `${i.id}  ${i.status.padEnd(11)} ${i.severity.padEnd(7)} ${i.kind.padEnd(14)} ${(i.source.story ?? "").padEnd(6)} ${(i.source.op ?? "").padEnd(5)} ${i.title}`,
+      )
+      .join("\n") + (items.length ? "\n" : "")
+  );
+}
+
 // ---- CLI -------------------------------------------------------------------
 export function main(argv) {
   const opts = parseArgs(argv);
@@ -208,6 +344,39 @@ export function main(argv) {
           : formatTable(entries),
       );
       return 0;
+    }
+    case "backlog": {
+      const [, sub, id] = opts._;
+      if (sub === "add") {
+        const it = backlogAdd(specs, opts);
+        process.stdout.write(it.id + "\n");
+        return 0;
+      }
+      if (sub === "list" || sub === undefined) {
+        const items = backlogList(specs, opts);
+        process.stdout.write(
+          opts.json
+            ? JSON.stringify(items, null, 2) + "\n"
+            : formatBacklog(items),
+        );
+        return 0;
+      }
+      if (sub === "resolve") {
+        process.stdout.write(
+          JSON.stringify(backlogResolve(specs, id, opts)) + "\n",
+        );
+        return 0;
+      }
+      if (sub === "wontfix") {
+        process.stdout.write(
+          JSON.stringify(backlogWontfix(specs, id, opts)) + "\n",
+        );
+        return 0;
+      }
+      process.stderr.write(
+        "usage: ledger backlog <add|list|resolve BL-NNN|wontfix BL-NNN>\n",
+      );
+      return 2;
     }
     default:
       process.stderr.write(
