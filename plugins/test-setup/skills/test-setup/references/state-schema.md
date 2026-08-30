@@ -144,7 +144,7 @@ When invoked without an explicit `Op-X` arg, each skill resolves the target Oper
 
 ```
 /test-setup US-NNN:
-  pick first op where operation_phase ∈ {pending, red_a}
+  pick first op where operation_phase ∉ {red, green, refactored}
   if none → "All ops are RED. Did you mean /spec-implementation US-NNN?"
 
 /test-setup-verification US-NNN:
