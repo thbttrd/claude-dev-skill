@@ -12,8 +12,6 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 - Pipeline contract; verdict journaled; warnings filed as backlog items (BL-NNN); toolchain placeholders.
 
--
-
 ## [2.1.0] — 2026-08-22
 
 ### Changed
