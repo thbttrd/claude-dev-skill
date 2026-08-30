@@ -3,12 +3,16 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { execFileSync } from "node:child_process";
 import {
   findSpecsDir,
   parseArgs,
   autopilotContext,
   log,
   readJournal,
+  filterJournal,
+  gitCommits,
+  formatTable,
   KINDS,
 } from "./ledger.mjs";
 
@@ -134,4 +138,79 @@ test("log validates kind, summary and gate verdict", () => {
 
 test("readJournal on a missing file is an empty array", () => {
   assert.deepEqual(readJournal(join(fixtureProject(), "specs")), []);
+});
+
+test("filterJournal filters by story/op/kind/since", () => {
+  const es = [
+    {
+      ts: "2026-08-29T00:00:00Z",
+      story: "US-001",
+      op: "Op-1",
+      kind: "decision",
+      summary: "a",
+    },
+    {
+      ts: "2026-08-30T00:00:00Z",
+      story: "US-001",
+      op: "Op-2",
+      kind: "gate",
+      summary: "b",
+    },
+    {
+      ts: "2026-08-30T00:00:00Z",
+      story: "US-002",
+      op: null,
+      kind: "decision",
+      summary: "c",
+    },
+  ];
+  assert.equal(filterJournal(es, { story: "US-001" }).length, 2);
+  assert.equal(filterJournal(es, { op: "Op-2" })[0].summary, "b");
+  assert.equal(filterJournal(es, { kind: "decision" }).length, 2);
+  assert.equal(filterJournal(es, { since: "2026-08-30" }).length, 2);
+});
+
+test("gitCommits turns conventional commits with a US-NNN scope into commit entries", () => {
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  git("add", ".");
+  git("commit", "-qm", "feat(US-001): implement Op-1 — thing");
+  git("commit", "-q", "--allow-empty", "-m", "chore: unrelated");
+  const all = gitCommits(root, {});
+  assert.equal(all.length, 2);
+  const only = gitCommits(root, { story: "US-001" });
+  assert.equal(only.length, 1);
+  assert.equal(only[0].kind, "commit");
+  assert.equal(only[0].story, "US-001");
+  assert.match(only[0].sha, /^[0-9a-f]{7,}$/);
+  assert.match(only[0].ts, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(only[0].summary, "feat(US-001): implement Op-1 — thing");
+});
+
+test("formatTable renders one line per entry, sorted by ts", () => {
+  const s = formatTable([
+    {
+      ts: "2026-08-30T10:00:00Z",
+      story: "US-001",
+      op: "Op-2",
+      kind: "gate",
+      verdict: "PASS",
+      summary: "b",
+    },
+    {
+      ts: "2026-08-30T09:00:00Z",
+      story: "US-001",
+      op: null,
+      kind: "decision",
+      summary: "a",
+    },
+  ]);
+  const lines = s.trim().split("\n");
+  assert.equal(lines.length, 2);
+  assert.match(lines[0], /09:00.*US-001.*decision.*a/);
+  assert.match(lines[1], /10:00.*Op-2.*gate.*PASS.*b/);
 });

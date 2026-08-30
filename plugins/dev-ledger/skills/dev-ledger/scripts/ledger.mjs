@@ -129,6 +129,58 @@ export function readJournal(specs) {
     .map((l) => JSON.parse(l));
 }
 
+export function filterJournal(entries, f = {}) {
+  return entries.filter(
+    (e) =>
+      (!f.story || e.story === f.story) &&
+      (!f.op || e.op === f.op) &&
+      (!f.kind || e.kind === f.kind) &&
+      (!f.since || e.ts >= new Date(f.since).toISOString()),
+  );
+}
+
+export function gitCommits(root, f = {}) {
+  const r = spawnSync("git", ["log", "--format=%h%x1f%aI%x1f%s"], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  if (r.status !== 0) return [];
+  return r.stdout
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const [sha, ts, summary] = line.split("\x1f");
+      const story = summary.match(/^\w+\((US-\d{3})\)/)?.[1] ?? null;
+      return {
+        ts,
+        story,
+        op: null,
+        stage: null,
+        kind: "commit",
+        summary,
+        sha,
+        refs: [],
+      };
+    })
+    .filter((e) => !f.story || e.story === f.story);
+}
+
+export function formatTable(entries) {
+  const pad = (s, n) =>
+    String(s ?? "")
+      .padEnd(n)
+      .slice(0, n);
+  return (
+    [...entries]
+      .sort((a, b) => a.ts.localeCompare(b.ts))
+      .map(
+        (e) =>
+          `${e.ts.slice(0, 16).replace("T", " ")}  ${pad(e.story, 6)} ${pad(e.op, 5)} ${pad(e.stage, 22)} ${pad(e.kind, 11)} ${pad(e.verdict ?? e.sha ?? e.backlog_id ?? "", 18)} ${e.summary}`,
+      )
+      .join("\n") + "\n"
+  );
+}
+
 // ---- CLI -------------------------------------------------------------------
 export function main(argv) {
   const opts = parseArgs(argv);
@@ -141,6 +193,19 @@ export function main(argv) {
     case "log": {
       const e = log(specs, opts);
       process.stdout.write(JSON.stringify(e) + "\n");
+      return 0;
+    }
+    case "journal": {
+      let entries = filterJournal(readJournal(specs), opts);
+      if (!opts["no-git"])
+        entries = entries.concat(
+          filterJournal(gitCommits(dirname(specs), opts), opts),
+        );
+      process.stdout.write(
+        opts.json
+          ? JSON.stringify(entries, null, 2) + "\n"
+          : formatTable(entries),
+      );
       return 0;
     }
     default:
