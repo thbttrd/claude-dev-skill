@@ -1,6 +1,6 @@
 ---
 name: test-setup
-version: 3.1.0
+version: 3.2.0
 description: >
   Per-Operation RED-phase scaffolder. For ONE Operation of ONE story (US-NNN
   Op-X) at a time, writes the BDD step definitions and unit/integration tests
@@ -21,7 +21,7 @@ Writes the BDD step definitions, unit tests, and source stubs **for one Operatio
 
 The skill reads the story's `PLAN.md` (REASONS canvas), filters the Test Plan to rows where `Op = Op-X`, and turns those rows into actual files. It also reads the matching Operation's RED-A (BDD steps) and RED-B (unit/integration) sections to know what file to write where. Stubs are created lazily — only the files this Operation's tests import that don't exist yet.
 
-The story is the unit of *planning*; the Operation is the unit of *execution*. Every Operation cycles RED-A → RED-B → GREEN → REFACTOR independently, and the per-story `state.json` tracks each Operation's `operation_phase` cursor.
+The story is the unit of _planning_; the Operation is the unit of _execution_. Every Operation cycles RED-A → RED-B → GREEN → REFACTOR independently, and the per-story `state.json` tracks each Operation's `operation_phase` cursor.
 
 ## Prerequisites
 
@@ -33,22 +33,23 @@ The story is the unit of *planning*; the Operation is the unit of *execution*. E
 
 ## Pre-Flight
 
-| Check                                                | Action                                                                                                                                          |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/V*/` directory exists                          | Hard-stop with the migration command.                                                                                                           |
-| `specs/stories.json` does not exist                  | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                |
-| Target story id missing                              | Use `AskUserQuestion` to list stories whose `phase ∈ {planned, red}` and pick one.                                                              |
-| Story's `phase` is not `planned` or `red`            | Hard-stop. Print: `Story US-NNN must be planned or red before test-setup. Run /plan-writing US-NNN first.`                                      |
-| `specs/story-NNN-slug/PLAN.md` does not exist        | Hard-stop with the same message.                                                                                                                |
-| BDD toolchain not wired (first invocation only)      | Run the **BDD Toolchain Pre-Flight** gate below. If any check fails, emit `TOOLING_NOT_READY` and stop without writing tests.                  |
-| Any dependency in `depends_on_story_ids` is not `verified` and not `is_foundation: true` | Hard-stop with the dependency name and the suggested fix.                                                                |
-| `state.json.schema_version < 2`                      | Run the v1 → v2 migration (see `references/state-schema.md`) atomically, then continue.                                                         |
+| Check                                                                                    | Action                                                                                                                                                                                                                                                                     |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/V*/` directory exists                                                              | Hard-stop with the migration command.                                                                                                                                                                                                                                      |
+| `specs/stories.json` does not exist                                                      | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                                                                                                                                            |
+| Target story id missing                                                                  | Use `AskUserQuestion` to list stories whose `phase ∈ {planned, red}` and pick one.                                                                                                                                                                                         |
+| Story's `phase` is not `planned` or `red`                                                | Hard-stop. Print: `Story US-NNN must be planned or red before test-setup. Run /plan-writing US-NNN first.`                                                                                                                                                                 |
+| `specs/story-NNN-slug/PLAN.md` does not exist                                            | Hard-stop with the same message.                                                                                                                                                                                                                                           |
+| BDD toolchain not wired (first invocation only)                                          | Run the **BDD Toolchain Pre-Flight** gate below. If any check fails, emit `TOOLING_NOT_READY` and stop without writing tests.                                                                                                                                              |
+| Any dependency in `depends_on_story_ids` is not `verified` and not `is_foundation: true` | Hard-stop with the dependency name and the suggested fix.                                                                                                                                                                                                                  |
+| `state.json.schema_version < 2`                                                          | Run the v1 → v2 migration (see `references/state-schema.md`) atomically, then continue.                                                                                                                                                                                    |
+| `specs/autopilot.json` has `"active": true` (or env `AUTOPILOT=1`)                       | Follow `references/autopilot-contract.md` §1–2 for this whole invocation: no `AskUserQuestion`, take the _(Recommended)_ option, journal decisions and gates, stop only on the contract's hard conditions. Journaling (§3) and toolchain resolution (§4) apply regardless. |
 
 ## BDD Toolchain Pre-Flight (hard go/no-go gate)
 
 Runs **only on the first per-story invocation** (when `state.json` is absent OR every Op's `operation_phase = "pending"`). Subsequent per-Op invocations skip this gate.
 
-Four checks (unchanged from v2): BDD dependency declared in `package.json` (`playwright-bdd` or `@cucumber/cucumber`); wiring file consumes `.feature` files at `specs/story-*/features/**/*.feature`; discovery dry-run succeeds; every `.feature` file parses. If any fails, emit `TOOLING_NOT_READY` with specific remediation steps and stop.
+Four checks (unchanged from v2): BDD dependency declared in `package.json` (`playwright-bdd` or `@cucumber/cucumber`); wiring file consumes `.feature` files at `specs/story-*/features/**/*.feature`; discovery dry-run succeeds; every `.feature` file parses. If any fails, emit `TOOLING_NOT_READY` with specific remediation steps. Under autopilot this is hard stop `tooling_not_ready` (contract §2).
 
 ---
 
@@ -63,7 +64,7 @@ If Op-X passed explicitly:
   Else → use Op-X.
 
 If no Op-X passed (smart default):
-  Pick the first Op where operation_phase ∈ {pending, red_a}.
+  Pick the first Op where operation_phase ∉ {red, green, refactored} (i.e. the cursor rule: current_operation = first Op not yet RED-complete for this skill; the shared rule across skills is "first Op not yet GREEN").
   If none → "All ops are RED. Did you mean /spec-implementation US-NNN?"
 ```
 
@@ -126,19 +127,23 @@ Read PLAN.md and extract:
 
 If a Test Plan row has no `Op` value (legacy v1 plan), fall back to matching by scenario name from the Op's `Covers scenarios:` line.
 
+Rows typed `manual` are not written. Record each as `test_plan_rows[T-N] = { type: "manual", op: "Op-X", file: <qa-report path>, written: false, passing: false }`. If every row of Op-X is manual, skip Phases 2–4, set `Op-X.tests_status = "manual"`, and treat Op-X as RED in Phase 5; journal the decision.
+
 ### Phase 2 — Write RED-A (BDD step definitions)
 
 For every BDD-typed Test Plan row tagged `Op-X`, create or update the step definition file referenced in the row (typically `e2e/steps/<feature-slug>.steps.ts`). The Operation's RED-A description in PLAN.md states the exact bindings.
 
 Step definitions must contain real Playwright/`request` interactions — navigation, clicks, form fills, real DOM/API assertions. NOT empty callbacks with comments. UI tests use `page`, API-only steps use `request`, shared setup steps live in `e2e/steps/shared-state.ts`.
 
-**Tag each scenario with `@US-NNN @Op-X`.** Cucumber tag annotations go on the `Scenario:` or `Rule:` line in the `.feature` file (only if missing — most `.feature` files already carry `@US-NNN`; add `@Op-X` if absent). The runner filter `bun bdd --tags="@US-NNN and @Op-X"` selects only this Operation's scenarios.
+**Never edit `specs/**/*.feature`.** Select this Operation's scenarios per `references/autopilot-contract.md` §4: by `@Op-X` tag if the feature files already carry one, otherwise by scenario name from the Operation's `Covers scenarios:` line.
 
-Run `bun bdd --tags="@US-NNN and @Op-X"`. **Every selected scenario MUST FAIL** at assertion time, not at compile time. Commit:
+Run `<BDD>` with the Op filter (§4). **Every selected scenario MUST FAIL** at assertion time, not at compile time. Commit:
 
 ```
 test(US-NNN): add BDD steps for Op-X — <operation title>
 ```
+
+Journal: `node "$LEDGER" log --kind commit --sha $(git rev-parse --short HEAD) --summary "test(US-NNN): add BDD steps for Op-X"` (contract §3, §5).
 
 Update `state.json`: `Op-X.operation_phase = "red_a"`, `Op-X.tests_status = "in_progress"`. For each `T-N` row written, append/update `test_plan_rows[T-N] = { type: "BDD", op: "Op-X", file: <path>, written: true, passing: false }`.
 
@@ -153,15 +158,17 @@ Tests must:
 - Assert specific behavioural outcomes (no `expect(true).toBe(true)`)
 - Fail because the implementation is empty — not because the test itself is broken
 
-**Tag each test with `@US-NNN @Op-X`.** For Vitest/Jest, the tag goes in the `describe()` or `test()` name (e.g., `describe("@US-NNN @Op-2 startSession", …)`). The runner filter `bun test --grep="@US-NNN.*@Op-X"` selects only this Operation's unit/integration tests.
+**Tag each test with `@US-NNN @Op-X`.** For Vitest/Jest, the tag goes in the `describe()` or `test()` name (e.g., `describe("@US-NNN @Op-2 startSession", …)`). The runner filter `<TEST> -t "@US-NNN.*@Op-X"` (§4) selects only this Operation's unit/integration tests.
 
 Hand-written fakes are fully functional in-memory implementations placed under `<module>/__tests__/fakes/`. Fakes are test infrastructure, not production code; they must work correctly so test failures point at the service under test, not at broken fakes.
 
-Run `bun test --grep="@US-NNN.*@Op-X"`. **Every selected test MUST FAIL** at assertion time. Commit:
+Run `<TEST> -t "@US-NNN.*@Op-X"`. **Every selected test MUST FAIL** at assertion time. Commit:
 
 ```
 test(US-NNN): add failing tests for Op-X — <operation title>
 ```
+
+Journal: `node "$LEDGER" log --kind commit --sha $(git rev-parse --short HEAD) --summary "test(US-NNN): add failing tests for Op-X"` (contract §3, §5).
 
 Update `state.json`: `Op-X.operation_phase = "red_b"`. Update `test_plan_rows[T-N]` for the rows just written.
 
@@ -182,7 +189,7 @@ What gets stubbed vs. fully implemented:
 
 | Artifact                    | Fully Implemented | Why                                            |
 | --------------------------- | ----------------- | ---------------------------------------------- |
-| TypeScript types/interfaces | Yes               | No runtime behaviour, needed for compilation    |
+| TypeScript types/interfaces | Yes               | No runtime behaviour, needed for compilation   |
 | Constants                   | Yes               | Simple values, needed by tests and fakes       |
 | Pure utility functions      | Yes               | Small, pure, testable independently            |
 | Fakes (test infrastructure) | Yes               | Must work correctly for tests to be meaningful |
@@ -203,8 +210,10 @@ chore(US-NNN): add stubs for Op-X — <operation title>
 
 Re-run **only** the Op-X-filtered suites:
 
-- `bun bdd --tags="@US-NNN and @Op-X"` → every scenario FAIL at assertion time.
-- `bun test --grep="@US-NNN.*@Op-X"` → every test FAIL at assertion time.
+- `<BDD>` Op filter → every scenario FAIL at assertion time.
+- `<TEST> -t "@US-NNN.*@Op-X"` → every test FAIL at assertion time.
+
+A test that passes in RED _by nature_ (it pins an external tool's semantics and no repo file can make it fail) is allowed if journaled as a decision naming the test.
 
 If any test passes, either:
 
@@ -217,7 +226,7 @@ Fix and re-run. Then update `state.json`:
 - `Op-X.tests_status = "red"`
 - `Op-X.stub_status = "created"`
 - `Op-X.completed_at = <now>` (RED-side)
-- Advance `current_operation` to the next op where `operation_phase ∈ {pending, red_a}`, or `null` if every Op is now RED.
+- Advance `current_operation` to the first Op whose `operation_phase ∉ {green, refactored}` (the shared cursor rule), or `null` if every Op is GREEN.
 
 ### Phase 6 — `stories.json` sync (only on transitions)
 
@@ -244,6 +253,8 @@ Fix and re-run. Then update `state.json`:
 
 Fix failures before proceeding. This is the default RED gate; `/test-setup-verification` is an opt-in deep audit on top of it.
 
+Journal the self-review: `node "$LEDGER" log --kind gate --gate self-review --verdict <PASS|PASS_WITH_WARNINGS> --story US-NNN --op Op-X --stage test-setup --summary "<n>/4 checks"` (contract §3, §5). Any unchecked item not fixed → `ledger backlog add`.
+
 Output a short summary:
 
 ```
@@ -255,7 +266,7 @@ US-NNN — Op-X RED'd
   Story phase:      red  (Op-X / N total)
 ```
 
-Use `AskUserQuestion`:
+Outside autopilot, use `AskUserQuestion`:
 
 - **Header: "Next"** — "Op-X is RED. What's next?"
   - "Move to GREEN — run /spec-implementation US-NNN Op-X" (Recommended)
@@ -263,7 +274,7 @@ Use `AskUserQuestion`:
   - "RED the next Op — /test-setup US-NNN" (auto-picks next pending op)
   - "Done for now"
 
-If running in a ralph-loop, skip the AskUserQuestion and emit `<promise>RED_COMPLETE_US-NNN_Op-X</promise>` for the loop to detect. If every Op is now RED, also emit `<promise>TEST_SETUP_COMPLETE_US-NNN</promise>`.
+Under autopilot (contract §2), skip the question and emit `<promise>RED_COMPLETE_US-NNN_Op-X</promise>`; if every Op is now RED also emit `<promise>TEST_SETUP_COMPLETE_US-NNN</promise>`.
 
 ---
 
@@ -296,19 +307,15 @@ The mix lives at the file level — within US-000's first Op, some files are ful
 - `vi.mock("…")` of the module under test.
 - Tests that pass without the implementation existing.
 
-### Inside a ralph-loop
+### Asking vs deciding
 
-Never ask. Decide and document in `state.json`. Emit the per-Op `<promise>RED_COMPLETE_US-NNN_Op-X</promise>` and exit so the next iteration can pick up the next Op.
-
-### Outside the loop
-
-Use `AskUserQuestion` when a Gherkin scenario is ambiguous about what to assert, or when a Test Plan row's file path or assertion is unclear.
+See `references/autopilot-contract.md` §2. Outside autopilot, use `AskUserQuestion` when a Gherkin scenario is ambiguous about what to assert, or when a Test Plan row's file path or assertion is unclear. Under autopilot, take the reading closest to the scenario text and journal it.
 
 ---
 
 ## Commit Rules
 
-All commits follow Conventional Commits. NEVER add a `Co-Authored-By` trailer.
+All commits follow Conventional Commits.
 
 ```
 test(US-NNN): add BDD steps for Op-X — <operation title>
