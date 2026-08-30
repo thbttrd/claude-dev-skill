@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.3.0] — 2026-08-30
+
+### Added
+
+- `manual` Test Plan type for out-of-repo assertions; toolchain placeholders; pipeline contract (autopilot, journaling).
+
 ## [2.2.0] — 2026-08-22
 
 ### Added

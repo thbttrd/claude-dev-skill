@@ -43,7 +43,7 @@
       "name": "plan-writing",
       "source": "./plugins/plan-writing",
       "description": "Plans the implementation of one **user story** at a time (US-NNN) — not a release, not a wave. Reads the story's STORY.md + features + the project-wide ARCHITECTURE.md and produces a single PLAN.md in the **REASONS canvas** format (Requirements / Entities / Approach / Structure / Operations / Norms / Safeguards) plus an explicit Test Strategy and Test Plan. Plans are dry — zero code. Each Operation prescribes RED-A → RED-B → GREEN → REFACTOR. Every Test Plan row is tagged with the Operation that owns it (the new `Op` column), so per-Operation skills can filter the table deterministically. The story DAG lives in specs/stories.json (depends_on_story_ids); this skill does not produce any DAG artifact of its own. Use this skill after a story is specced (phase = specced), before /test-setup. Triggers on: \"plan US-NNN\", \"plan this story\", \"write the plan\", \"/plan-writing US-NNN\", or any request to produce an implementation plan for a single story.",
-      "version": "2.2.0"
+      "version": "2.3.0"
     },
     {
       "name": "plan-writing-verification",

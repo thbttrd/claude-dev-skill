@@ -1,6 +1,6 @@
 ---
 name: plan-writing
-version: 2.2.0
+version: 2.3.0
 description: >
   Plans the implementation of one **user story** at a time (US-NNN) — not a
   release, not a wave. Reads the story's STORY.md + features + the project-wide
@@ -36,6 +36,7 @@ There is no separate `00-foundation.md`, no `WN-…md`, no `DAG.md`, no `impleme
 | `specs/story-NNN-slug/STORY.md` does not exist       | Hard-stop with the same message.                                                                                                                        |
 | `specs/ARCHITECTURE.md` does not exist               | Hard-stop. Print: `No specs/ARCHITECTURE.md found. Run /research-and-architecture first.`                                                              |
 | Any dependency in `depends_on_story_ids` is not `verified` and not `is_foundation: true` | Hard-stop. Print which dependency is missing and what to do (`/spec-implementation US-XXX` or similar). |
+| `specs/autopilot.json` has `"active": true` (or env `AUTOPILOT=1`) | Follow `references/autopilot-contract.md` §1–2 for this whole invocation: no `AskUserQuestion`, take the *(Recommended)* option, journal decisions and gates, stop only on the contract's hard conditions. Journaling (§3) and toolchain resolution (§4) apply regardless. |
 
 ---
 
@@ -162,6 +163,8 @@ Build a row-per-test table. Each row:
 
 Every Gherkin scenario gets at least one BDD row. Every AC gets at least one row (BDD or unit). Every Safeguard with an observable assertion gets a row (often a bench or integration test).
 
+**`manual` rows.** A row may be typed `manual` only when its Asserts column references something outside the repository — a remote host, a network path, a human observation (e.g. "the container port is refused from any host but dc2"). `manual` rows are skipped by `/test-setup` and `/spec-implementation` and are walked by `/verification-and-validation`, which records each outcome in `verification/qa-report.md`. Their `File` column is `specs/story-NNN-slug/verification/qa-report.md`. A row that *can* be automated in-repo must not be `manual`; a whole story of `manual` rows is a signal the story is an ops runbook, not software — say so in the report.
+
 **No untraceable rows.** A test that doesn't reference a spec artifact is a test without a reason.
 
 **Every row MUST have an `Op` value.** The per-Operation skills (`/test-setup US-NNN Op-X`, `/spec-implementation US-NNN Op-X`, `/spec-implementation-verification US-NNN Op-X`) filter the table by this column to know which tests to write, implement, or audit for the requested Operation. A row with no `Op` value can never be picked up by these skills.
@@ -197,12 +200,13 @@ Regenerate `specs/STORIES.md` so the kanban shows the new phase.
    - [ ] Every Gherkin scenario has ≥ 1 BDD row; every AC has ≥ 1 row; every observable Safeguard has a row
    - [ ] No code in the plan; module assignments match `specs/ARCHITECTURE.md`
    - [ ] Operations count within budget (≤ 6 full, ≤ 3 light) or explicitly resolved with the user
+   Journal the self-review: `node "$LEDGER" log --kind gate --gate self-review --verdict <PASS|PASS_WITH_WARNINGS> --story US-NNN --stage plan-writing --summary "<n>/6 checks"` (contract §3, §5). Any unchecked item not fixed → `ledger backlog add`.
 2. Report to the user:
    - Story: US-NNN — title (+ rigor tier)
    - Operations count
    - Test Plan row count (BDD / unit / integration / bench breakdown)
    - Files to be created / modified
-3. Use `AskUserQuestion`:
+3. Outside autopilot, use `AskUserQuestion`:
    - **Header: "Next"** — "Plan for US-NNN is ready and self-reviewed. What's next?"
      - "Move to /test-setup US-NNN (Recommended)" — start the RED phase
      - "Run the deep audit — /plan-writing-verification US-NNN" — opt-in fresh-agent audit; recommended for `US-000` and other full-rigor, high-stakes stories, skippable otherwise
