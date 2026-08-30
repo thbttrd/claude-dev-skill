@@ -214,3 +214,36 @@ test("formatTable renders one line per entry, sorted by ts", () => {
   assert.match(lines[0], /09:00.*US-001.*decision.*a/);
   assert.match(lines[1], /10:00.*Op-2.*gate.*PASS.*b/);
 });
+
+test("gitCommits normalizes non-UTC timestamps to UTC and sorts correctly", () => {
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  git("add", ".");
+  const env = {
+    ...process.env,
+    GIT_AUTHOR_DATE: "2026-08-30T15:05:00+02:00",
+    GIT_COMMITTER_DATE: "2026-08-30T15:05:00+02:00",
+  };
+  execFileSync("git", ["commit", "-qm", "feat(US-001): with +02:00 offset"], {
+    cwd: root,
+    stdio: "pipe",
+    env,
+  });
+  const commits = gitCommits(root, {});
+  assert.equal(commits[0].ts, "2026-08-30T13:05:00.000Z");
+  const later = {
+    ts: "2026-08-30T14:00:00.000Z",
+    story: null,
+    op: null,
+    kind: "decision",
+    summary: "later",
+  };
+  const table = formatTable([commits[0], later]);
+  const lines = table.trim().split("\n");
+  assert.match(lines[0], /13:05.*feat\(US-001\)/);
+  assert.match(lines[1], /14:00.*later/);
+});

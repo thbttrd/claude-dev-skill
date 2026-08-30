@@ -149,7 +149,8 @@ export function gitCommits(root, f = {}) {
     .split("\n")
     .filter(Boolean)
     .map((line) => {
-      const [sha, ts, summary] = line.split("\x1f");
+      const [sha, tsRaw, summary] = line.split("\x1f");
+      const ts = new Date(tsRaw).toISOString();
       const story = summary.match(/^\w+\((US-\d{3})\)/)?.[1] ?? null;
       return {
         ts,
