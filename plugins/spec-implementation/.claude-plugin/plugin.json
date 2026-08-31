@@ -1,6 +1,6 @@
 {
   "name": "spec-implementation",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "description": "Per-Operation GREEN-phase executor with story-end wrap-up gates. For ONE Operation of ONE story (US-NNN Op-X) at a time, writes the minimal implementation that makes that Operation's failing tests pass, then optionally REFACTORs. Operations are sequential: RED → GREEN → REFACTOR → next op. Reads PLAN.md (REASONS canvas Operation X) and state.json. The Op-X arg is optional; with no Op-X, the skill auto-picks the next op whose tests are RED but implementation is pending. When invoked without Op-X AND all ops are GREEN, the skill enters story-end mode and runs the three story-level quality gates (Simplify / Code Review / Verify), then flips the story's phase to \"green\" in specs/stories.json. If invoked for the Foundation Story (US-000) against an empty repo where state phase = planned, auto-chains /repo-initialization first. Tracks progress in specs/story-NNN-slug/state.json. Use after /test-setup US-NNN Op-X (Op-X is RED). Triggers on: \"implement Op-X\", \"GREEN Op-2 of US-001\", \"spec-implement next op\", \"/spec-implementation US-NNN\", \"/spec-implementation US-NNN Op-X\", \"run the story-end gates for US-NNN\".",
   "author": {
     "name": "thbttrd"

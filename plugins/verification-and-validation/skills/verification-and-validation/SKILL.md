@@ -1,6 +1,6 @@
 ---
 name: verification-and-validation
-version: 2.1.0
+version: 2.1.1
 description: >
   Per-story end-to-end verification of a completed implementation. Runs the
   full automated test suite, starts the application, exercises every API
@@ -119,8 +119,8 @@ Run the full automated suite filtered to this story (and stories already `verifi
 `$BASE_SHA` is the parent of the story's first `test(US-NNN):` commit (same definition Gate 1 of `/spec-implementation` uses). Evaluate through the regression baseline (contract §4):
 
 ```bash
-node "$LEDGER" regress --base $BASE_SHA --runner vitest   --cmd "<TEST> --reporter=json --outputFile=/tmp/ledger-vitest.json" --report-file /tmp/ledger-vitest.json
-node "$LEDGER" regress --base $BASE_SHA --runner cucumber --cmd "<BDD> --format json:/tmp/ledger-bdd.json"                    --report-file /tmp/ledger-bdd.json
+RPT=$(mktemp) && node "$LEDGER" regress --base $BASE_SHA --runner vitest   --cmd "<TEST> --reporter=json --outputFile=$RPT" --report-file "$RPT"
+RPT=$(mktemp) && node "$LEDGER" regress --base $BASE_SHA --runner cucumber --cmd "<BDD> --format json:$RPT"                 --report-file "$RPT"
 ```
 
 Zero regressions; lint and types clean. If any fails, **fix the issue first**, re-run, and only continue once everything is green.

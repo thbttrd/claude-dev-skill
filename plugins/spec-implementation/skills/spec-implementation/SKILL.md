@@ -1,6 +1,6 @@
 ---
 name: spec-implementation
-version: 3.2.0
+version: 3.2.1
 description: >
   Per-Operation GREEN-phase executor with story-end wrap-up gates. For ONE
   Operation of ONE story (US-NNN Op-X) at a time, writes the minimal
@@ -151,7 +151,7 @@ Constraints:
 After writing the code, run:
 
 - `<TEST> -t "@US-NNN"` and `<BDD>` (story filter) — Op-X's tests pass; earlier Ops' tests still pass.
-- Regression baseline (contract §4): `node "$LEDGER" regress --base HEAD --runner vitest --cmd "<TEST> --reporter=json --outputFile=/tmp/ledger-vitest.json" --report-file /tmp/ledger-vitest.json` and the cucumber equivalent. Exit 0 required. A regression in a story already `verified` is hard stop `regression` under autopilot; otherwise back out and re-think.
+- Regression baseline (contract §4): `RPT=$(mktemp) && node "$LEDGER" regress --base HEAD --runner vitest --cmd "<TEST> --reporter=json --outputFile=$RPT" --report-file "$RPT"` and the cucumber equivalent. Exit 0 required. A regression in a story already `verified` is hard stop `regression` under autopilot; otherwise back out and re-think.
 
 If anything fails:
 

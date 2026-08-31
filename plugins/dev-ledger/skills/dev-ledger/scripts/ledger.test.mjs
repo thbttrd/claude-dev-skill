@@ -1,12 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  existsSync,
   mkdtempSync,
   mkdirSync,
   writeFileSync,
   readFileSync,
   readdirSync,
   symlinkSync,
+  utimesSync,
 } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -398,6 +400,22 @@ test("failuresFromLines trims, drops blanks, sorts", () => {
   assert.deepEqual(failuresFromLines(" b \n\na\n"), ["a", "b"]);
 });
 
+test("failuresFromVitest counts a load-broken file (status failed, no failed assertions)", () => {
+  const json = JSON.stringify({
+    testResults: [
+      { name: "/repo/src/broken.test.ts", status: "failed", assertionResults: [] },
+      {
+        name: "/repo/src/ok.test.ts",
+        status: "passed",
+        assertionResults: [{ status: "passed", fullName: "works" }],
+      },
+    ],
+  });
+  assert.deepEqual(failuresFromVitest(json, "/repo"), [
+    "src/broken.test.ts::(file failed to run)",
+  ]);
+});
+
 test("regress diffs failures of the working tree against a base sha via a worktree", () => {
   const root = fixtureProject();
   const git = (...a) =>
@@ -557,6 +575,130 @@ test("regress throws with diagnostic on unparseable runner output", () => {
       }),
     /not parseable|echo not-json/,
   );
+});
+
+test("regress fails closed when the suite exits non-zero reporting zero failures", () => {
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
+  writeFileSync(join(root, "f.txt"), "a\n");
+  git("add", ".");
+  git("commit", "-qm", "base");
+  assert.throws(
+    () => regress({ root, base: "HEAD", cmd: "exit 3", runner: "lines" }),
+    /exited 3 but reported zero failures/,
+  );
+});
+
+test("regress matches base and head ids when tmpdir is a symlink (realpath'd worktree)", () => {
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
+  // Runner reports realpath'd absolute names, like vitest does.
+  writeFileSync(
+    join(root, "gen.sh"),
+    `printf '{"testResults":[{"name":"%s/x.test.ts","status":"failed","assertionResults":[{"status":"failed","fullName":"t"}]}]}' "$(pwd -P)" > out.json\nexit 1\n`,
+  );
+  git("add", ".");
+  git("commit", "-qm", "base");
+  const realTmp = mkdtempSync(join(tmpdir(), "real-tmp-"));
+  const linkTmp = join(mkdtempSync(join(tmpdir(), "link-holder-")), "link");
+  symlinkSync(realTmp, linkTmp, "dir");
+  const saved = process.env.TMPDIR;
+  process.env.TMPDIR = linkTmp;
+  try {
+    const r = regress({
+      root,
+      base: "HEAD",
+      cmd: "sh gen.sh",
+      runner: "vitest",
+      reportFile: "out.json",
+    });
+    assert.deepEqual(r.head, ["x.test.ts::t"]);
+    assert.deepEqual(r.base, ["x.test.ts::t"]);
+    assert.deepEqual(r.regressions, []);
+  } finally {
+    if (saved === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = saved;
+  }
+});
+
+test("regress flags base failures of already-verified stories as suspect_base", () => {
+  const root = fixtureProject();
+  const specs = join(root, "specs");
+  writeFileSync(
+    join(specs, "stories.json"),
+    JSON.stringify({ stories: [{ id: "US-001", phase: "verified" }] }),
+  );
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
+  writeFileSync(join(root, "failures.txt"), "a.test.ts::@US-001 broken\nb\n");
+  git("add", ".");
+  git("commit", "-qm", "base");
+  writeFileSync(join(root, "failures.txt"), "b\n");
+  const r = regress({
+    root,
+    base: "HEAD",
+    cmd: "cat failures.txt",
+    runner: "lines",
+    specs,
+  });
+  assert.deepEqual(r.regressions, []);
+  assert.deepEqual(r.suspect_base, ["a.test.ts::@US-001 broken"]);
+  // No stories.json knowledge → nothing flagged.
+  const r2 = regress({
+    root,
+    base: "HEAD",
+    cmd: "cat failures.txt",
+    runner: "lines",
+  });
+  assert.deepEqual(r2.suspect_base, []);
+});
+
+test("backlogAdd steals a stale lock and still assigns the next id", () => {
+  const specs = join(fixtureProject(), "specs");
+  writeFileSync(join(specs, ".backlog.lock"), "999999");
+  const old = new Date(Date.now() - 60_000);
+  utimesSync(join(specs, ".backlog.lock"), old, old);
+  const a = backlogAdd(specs, { title: "t", severity: "info", kind: "doc" });
+  assert.equal(a.id, "BL-001");
+  assert.equal(existsSync(join(specs, ".backlog.lock")), false);
+});
+
+test("readJournal skips malformed lines instead of throwing", () => {
+  const specs = join(fixtureProject(), "specs");
+  const good = JSON.stringify({ ts: "2026-08-30T00:00:00Z", kind: "decision", summary: "ok" });
+  writeFileSync(join(specs, "journal.jsonl"), `{"ts":"2026-08-30T00{"tr\n${good}\n`);
+  const entries = readJournal(specs);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].summary, "ok");
+});
+
+test("CLI: failures and usage work outside a specs project", () => {
+  const real = fileURLToPath(new URL("./ledger.mjs", import.meta.url));
+  const outside = mkdtempSync(join(tmpdir(), "nospecs-"));
+  const f = spawnSync(process.execPath, [real, "failures", "--runner", "lines"], {
+    cwd: outside,
+    input: "b\na\n",
+    encoding: "utf8",
+  });
+  assert.equal(f.status, 0, f.stderr);
+  assert.equal(f.stdout, "a\nb\n");
+  const u = spawnSync(process.execPath, [real], { cwd: outside, encoding: "utf8" });
+  assert.equal(u.status, 2, u.stderr);
+  assert.match(u.stderr, /usage:/);
 });
 
 test("CLI entry works when invoked through a symlink", () => {

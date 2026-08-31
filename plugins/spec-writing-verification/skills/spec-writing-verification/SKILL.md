@@ -1,6 +1,6 @@
 ---
 name: spec-writing-verification
-version: 2.2.0
+version: 2.2.1
 description: >
   Per-story verification of the output of /spec-writing for completeness, coherence,
   INVEST compliance, and template fidelity. Spawns a fresh agent to audit
@@ -202,7 +202,7 @@ FAIL = critical issues that must be fixed before /plan-writing
 
 1. Present the report to the user.
 2. Journal the verdict: `node "$LEDGER" log --kind gate --gate spec-verification --verdict <PASS|PASS_WITH_WARNINGS|FAIL> --report <report path> --story US-NNN --summary "<one line>"`.
-3. **FAIL**: list critical issues. Outside autopilot ask whether to fix now (loops back into `/spec-writing US-NNN` with `--force`). Under autopilot: hard stop `verifier_fail` (contract §2).
+3. **FAIL**: list critical issues. Outside autopilot ask whether to fix now (loops back into `/spec-writing US-NNN`, which enters update mode when `STORY.md` already exists). Under autopilot: hard stop `verifier_fail` (contract §2).
 4. **PASS_WITH_WARNINGS**: file every warning — `node "$LEDGER" backlog add --title "<warning>" --severity warning --kind <spec-gap|test-gap|refactor|doc|bug> --gate spec-verification --report <report path> --story US-NNN` — print the ids, then proceed as PASS. Outside autopilot you may instead offer to address them now.
 5. **PASS**: confirm readiness and suggest running `/plan-writing US-NNN`.
 

@@ -8,6 +8,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -125,10 +126,19 @@ export function log(specs, opts, now = new Date()) {
 export function readJournal(specs) {
   const p = join(specs, "journal.jsonl");
   if (!existsSync(p)) return [];
-  return readFileSync(p, "utf8")
-    .split("\n")
-    .filter(Boolean)
-    .map((l) => JSON.parse(l));
+  const out = [];
+  for (const l of readFileSync(p, "utf8").split("\n").filter(Boolean)) {
+    try {
+      out.push(JSON.parse(l));
+    } catch {
+      // A crash mid-append leaves a partial line; one bad line must not
+      // brick every read path.
+      process.stderr.write(
+        `ledger: skipping malformed journal line: ${l.slice(0, 120)}\n`,
+      );
+    }
+  }
+  return out;
 }
 
 export function filterJournal(entries, f = {}) {
@@ -199,6 +209,41 @@ function writeBacklog(specs, data) {
   writeFileSync(backlogPath(specs), JSON.stringify(data, null, 2) + "\n");
 }
 
+// Serialize backlog read-modify-writes: gate agents run in parallel, and an
+// unlocked RMW mints duplicate BL ids / clobbers a sibling's write.
+// ponytail: O_EXCL lockfile with a 10s stale steal — enough for CLI bursts.
+const LOCK_MS = 10_000;
+function withBacklogLock(specs, fn) {
+  const lock = join(specs, ".backlog.lock");
+  const deadline = Date.now() + LOCK_MS;
+  for (;;) {
+    try {
+      writeFileSync(lock, String(process.pid), { flag: "wx" });
+      break;
+    } catch (err) {
+      if (err.code !== "EEXIST") throw err;
+      let age = 0;
+      try {
+        age = Date.now() - statSync(lock).mtimeMs;
+      } catch {
+        continue; // lock vanished — retry
+      }
+      if (age > LOCK_MS) {
+        rmSync(lock, { force: true });
+        continue;
+      }
+      if (Date.now() > deadline)
+        throw new Error(`ledger: ${lock} held for >10s — remove it if stale`);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+    }
+  }
+  try {
+    return fn();
+  } finally {
+    rmSync(lock, { force: true });
+  }
+}
+
 const day = (d) => d.toISOString().slice(0, 10);
 
 export function backlogAdd(specs, opts, now = new Date()) {
@@ -212,27 +257,35 @@ export function backlogAdd(specs, opts, now = new Date()) {
     `--kind must be one of ${BACKLOG_KINDS.join("|")}`,
   );
   const ctx = autopilotContext(specs);
-  const data = readBacklog(specs);
-  const item = {
-    id: `BL-${String(data.next_id).padStart(3, "0")}`,
-    title: opts.title,
-    detail: opts.detail ?? "",
-    source: {
-      stage: opts.stage ?? ctx.stage ?? null,
-      gate: opts.gate ?? null,
-      story: opts.story ?? ctx.story ?? null,
-      op: opts.op ?? ctx.op ?? null,
-      report: opts.report ?? null,
-    },
-    severity: opts.severity,
-    kind: opts.kind,
-    files: opts.file ?? [],
-    status: "open",
-    created_at: day(now),
-    resolved_at: null,
-    resolved_sha: null,
-    resolution: null,
-  };
+  const item = withBacklogLock(specs, () => {
+    const data = readBacklog(specs);
+    const it = {
+      id: `BL-${String(data.next_id).padStart(3, "0")}`,
+      title: opts.title,
+      detail: opts.detail ?? "",
+      source: {
+        stage: opts.stage ?? ctx.stage ?? null,
+        gate: opts.gate ?? null,
+        story: opts.story ?? ctx.story ?? null,
+        op: opts.op ?? ctx.op ?? null,
+        report: opts.report ?? null,
+      },
+      severity: opts.severity,
+      kind: opts.kind,
+      files: opts.file ?? [],
+      status: "open",
+      created_at: day(now),
+      resolved_at: null,
+      resolved_sha: null,
+      resolution: null,
+    };
+    data.items.push(it);
+    data.next_id += 1;
+    writeBacklog(specs, data);
+    return it;
+  });
+  // Journal after the backlog write: a failed write must not leave a journal
+  // line pointing at a BL id that doesn't exist.
   log(
     specs,
     {
@@ -246,9 +299,6 @@ export function backlogAdd(specs, opts, now = new Date()) {
     },
     now,
   );
-  data.items.push(item);
-  data.next_id += 1;
-  writeBacklog(specs, data);
   return item;
 }
 
@@ -262,14 +312,18 @@ export function backlogList(specs, f = {}) {
 }
 
 function updateItem(specs, id, patch, summary, now) {
-  const data = readBacklog(specs);
-  const item = data.items.find((i) => i.id === id);
-  must(item, `${id} not found`);
-  must(
-    item.status === "open" || item.status === "in-progress",
-    `${id} is already ${item.status}`,
-  );
-  Object.assign(item, patch);
+  const item = withBacklogLock(specs, () => {
+    const data = readBacklog(specs);
+    const it = data.items.find((i) => i.id === id);
+    must(it, `${id} not found`);
+    must(
+      it.status === "open" || it.status === "in-progress",
+      `${id} is already ${it.status}`,
+    );
+    Object.assign(it, patch);
+    writeBacklog(specs, data);
+    return it;
+  });
   log(
     specs,
     {
@@ -282,7 +336,6 @@ function updateItem(specs, id, patch, summary, now) {
     },
     now,
   );
-  writeBacklog(specs, data);
   return item;
 }
 
@@ -331,10 +384,16 @@ const rel = (p, root) =>
 export function failuresFromVitest(json, root) {
   const r = JSON.parse(json);
   const out = [];
-  for (const f of r.testResults ?? [])
-    for (const a of f.assertionResults ?? [])
+  for (const f of r.testResults ?? []) {
+    const asserts = f.assertionResults ?? [];
+    for (const a of asserts)
       if (a.status === "failed")
         out.push(`${rel(f.name, root)}::${a.fullName}`);
+    // A file that failed to load/run reports status "failed" with no failed
+    // assertions — count it, or regress fails open on syntax/import errors.
+    if (f.status === "failed" && !asserts.some((a) => a.status === "failed"))
+      out.push(`${rel(f.name, root)}::(file failed to run)`);
+  }
   return out.sort();
 }
 
@@ -383,19 +442,42 @@ function runFailures(cwd, cmd, runner, reportFile) {
   const text = reportFile
     ? readFileSync(resolve(cwd, reportFile), "utf8")
     : r.stdout;
+  let failures;
   try {
-    return PARSERS[runner](text, cwd);
+    failures = PARSERS[runner](text, cwd);
   } catch (err) {
     throw new Error(
       `ledger regress: ${runner} output of \`${cmd}\` in ${cwd} is not parseable (${err.message}). stderr tail: ${(r.stderr ?? "").slice(-500)}`,
     );
   }
+  // Non-zero exit with zero reported failures = the suite itself broke
+  // (config/support-code load error). Fail closed instead of diffing nothing.
+  if (failures.length === 0 && r.status !== 0)
+    throw new Error(
+      `ledger regress: \`${cmd}\` in ${cwd} exited ${r.status} but reported zero failures — the suite likely failed to load. stderr tail: ${(r.stderr ?? "").slice(-500)}`,
+    );
+  return failures;
 }
 
-export function regress({ root, base, cmd, runner, reportFile }) {
+// Story numbers with phase "verified" in specs/stories.json, e.g. ["008"].
+function verifiedStoryNums(specs) {
+  if (!specs || !existsSync(join(specs, "stories.json"))) return [];
+  const { stories = [] } = JSON.parse(
+    readFileSync(join(specs, "stories.json"), "utf8"),
+  );
+  return stories
+    .filter((s) => s.phase === "verified")
+    .map((s) => String(s.id ?? "").match(/US-(\d{3})/)?.[1])
+    .filter(Boolean);
+}
+
+export function regress({ root, base, cmd, runner, reportFile, specs }) {
   must(base && cmd, "--base and --cmd are required");
+  // Runners report realpath'd file names; realpath both roots or every id
+  // stays absolute and nothing matches (macOS tmpdir, symlinked checkouts).
+  root = realpathSync(root);
   const head = runFailures(root, cmd, runner, reportFile);
-  const wt = mkdtempSync(join(tmpdir(), "ledger-regress-"));
+  const wt = realpathSync(mkdtempSync(join(tmpdir(), "ledger-regress-")));
   try {
     execFileSync("git", ["worktree", "add", "--detach", "-f", wt, base], {
       cwd: root,
@@ -408,10 +490,20 @@ export function regress({ root, base, cmd, runner, reportFile }) {
       symlinkSync(join(root, "node_modules"), join(wt, "node_modules"), "dir");
     const baseFailures = runFailures(wt, cmd, runner, reportFile);
     const baseSet = new Set(baseFailures);
+    // Base failures in already-verified stories are broken-suite red, not
+    // grandfatherable scaffold-RED — surface them instead of excusing them.
+    // ponytail: matches US-NNN/story-NNN substrings in ids; a rename-proof
+    // mapping would need per-story state.json — add if this misfires.
+    const verified = verifiedStoryNums(specs);
+    const suspectBase = baseFailures.filter((id) => {
+      const m = id.match(/US-(\d{3})|story-(\d{3})/);
+      return verified.includes(m?.[1] ?? m?.[2]);
+    });
     return {
       base: baseFailures,
       head,
       regressions: head.filter((id) => !baseSet.has(id)),
+      suspect_base: suspectBase,
     };
   } finally {
     spawnSync("git", ["worktree", "remove", "--force", wt], {
@@ -426,17 +518,17 @@ export function regress({ root, base, cmd, runner, reportFile }) {
 export function main(argv) {
   const opts = parseArgs(argv);
   const [cmd] = opts._;
-  const specs = findSpecsDir(
-    process.cwd(),
-    opts.specs ?? process.env.LEDGER_SPECS,
-  );
+  // Resolved lazily: `failures` and bare usage must work outside a specs project.
+  const getSpecs = () =>
+    findSpecsDir(process.cwd(), opts.specs ?? process.env.LEDGER_SPECS);
   switch (cmd) {
     case "log": {
-      const e = log(specs, opts);
+      const e = log(getSpecs(), opts);
       process.stdout.write(JSON.stringify(e) + "\n");
       return 0;
     }
     case "journal": {
+      const specs = getSpecs();
       let entries = filterJournal(readJournal(specs), opts);
       if (!opts["no-git"])
         entries = entries.concat(
@@ -450,6 +542,7 @@ export function main(argv) {
       return 0;
     }
     case "backlog": {
+      const specs = getSpecs();
       const [, sub, id] = opts._;
       if (sub === "add") {
         const it = backlogAdd(specs, opts);
@@ -496,19 +589,24 @@ export function main(argv) {
       return 0;
     }
     case "regress": {
+      const specs = getSpecs();
       const r = regress({
         root: dirname(specs),
         base: opts.base,
         cmd: opts.cmd,
         runner: opts.runner,
         reportFile: opts["report-file"],
+        specs,
       });
       if (opts.json) process.stdout.write(JSON.stringify(r, null, 2) + "\n");
       else
         process.stdout.write(
-          `base failures: ${r.base.length}\nhead failures: ${r.head.length}\nregressions:  ${r.regressions.length}\n${r.regressions.map((x) => "  " + x).join("\n")}${r.regressions.length ? "\n" : ""}`,
+          `base failures: ${r.base.length}\nhead failures: ${r.head.length}\nregressions:  ${r.regressions.length}\n${r.regressions.map((x) => "  " + x).join("\n")}${r.regressions.length ? "\n" : ""}` +
+            (r.suspect_base.length
+              ? `suspect base failures (verified-story tests red at base — not grandfatherable): ${r.suspect_base.length}\n${r.suspect_base.map((x) => "  " + x).join("\n")}\n`
+              : ""),
         );
-      return r.regressions.length ? 1 : 0;
+      return r.regressions.length || r.suspect_base.length ? 1 : 0;
     }
     default:
       process.stderr.write(

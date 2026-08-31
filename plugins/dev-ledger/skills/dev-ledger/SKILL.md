@@ -1,6 +1,6 @@
 ---
 name: dev-ledger
-version: 1.0.0
+version: 1.0.1
 description: 'Journal + backlog + regression CLI for story-based projects. `/dev-ledger` prints the project journal (specs/journal.jsonl merged with git log); `/dev-ledger US-008` filters one story. Other pipeline skills call the bundled `scripts/ledger.mjs` to record decisions, gate results and findings, to file backlog items (BL-NNN), and to compute a regression baseline. Triggers on "show the journal", "what happened on US-008", "what did autopilot decide", "/dev-ledger".'
 ---
 

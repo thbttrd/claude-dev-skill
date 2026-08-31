@@ -4,6 +4,18 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-08-31
+
+### Fixed
+
+- `regress` fails closed on load-broken test files: a vitest file with `status: "failed"` and no failed assertions now counts as a failure (`::(file failed to run)`), and any runner exiting non-zero while reporting zero failures is an error instead of a clean baseline.
+- `regress` realpaths the repo root and the base worktree, so runner-reported realpath'd file names produce matching repo-relative ids (fixes every pre-existing failure becoming a false regression on macOS `/var` tmpdirs and symlinked checkouts).
+- `regress` reports `suspect_base` — base-commit failures belonging to stories already `verified` in `specs/stories.json` are surfaced and exit 1 instead of being grandfathered as scaffold-RED.
+- `backlog add`/`resolve`/`wontfix` serialize `backlog.json` read-modify-writes behind an `O_EXCL` lockfile (parallel gate agents no longer mint duplicate BL ids or clobber each other), and the journal `finding` line is written only after the backlog write succeeds.
+- `readJournal` skips malformed journal lines with a warning instead of throwing forever after a crash mid-append.
+- The CLI resolves `specs/` lazily: `ledger failures` (a pure stdin filter) and the bare usage message work outside a specs project.
+- Contract §4: `mktemp` report paths, story-wide BDD path fallback for untagged feature files, suspect-base-failure semantics.
+
 ## [1.0.0] — 2026-08-30
 
 ### Added

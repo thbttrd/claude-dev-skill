@@ -1,6 +1,6 @@
 ---
 name: spec-implementation-verification
-version: 1.2.0
+version: 1.2.1
 description: >
   Per-Operation verification of /spec-implementation output for GREEN-state
   compliance, no over-implementation, architecture alignment, and zero
@@ -312,8 +312,12 @@ Commands resolve per `references/autopilot-contract.md` §4.
 
 ## Step 4: Full Test Suite
 
-- [ ] `<TEST>` → all unit + integration tests pass
-- [ ] `<BDD>` → all Gherkin scenarios pass (story + previously verified)
+- [ ] `<TEST> -t "@US-NNN"` and `<BDD>` (story filter, contract §4) → all pass
+- [ ] Unfiltered suites evaluated through the regression baseline (contract §4) —
+      the unfiltered run may be permanently red (RED scaffolds of unstarted
+      stories); what must hold is **zero regressions** against `$BASE_SHA`:
+      `RPT=$(mktemp) && node "$LEDGER" regress --base $BASE_SHA --runner vitest --cmd "<TEST> --reporter=json --outputFile=$RPT" --report-file "$RPT"`
+      (+ the cucumber equivalent), exit 0 required
 - [ ] `<LINT> && <TYPES>` → clean
 
 ## Step 5: state.json + stories.json

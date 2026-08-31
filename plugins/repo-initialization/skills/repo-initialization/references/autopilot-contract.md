@@ -73,17 +73,20 @@ Run through the package manager the lockfile implies: `bun.lock`/`bun.lockb` →
 **Op filtering.** Never edit `specs/**/*.feature` to add tags.
 
 - BDD: if the story's feature files already carry `@Op-X` tags → `<BDD> --tags "@US-NNN and @Op-X"`. Otherwise select by name from the Operation's `Covers scenarios:` line in PLAN.md: `<BDD> --name "^(<scenario 1>|<scenario 2>)$"` (regex-escape the names).
+- BDD story-wide: `<BDD> --tags "@US-NNN"` if the feature files carry the tag (`/spec-writing` always adds it at feature level). If they don't (e.g. a repo onboarded via `/migrate-specs`), select by path instead — the story's features all live in one directory: `<BDD> specs/story-NNN-slug/features/`. Never rely on a tag filter you haven't confirmed selects > 0 scenarios: a tag matching nothing exits 0 and passes vacuously.
 - Unit/integration: tests are named `@US-NNN @Op-X …` by `/test-setup`, so `<TEST> -t "@US-NNN.*@Op-X"` (Vitest/Jest `-t`); story-wide: `-t "@US-NNN"`.
 - `manual` Test Plan rows are never run by `<TEST>`/`<BDD>`; only `/verification-and-validation` walks them.
 
 **Regression baseline.** The unfiltered suite may be permanently red (RED scaffolds of unstarted stories). "No regression" therefore means: no test fails in the working tree that passed at the base commit. Compute it, never eyeball it:
 
 ```bash
-node "$LEDGER" regress --base <sha> --runner vitest   --cmd "<TEST> --reporter=json --outputFile=/tmp/ledger-vitest.json" --report-file /tmp/ledger-vitest.json
-node "$LEDGER" regress --base <sha> --runner cucumber --cmd "<BDD> --format json:/tmp/ledger-bdd.json"                    --report-file /tmp/ledger-bdd.json
+RPT=$(mktemp) && node "$LEDGER" regress --base <sha> --runner vitest   --cmd "<TEST> --reporter=json --outputFile=$RPT" --report-file "$RPT"
+RPT=$(mktemp) && node "$LEDGER" regress --base <sha> --runner cucumber --cmd "<BDD> --format json:$RPT"                 --report-file "$RPT"
 ```
 
-`<sha>` is `HEAD` before committing an Op's GREEN (working tree vs last commit), or the story's `BASE_SHA` (parent of its first `test(US-NNN):` commit) at story-end. Exit code 1 = regressions; each id is printed.
+(`mktemp`, not a fixed `/tmp` path — concurrent sessions on one machine must not read each other's reports.)
+
+`<sha>` is `HEAD` before committing an Op's GREEN (working tree vs last commit), or the story's `BASE_SHA` (parent of its first `test(US-NNN):` commit) at story-end. Exit code 1 = regressions or suspect base failures; each id is printed. A **suspect base failure** is a base-commit failure belonging to a story already `verified` in `specs/stories.json`: that is broken-verified red, not grandfatherable scaffold-RED — under autopilot it is the `regression` hard stop; outside autopilot, fix it before trusting the baseline.
 
 ## 5. Locating the ledger
 
