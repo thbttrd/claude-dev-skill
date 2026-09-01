@@ -63,11 +63,30 @@ for plugin_dir in "$ROOT/plugins/"*/; do
   fi
 
   ok "  $name @ $pj_version"
+
+  # extra skills bundled in the same plugin: frontmatter name must match dir, version must match plugin
+  for extra in "$plugin_dir/skills/"*/; do
+    extra="${extra%/}"; ename="$(basename "$extra")"
+    [ "$ename" = "$name" ] && continue
+    esm="$extra/SKILL.md"
+    [ -f "$esm" ] || { fail "  $name: extra skill $ename has no SKILL.md"; continue; }
+    [ "$(skill_field "$esm" name)" = "$ename" ] || fail "  $name: extra skill $ename frontmatter name mismatch"
+    [ "$(skill_field "$esm" version)" = "$pj_version" ] || fail "  $name: extra skill $ename version ≠ plugin version"
+  done
 done
 
 # 4. marketplace.json plugin entries all map to existing dirs
 for entry in $(jq -r '.plugins[].name' "$MARKETPLACE"); do
   [ -d "$ROOT/plugins/$entry" ] || fail "marketplace lists $entry but plugins/$entry/ is missing"
+done
+
+# 5. Pipeline contract copies are byte-identical to the canonical one
+canon_sum="$(sha256sum "$ROOT/$CONTRACT_CANONICAL" | cut -d' ' -f1)"
+for name in "${PIPELINE_PLUGINS[@]}"; do
+  copy="$ROOT/plugins/$name/skills/$name/references/autopilot-contract.md"
+  [ -f "$copy" ] || { fail "$name: missing references/autopilot-contract.md (run scripts/sync-contract.sh)"; continue; }
+  [ "$(sha256sum "$copy" | cut -d' ' -f1)" = "$canon_sum" ] || fail "$name: autopilot-contract.md differs from canonical (run scripts/sync-contract.sh)"
+  grep -q "autopilot-contract.md" "$ROOT/plugins/$name/skills/$name/SKILL.md" || fail "$name: SKILL.md does not reference references/autopilot-contract.md"
 done
 
 echo ""

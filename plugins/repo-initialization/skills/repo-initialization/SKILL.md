@@ -1,6 +1,6 @@
 ---
 name: repo-initialization
-version: 2.1.0
+version: 2.2.1
 description: >
   Scaffolds a new project repository from `specs/ARCHITECTURE.md`,
   `specs/PROJECT.md`, and the Foundation Story
@@ -26,25 +26,26 @@ The goal: after this skill completes, `/spec-implementation US-000` (or a develo
 
 ## Pre-Flight
 
-| Check                                                  | Action                                                                                                                                          |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/V*/` directory exists                            | Hard-stop with the migration command.                                                                                                           |
-| `specs/ARCHITECTURE.md` does not exist                 | Hard-stop. Print: `No specs/ARCHITECTURE.md found. Run /research-and-architecture first.`                                                       |
-| `specs/story-000-foundation/STORY.md` does not exist   | Hard-stop. Print: `No Foundation Story found. Run /spec-writing US-000 first.`                                                                  |
-| Foundation Story phase is not at least `specced`       | Hard-stop. Print: `Foundation Story (US-000) must be specced before scaffolding. Run /spec-writing US-000 first.`                              |
-| `package.json` already exists (project already init'd) | Switch to **incremental mode** — only run steps that are missing (e.g., add Husky to a manually-init'd repo). Confirm via `AskUserQuestion`.    |
+| Check                                                              | Action                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/V*/` directory exists                                        | Hard-stop with the migration command.                                                                                                                                                                                                                                      |
+| `specs/ARCHITECTURE.md` does not exist                             | Hard-stop. Print: `No specs/ARCHITECTURE.md found. Run /research-and-architecture first.`                                                                                                                                                                                  |
+| `specs/story-000-foundation/STORY.md` does not exist               | Hard-stop. Print: `No Foundation Story found. Run /spec-writing US-000 first.`                                                                                                                                                                                             |
+| Foundation Story phase is not at least `specced`                   | Hard-stop. Print: `Foundation Story (US-000) must be specced before scaffolding. Run /spec-writing US-000 first.`                                                                                                                                                          |
+| `package.json` already exists (project already init'd)             | Switch to **incremental mode** — only run steps that are missing (e.g., add Husky to a manually-init'd repo). Outside autopilot, confirm via `AskUserQuestion`.                                                                                                            |
+| `specs/autopilot.json` has `"active": true` (or env `AUTOPILOT=1`) | Follow `references/autopilot-contract.md` §1–2 for this whole invocation: no `AskUserQuestion`, take the _(Recommended)_ option, journal decisions and gates, stop only on the contract's hard conditions. Journaling (§3) and toolchain resolution (§4) apply regardless. |
 
 ## Prerequisites
 
 This skill expects these files to already exist:
 
-| File                                              | Produced by                                            | Contains                                            |
-| ------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------- |
-| `specs/PROJECT.md`                                | `/high-level-scoping`                                  | Project overview, NFRs, tech-stack pointer          |
-| `specs/ARCHITECTURE.md`                           | `/research-and-architecture`                           | Module map, dependency graph, tech stack, ADRs      |
-| `specs/story-000-foundation/STORY.md`             | `/spec-writing`                                        | Foundation Story AC + Rules                         |
-| `specs/story-000-foundation/features/F-*.feature` | `/spec-writing`                                        | Walking-skeleton Gherkin scenario(s)                |
-| `specs/stories.json`                              | `/high-level-scoping`, enriched by downstream skills   | Story tracker (read for project name, story slugs)   |
+| File                                              | Produced by                                          | Contains                                           |
+| ------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------- |
+| `specs/PROJECT.md`                                | `/high-level-scoping`                                | Project overview, NFRs, tech-stack pointer         |
+| `specs/ARCHITECTURE.md`                           | `/research-and-architecture`                         | Module map, dependency graph, tech stack, ADRs     |
+| `specs/story-000-foundation/STORY.md`             | `/spec-writing`                                      | Foundation Story AC + Rules                        |
+| `specs/story-000-foundation/features/F-*.feature` | `/spec-writing`                                      | Walking-skeleton Gherkin scenario(s)               |
+| `specs/stories.json`                              | `/high-level-scoping`, enriched by downstream skills | Story tracker (read for project name, story slugs) |
 
 If any are missing, hard-stop with the appropriate error message above.
 
@@ -213,7 +214,7 @@ This commit is separate from tooling config — it captures the architectural in
 
 Generate a `.gitignore` tailored to the project's stack. Same patterns as the legacy skill — node_modules, build output, database, env, IDE, OS, test artifacts, uploads, ORM-generated, logs, temp.
 
-Add one extra entry: ensure `specs/` is **NOT** ignored. The specs/ directory is part of the repo and must be tracked.
+Add extra entries: ensure `specs/` is **NOT** ignored — `specs/journal.jsonl` and `specs/backlog.json` are tracked (never gitignored), the specs/ directory is part of the repo. Do gitignore `specs/.site/` (reserved for the specs-site plugin).
 
 ---
 
@@ -259,23 +260,23 @@ Mark sections that need details from not-yet-implemented stories with `<!-- TODO
 
 ## Step 12: Verify Everything
 
-Run each verification and fix any issues before committing:
+Run each verification and fix any issues before committing. Commands resolve per `references/autopilot-contract.md` §4 — Step 5 just wrote `package.json` with the `dev`/`lint`/`format:check`/`typecheck`/`test` scripts, so the placeholders below resolve by construction:
 
 ```bash
 # 1. Type checker passes
-bunx tsc --noEmit
+<TYPES>
 
 # 2. Linter passes
-bun lint
+<LINT>
 
-# 3. Formatter passes
-bunx prettier --check .
+# 3. Formatter passes — run the project's own format:check script
+#    (same package manager as above, per §4)
 
 # 4. Test runner works (0 tests is OK)
-bun test
+<TEST>
 
 # 5. Dev server starts (optional — some scaffolds won't run yet)
-bun dev   # kill after confirming startup
+<DEV>   # kill after confirming startup
 
 # 6. Commit hook works
 git add -A
@@ -292,6 +293,7 @@ Then walk this structural checklist and print the result as a compact checked li
 - [ ] CLAUDE.md states the project rules (module boundaries, TDD cycle, commit conventions)
 - [ ] README.md covers setup, commands, and the `specs/` workflow
 - [ ] `.gitignore` covers build output, env files, and editor noise
+- [ ] `specs/journal.jsonl` and `specs/backlog.json` are tracked (never gitignored); `specs/.site/` is gitignored (reserved for the specs-site plugin)
 
 ---
 
@@ -336,16 +338,18 @@ Then report to the user:
 - Quality gates configured (list them)
 - What to run next: `/test-setup US-000` to enter the RED phase for the Foundation Story.
 
+Under autopilot, skip narrating this and emit `<promise>REPO_INIT_COMPLETE</promise>`.
+
 ---
 
 ## Conventions
 
 ### Commit Messages During Scaffolding
 
-| Commit                 | Message                                                                       |
-| ---------------------- | ----------------------------------------------------------------------------- |
-| Directory structure    | `chore: create project directory structure following specs/ARCHITECTURE.md`   |
-| Tooling + hooks + docs | `chore: initial project scaffolding with quality gates`                       |
+| Commit                 | Message                                                                     |
+| ---------------------- | --------------------------------------------------------------------------- |
+| Directory structure    | `chore: create project directory structure following specs/ARCHITECTURE.md` |
+| Tooling + hooks + docs | `chore: initial project scaffolding with quality gates`                     |
 
 Keep it to 1-2 commits. Scaffolding is infrastructure, not features — `chore` type only.
 

@@ -1,6 +1,6 @@
 ---
 name: spec-implementation-verification
-version: 1.1.0
+version: 1.2.1
 description: >
   Per-Operation verification of /spec-implementation output for GREEN-state
   compliance, no over-implementation, architecture alignment, and zero
@@ -33,13 +33,14 @@ The verification runs in a **fresh agent** so the review has no context bias. Th
 
 ## Pre-Flight
 
-| Check                                                | Action                                                                                                                                          |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/V*/` directory exists                          | Hard-stop with the migration command.                                                                                                           |
-| `specs/stories.json` does not exist                  | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                |
-| Target story id missing                              | Use `AskUserQuestion` to list stories whose `phase ∈ {red, green}`.                                                                             |
-| Story's `phase` is not `red` or `green`              | Hard-stop. Print: `Story US-NNN must be at least at red phase before verification. Run /spec-implementation US-NNN Op-X first.`                 |
-| `state.json.schema_version < 2`                      | Hard-stop. Print: `state.json is on the v1 schema. Re-run /spec-implementation US-NNN to migrate, then re-invoke this skill.`                   |
+| Check                                                              | Action                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/V*/` directory exists                                        | Hard-stop with the migration command.                                                                                                                                                                                                                                      |
+| `specs/stories.json` does not exist                                | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                                                                                                                                            |
+| Target story id missing                                            | Use `AskUserQuestion` to list stories whose `phase ∈ {red, green}`.                                                                                                                                                                                                        |
+| Story's `phase` is not `red` or `green`                            | Hard-stop. Print: `Story US-NNN must be at least at red phase before verification. Run /spec-implementation US-NNN Op-X first.`                                                                                                                                            |
+| `state.json.schema_version < 2`                                    | Hard-stop. Print: `state.json is on the v1 schema. Re-run /spec-implementation US-NNN to migrate, then re-invoke this skill.`                                                                                                                                              |
+| `specs/autopilot.json` has `"active": true` (or env `AUTOPILOT=1`) | Follow `references/autopilot-contract.md` §1–2 for this whole invocation: no `AskUserQuestion`, take the _(Recommended)_ option, journal decisions and gates, stop only on the contract's hard conditions. Journaling (§3) and toolchain resolution (§4) apply regardless. |
 
 ## Resolving the target Operation (or story-end mode)
 
@@ -90,6 +91,8 @@ pipeline. Your job is to verify that the GREEN implementation written for
 ONE Operation (Op-X) of story US-NNN is real, scope-bounded,
 architecture-compliant, and free of regressions.
 
+Commands resolve per `references/autopilot-contract.md` §4.
+
 ## Step 1: Read the Artifacts (scoped to Op-X)
 
 1. specs/story-NNN-slug/STORY.md (full)
@@ -116,12 +119,12 @@ architecture-compliant, and free of regressions.
 ## Step 2: GREEN-State Verification (Op-X scope)
 
 Run the test suites:
-- bun test --grep="@US-NNN.*@Op-X"  → expect: every test PASSES
-- bun bdd --tags="@US-NNN and @Op-X" → expect: every test PASSES
+- `<TEST> -t "@US-NNN.*@Op-X"` → expect: every test PASSES
+- `<BDD>` with the Op filter → expect: every test PASSES
 
 Then run the per-story suite (covers earlier Ops):
-- bun test --grep="@US-NNN"   → expect: every test PASSES (no regression in earlier Ops)
-- bun bdd --tags="@US-NNN"    → expect: every test PASSES
+- `<TEST> -t "@US-NNN"` → expect: every test PASSES (no regression in earlier Ops)
+- `<BDD>` (story filter) → expect: every test PASSES
 
 Any test failure at this stage is a critical issue.
 
@@ -247,18 +250,21 @@ FAIL = critical issues that must be fixed before moving on
 1. Persist the report to `specs/story-NNN-slug/verification/green-audit-Op-X.md`.
 2. Update `state.json.operations[Op-X].green_audit`:
    ```json
-   { "verdict": "PASS|PASS_WITH_WARNINGS|FAIL",
+   {
+     "verdict": "PASS|PASS_WITH_WARNINGS|FAIL",
      "at": "<ISO 8601>",
-     "report_path": "specs/story-NNN-slug/verification/green-audit-Op-X.md" }
+     "report_path": "specs/story-NNN-slug/verification/green-audit-Op-X.md"
+   }
    ```
 3. Present the report's summary to the user.
-4. If **FAIL**: list critical issues; ask if they want to fix now (loops back into `/spec-implementation US-NNN Op-X --force`).
-5. If **PASS WITH WARNINGS**: show warnings; ask whether to address or proceed.
-6. If **PASS**: confirm readiness. Suggest:
+4. Journal the verdict: `node "$LEDGER" log --kind gate --gate green-audit --verdict <PASS|PASS_WITH_WARNINGS|FAIL> --report <report path> --story US-NNN --op Op-X --summary "<one line>"`.
+5. **FAIL**: list critical issues. Outside autopilot ask whether to fix now (loops back into `/spec-implementation US-NNN Op-X` with `--force`). Under autopilot: hard stop `verifier_fail` (contract §2).
+6. **PASS_WITH_WARNINGS**: file every warning — `node "$LEDGER" backlog add --title "<warning>" --severity warning --kind <spec-gap|test-gap|refactor|doc|bug> --gate green-audit --report <report path> --story US-NNN --op Op-X` — print the ids, then proceed as PASS. Outside autopilot you may instead offer to address them now.
+7. **PASS**: confirm readiness. Suggest:
    - If Op-X is the last Op (every Op now `green` or `refactored`): "Run `/spec-implementation US-NNN` (no Op-X) to trigger the story-end gates."
    - Otherwise: "Run `/test-setup US-NNN` to RED the next Op."
 
-If running in a ralph-loop, skip the AskUserQuestion and emit `<promise>GREEN_AUDIT_COMPLETE_US-NNN_Op-X</promise>`.
+Under autopilot, skip the question and emit `<promise>GREEN_AUDIT_COMPLETE_US-NNN_Op-X</promise>`.
 
 ---
 
@@ -274,6 +280,8 @@ Triggered when called with no `Op-X` arg, every Op is `green` or `refactored`, a
 You are a story-end spec-implementation auditor. Your job is to verify that
 story US-NNN is fully and correctly implemented, with all quality gates
 passed, and is ready for /verification-and-validation.
+
+Commands resolve per `references/autopilot-contract.md` §4.
 
 ## Step 1: Read the Artifacts
 
@@ -304,9 +312,13 @@ passed, and is ready for /verification-and-validation.
 
 ## Step 4: Full Test Suite
 
-- [ ] bun test       → all unit + integration tests pass
-- [ ] bun bdd        → all Gherkin scenarios pass (story + previously verified)
-- [ ] bun lint && bun typecheck → clean
+- [ ] `<TEST> -t "@US-NNN"` and `<BDD>` (story filter, contract §4) → all pass
+- [ ] Unfiltered suites evaluated through the regression baseline (contract §4) —
+      the unfiltered run may be permanently red (RED scaffolds of unstarted
+      stories); what must hold is **zero regressions** against `$BASE_SHA`:
+      `RPT=$(mktemp) && node "$LEDGER" regress --base $BASE_SHA --runner vitest --cmd "<TEST> --reporter=json --outputFile=$RPT" --report-file "$RPT"`
+      (+ the cucumber equivalent), exit 0 required
+- [ ] `<LINT> && <TYPES>` → clean
 
 ## Step 5: state.json + stories.json
 
@@ -356,10 +368,12 @@ FAIL = critical issues to fix before /v-and-v
 
 1. Persist the report to `specs/story-NNN-slug/verification/green-audit-story-end.md`.
 2. Present the report's summary to the user.
-3. If **FAIL**: list critical issues. The user may need to re-run `/spec-implementation US-NNN` (story-end mode with `--force`) or fix specific Ops.
-4. If **PASS** or **PASS WITH WARNINGS**: confirm readiness and suggest running `/verification-and-validation US-NNN`.
+3. Journal the verdict: `node "$LEDGER" log --kind gate --gate green-audit --verdict <PASS|PASS_WITH_WARNINGS|FAIL> --report <report path> --story US-NNN --summary "<one line>"`.
+4. **FAIL**: list critical issues. Outside autopilot the user may need to re-run `/spec-implementation US-NNN` (story-end mode with `--force`) or fix specific Ops. Under autopilot: hard stop `verifier_fail` (contract §2).
+5. **PASS_WITH_WARNINGS**: file every warning — `node "$LEDGER" backlog add --title "<warning>" --severity warning --kind <spec-gap|test-gap|refactor|doc|bug> --gate green-audit --report <report path> --story US-NNN` — print the ids, then proceed as PASS. Outside autopilot you may instead offer to address them now.
+6. **PASS**: confirm readiness and suggest running `/verification-and-validation US-NNN`.
 
-If running in a ralph-loop, emit `<promise>GREEN_AUDIT_COMPLETE_US-NNN</promise>`.
+Under autopilot, skip the question and emit `<promise>GREEN_AUDIT_COMPLETE_US-NNN</promise>`.
 
 ---
 

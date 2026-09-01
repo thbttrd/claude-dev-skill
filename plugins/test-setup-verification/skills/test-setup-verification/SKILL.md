@@ -1,6 +1,6 @@
 ---
 name: test-setup-verification
-version: 3.1.0
+version: 3.2.1
 description: >
   Per-Operation verification of /test-setup output for completeness, RED-state
   compliance, and Test Plan traceability. Spawns a fresh agent to audit ONE
@@ -29,13 +29,14 @@ The verification runs in a **fresh agent** so the review has no context bias. Th
 
 ## Pre-Flight
 
-| Check                                                | Action                                                                                                                                          |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/V*/` directory exists                          | Hard-stop with the migration command.                                                                                                           |
-| `specs/stories.json` does not exist                  | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                |
-| Target story id missing                              | Use `AskUserQuestion` to list stories whose `phase = red`.                                                                                      |
-| Story's `phase` is not `red`                         | Hard-stop. Print: `Story US-NNN must be in red phase before verification. Run /test-setup US-NNN first.`                                        |
-| `state.json.schema_version < 2`                      | Hard-stop. Print: `state.json is on the v1 schema. Re-run /test-setup US-NNN to migrate, then re-invoke this skill.`                            |
+| Check                                                              | Action                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/V*/` directory exists                                        | Hard-stop with the migration command.                                                                                                                                                                                                                                      |
+| `specs/stories.json` does not exist                                | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                                                                                                                                            |
+| Target story id missing                                            | Use `AskUserQuestion` to list stories whose `phase = red`.                                                                                                                                                                                                                 |
+| Story's `phase` is not `red`                                       | Hard-stop. Print: `Story US-NNN must be in red phase before verification. Run /test-setup US-NNN first.`                                                                                                                                                                   |
+| `state.json.schema_version < 2`                                    | Hard-stop. Print: `state.json is on the v1 schema. Re-run /test-setup US-NNN to migrate, then re-invoke this skill.`                                                                                                                                                       |
+| `specs/autopilot.json` has `"active": true` (or env `AUTOPILOT=1`) | Follow `references/autopilot-contract.md` §1–2 for this whole invocation: no `AskUserQuestion`, take the _(Recommended)_ option, journal decisions and gates, stop only on the contract's hard conditions. Journaling (§3) and toolchain resolution (§4) apply regardless. |
 
 ## Resolving the target Operation
 
@@ -80,6 +81,8 @@ Your job is to verify that the tests scaffolded for ONE Operation (Op-X) of
 story US-NNN are real, are RED, and correctly cover the rows in the story's
 PLAN.md Test Plan that are tagged with this Operation.
 
+Commands resolve per `references/autopilot-contract.md` §4.
+
 ## Step 1: Read the Artifacts (scoped to Op-X)
 
 1. specs/story-NNN-slug/STORY.md (full)
@@ -123,8 +126,8 @@ For EACH test file referenced by an Op-X-tagged Test Plan row:
 ## Step 4: RED-State Verification (Op-X scope only)
 
 Run the test suites with the Op filter:
-- bun bdd --tags="@US-NNN and @Op-X"
-- bun test --grep="@US-NNN.*@Op-X"
+- `<BDD>` with the Op filter
+- `<TEST> -t "@US-NNN.*@Op-X"`
 
 Expected: every test selected by these filters FAILS at assertion time.
 If any test passes, either:
@@ -234,16 +237,19 @@ FAIL = critical issues that must be fixed before GREEN
 1. Persist the report to `specs/story-NNN-slug/verification/red-audit-Op-X.md`.
 2. Update `state.json.operations[Op-X].red_audit`:
    ```json
-   { "verdict": "PASS|PASS_WITH_WARNINGS|FAIL",
+   {
+     "verdict": "PASS|PASS_WITH_WARNINGS|FAIL",
      "at": "<ISO 8601>",
-     "report_path": "specs/story-NNN-slug/verification/red-audit-Op-X.md" }
+     "report_path": "specs/story-NNN-slug/verification/red-audit-Op-X.md"
+   }
    ```
 3. Present the report's summary to the user.
-4. If **FAIL**: list critical issues; ask if they want to fix now (loops back into `/test-setup US-NNN Op-X` with `--force`).
-5. If **PASS WITH WARNINGS**: show warnings; ask whether to address or proceed.
-6. If **PASS**: confirm readiness and suggest running `/spec-implementation US-NNN Op-X`.
+4. Journal the verdict: `node "$LEDGER" log --kind gate --gate red-audit --verdict <PASS|PASS_WITH_WARNINGS|FAIL> --report <report path> --story US-NNN --op Op-X --summary "<one line>"`.
+5. **FAIL**: list critical issues. Outside autopilot ask whether to fix now (loops back into `/test-setup US-NNN Op-X` with `--force`). Under autopilot: hard stop `verifier_fail` (contract §2).
+6. **PASS_WITH_WARNINGS**: file every warning — `node "$LEDGER" backlog add --title "<warning>" --severity warning --kind <spec-gap|test-gap|refactor|doc|bug> --gate red-audit --report <report path> --story US-NNN --op Op-X` — print the ids, then proceed as PASS. Outside autopilot you may instead offer to address them now.
+7. **PASS**: confirm readiness and suggest running `/spec-implementation US-NNN Op-X`.
 
-If running in a ralph-loop, skip the AskUserQuestion and emit `<promise>RED_AUDIT_COMPLETE_US-NNN_Op-X</promise>` for the loop to detect.
+Under autopilot, skip the question and emit `<promise>RED_AUDIT_COMPLETE_US-NNN_Op-X</promise>` for the loop to detect.
 
 ## What This Skill Does NOT Do
 

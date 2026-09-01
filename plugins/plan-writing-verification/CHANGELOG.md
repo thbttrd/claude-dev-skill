@@ -6,6 +6,19 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.2.1] — 2026-08-31
+
+### Fixed
+
+- FAIL recovery no longer points at a nonexistent `/plan-writing --force` flag; re-runs are allowed while the story's phase is `planned`.
+- Contract §4 resync: `mktemp` report paths for `ledger regress` (concurrent sessions no longer share `/tmp/ledger-*.json`), story-wide BDD selection falls back to the story's feature directory path when feature files carry no `@US-NNN` tag (e.g. `/migrate-specs` onboarding), and base failures of already-`verified` stories are "suspect base failures" — never grandfathered by the regression baseline.
+
+## [2.2.0] — 2026-08-30
+
+### Added
+
+- Pipeline contract; verdict journaled; warnings filed as backlog items (BL-NNN); toolchain placeholders.
+
 ## [2.1.0] — 2026-08-22
 
 ### Changed

@@ -1,0 +1,728 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  readdirSync,
+  symlinkSync,
+  utimesSync,
+} from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
+import { execFileSync, spawnSync } from "node:child_process";
+import {
+  findSpecsDir,
+  parseArgs,
+  autopilotContext,
+  log,
+  readJournal,
+  filterJournal,
+  gitCommits,
+  formatTable,
+  KINDS,
+  readBacklog,
+  backlogAdd,
+  backlogList,
+  backlogResolve,
+  backlogWontfix,
+  failuresFromVitest,
+  failuresFromCucumber,
+  failuresFromLines,
+  regress,
+} from "./ledger.mjs";
+
+export function fixtureProject() {
+  const root = mkdtempSync(join(tmpdir(), "ledger-"));
+  mkdirSync(join(root, "specs", "story-001-x"), { recursive: true });
+  writeFileSync(join(root, "specs", "stories.json"), '{"stories":[]}\n');
+  return root;
+}
+
+test("findSpecsDir walks up to the dir holding specs/stories.json", () => {
+  const root = fixtureProject();
+  assert.equal(
+    findSpecsDir(join(root, "specs", "story-001-x"), undefined),
+    join(root, "specs"),
+  );
+  assert.throws(
+    () => findSpecsDir(tmpdir(), undefined),
+    /no specs\/stories.json/,
+  );
+});
+
+test("parseArgs handles values, flags and repeated --ref/--file", () => {
+  const o = parseArgs([
+    "log",
+    "--kind",
+    "decision",
+    "--summary",
+    "x y",
+    "--ref",
+    "a",
+    "--ref",
+    "b",
+    "--json",
+  ]);
+  assert.deepEqual(o._, ["log"]);
+  assert.equal(o.kind, "decision");
+  assert.equal(o.summary, "x y");
+  assert.deepEqual(o.ref, ["a", "b"]);
+  assert.equal(o.json, true);
+});
+
+test("log appends a journal line with defaults from autopilot.json when active", () => {
+  const root = fixtureProject();
+  const specs = join(root, "specs");
+  assert.deepEqual(autopilotContext(specs), {});
+  writeFileSync(
+    join(specs, "autopilot.json"),
+    JSON.stringify({
+      active: true,
+      run_id: "run-1",
+      current: {
+        story: "US-001",
+        op: "Op-2",
+        stage: "test-setup",
+        agent: "agent-a",
+      },
+    }),
+  );
+  const now = new Date("2026-08-30T10:00:00Z");
+  const e = log(
+    specs,
+    { kind: "decision", summary: "RED-B skipped", ref: ["specs/x.md"] },
+    now,
+  );
+  assert.equal(e.ts, "2026-08-30T10:00:00.000Z");
+  assert.equal(e.story, "US-001");
+  assert.equal(e.op, "Op-2");
+  assert.equal(e.stage, "test-setup");
+  assert.equal(e.agent, "agent-a");
+  assert.equal(e.run_id, "run-1");
+  assert.deepEqual(e.refs, ["specs/x.md"]);
+  assert.equal(e.sha, null);
+  const lines = readFileSync(join(specs, "journal.jsonl"), "utf8")
+    .trim()
+    .split("\n");
+  assert.equal(lines.length, 1);
+  assert.deepEqual(JSON.parse(lines[0]), e);
+  assert.deepEqual(readJournal(specs), [e]);
+});
+
+test("log: explicit args win over autopilot defaults; inactive autopilot gives nulls", () => {
+  const root = fixtureProject();
+  const specs = join(root, "specs");
+  writeFileSync(
+    join(specs, "autopilot.json"),
+    JSON.stringify({ active: false, current: { story: "US-009" } }),
+  );
+  const e = log(specs, { kind: "action", summary: "s", story: "US-002" });
+  assert.equal(e.story, "US-002");
+  assert.equal(e.op, null);
+  assert.equal(e.run_id, null);
+});
+
+test("log validates kind, summary and gate verdict", () => {
+  const specs = join(fixtureProject(), "specs");
+  assert.throws(
+    () => log(specs, { kind: "nope", summary: "s" }),
+    new RegExp(KINDS.join("\\|")),
+  );
+  assert.throws(() => log(specs, { kind: "decision" }), /--summary/);
+  assert.throws(
+    () =>
+      log(specs, {
+        kind: "gate",
+        summary: "s",
+        gate: "simplify",
+        verdict: "MEH",
+      }),
+    /--verdict/,
+  );
+  const g = log(specs, {
+    kind: "gate",
+    summary: "s",
+    gate: "simplify",
+    verdict: "PASS",
+    report: "r.md",
+  });
+  assert.equal(g.gate, "simplify");
+  assert.equal(g.verdict, "PASS");
+  assert.equal(g.report, "r.md");
+});
+
+test("readJournal on a missing file is an empty array", () => {
+  assert.deepEqual(readJournal(join(fixtureProject(), "specs")), []);
+});
+
+test("filterJournal filters by story/op/kind/since", () => {
+  const es = [
+    {
+      ts: "2026-08-29T00:00:00Z",
+      story: "US-001",
+      op: "Op-1",
+      kind: "decision",
+      summary: "a",
+    },
+    {
+      ts: "2026-08-30T00:00:00Z",
+      story: "US-001",
+      op: "Op-2",
+      kind: "gate",
+      summary: "b",
+    },
+    {
+      ts: "2026-08-30T00:00:00Z",
+      story: "US-002",
+      op: null,
+      kind: "decision",
+      summary: "c",
+    },
+  ];
+  assert.equal(filterJournal(es, { story: "US-001" }).length, 2);
+  assert.equal(filterJournal(es, { op: "Op-2" })[0].summary, "b");
+  assert.equal(filterJournal(es, { kind: "decision" }).length, 2);
+  assert.equal(filterJournal(es, { since: "2026-08-30" }).length, 2);
+});
+
+test("gitCommits turns conventional commits with a US-NNN scope into commit entries", () => {
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
+  git("add", ".");
+  git("commit", "-qm", "feat(US-001): implement Op-1 — thing");
+  git("commit", "-q", "--allow-empty", "-m", "chore: unrelated");
+  const all = gitCommits(root, {});
+  assert.equal(all.length, 2);
+  const only = gitCommits(root, { story: "US-001" });
+  assert.equal(only.length, 1);
+  assert.equal(only[0].kind, "commit");
+  assert.equal(only[0].story, "US-001");
+  assert.match(only[0].sha, /^[0-9a-f]{7,}$/);
+  assert.match(only[0].ts, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(only[0].summary, "feat(US-001): implement Op-1 — thing");
+});
+
+test("formatTable renders one line per entry, sorted by ts", () => {
+  const s = formatTable([
+    {
+      ts: "2026-08-30T10:00:00Z",
+      story: "US-001",
+      op: "Op-2",
+      kind: "gate",
+      verdict: "PASS",
+      summary: "b",
+    },
+    {
+      ts: "2026-08-30T09:00:00Z",
+      story: "US-001",
+      op: null,
+      kind: "decision",
+      summary: "a",
+    },
+  ]);
+  const lines = s.trim().split("\n");
+  assert.equal(lines.length, 2);
+  assert.match(lines[0], /09:00.*US-001.*decision.*a/);
+  assert.match(lines[1], /10:00.*Op-2.*gate.*PASS.*b/);
+});
+
+test("gitCommits normalizes non-UTC timestamps to UTC and sorts correctly", () => {
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
+  git("add", ".");
+  const env = {
+    ...process.env,
+    GIT_AUTHOR_DATE: "2026-08-30T15:05:00+02:00",
+    GIT_COMMITTER_DATE: "2026-08-30T15:05:00+02:00",
+  };
+  execFileSync("git", ["commit", "-qm", "feat(US-001): with +02:00 offset"], {
+    cwd: root,
+    stdio: "pipe",
+    env,
+  });
+  const commits = gitCommits(root, {});
+  assert.equal(commits[0].ts, "2026-08-30T13:05:00.000Z");
+  const later = {
+    ts: "2026-08-30T14:00:00.000Z",
+    story: null,
+    op: null,
+    kind: "decision",
+    summary: "later",
+  };
+  const table = formatTable([commits[0], later]);
+  const lines = table.trim().split("\n");
+  assert.match(lines[0], /13:05.*feat\(US-001\)/);
+  assert.match(lines[1], /14:00.*later/);
+});
+
+test("backlog add assigns BL-NNN ids, persists, and journals a finding", () => {
+  const specs = join(fixtureProject(), "specs");
+  assert.deepEqual(readBacklog(specs), { next_id: 1, items: [] });
+  const now = new Date("2026-08-30T12:00:00Z");
+  const a = backlogAdd(
+    specs,
+    {
+      title: "Extract helper",
+      severity: "warning",
+      kind: "simplification",
+      file: ["a.ts"],
+      story: "US-008",
+      op: "Op-1",
+      stage: "spec-implementation",
+      gate: "code-review",
+      report: "r.md",
+      detail: "d",
+    },
+    now,
+  );
+  assert.equal(a.id, "BL-001");
+  assert.equal(a.status, "open");
+  assert.equal(a.created_at, "2026-08-30");
+  assert.deepEqual(a.source, {
+    stage: "spec-implementation",
+    gate: "code-review",
+    story: "US-008",
+    op: "Op-1",
+    report: "r.md",
+  });
+  assert.deepEqual(a.files, ["a.ts"]);
+  assert.equal(a.resolved_sha, null);
+  const b = backlogAdd(
+    specs,
+    { title: "Second", severity: "info", kind: "doc" },
+    now,
+  );
+  assert.equal(b.id, "BL-002");
+  assert.equal(readBacklog(specs).next_id, 3);
+  const j = readJournal(specs);
+  assert.equal(j.length, 2);
+  assert.equal(j[0].kind, "finding");
+  assert.equal(j[0].backlog_id, "BL-001");
+  assert.equal(j[0].story, "US-008");
+});
+
+test("backlog add validates severity and kind", () => {
+  const specs = join(fixtureProject(), "specs");
+  assert.throws(
+    () => backlogAdd(specs, { title: "t", severity: "huge", kind: "bug" }),
+    /--severity/,
+  );
+  assert.throws(
+    () => backlogAdd(specs, { title: "t", severity: "info", kind: "vibe" }),
+    /--kind/,
+  );
+  assert.throws(
+    () => backlogAdd(specs, { severity: "info", kind: "bug" }),
+    /--title/,
+  );
+});
+
+test("backlog list filters; resolve and wontfix update status and journal an action", () => {
+  const specs = join(fixtureProject(), "specs");
+  backlogAdd(specs, {
+    title: "a",
+    severity: "error",
+    kind: "bug",
+    story: "US-001",
+  });
+  backlogAdd(specs, {
+    title: "b",
+    severity: "info",
+    kind: "doc",
+    story: "US-002",
+  });
+  assert.equal(backlogList(specs, {}).length, 2);
+  assert.equal(backlogList(specs, { story: "US-001" })[0].title, "a");
+  assert.equal(backlogList(specs, { severity: "info" })[0].id, "BL-002");
+  const r = backlogResolve(
+    specs,
+    "BL-001",
+    { sha: "abc1234", resolution: "fixed in shared helper" },
+    new Date("2026-09-01T00:00:00Z"),
+  );
+  assert.equal(r.status, "done");
+  assert.equal(r.resolved_sha, "abc1234");
+  assert.equal(r.resolved_at, "2026-09-01");
+  const w = backlogWontfix(specs, "BL-002", { reason: "not worth it" });
+  assert.equal(w.status, "wontfix");
+  assert.equal(w.resolution, "not worth it");
+  assert.equal(backlogList(specs, { status: "open" }).length, 0);
+  assert.throws(
+    () => backlogResolve(specs, "BL-999", { sha: "x", resolution: "y" }),
+    /BL-999 not found/,
+  );
+  assert.throws(
+    () => backlogWontfix(specs, "BL-001", { reason: "x" }),
+    /BL-001 is already done/,
+  );
+  assert.throws(
+    () => backlogResolve(specs, "BL-001", { sha: "y", resolution: "z" }),
+    /BL-001 is already done/,
+  );
+  const actions = readJournal(specs).filter((e) => e.kind === "action");
+  assert.equal(actions.length, 2);
+  assert.equal(actions[0].backlog_id, "BL-001");
+});
+
+test("failuresFromVitest lists failed assertions as root-relative ids, sorted", () => {
+  const fx = (n) =>
+    readFileSync(new URL(`./fixtures/${n}`, import.meta.url), "utf8");
+  assert.deepEqual(failuresFromVitest(fx("vitest.json"), "/repo"), [
+    "src/a.test.ts::@US-001 @Op-2 does y",
+    "tests/unit/b.test.ts::parses z",
+  ]);
+});
+
+test("failuresFromCucumber lists scenarios with any failed/undefined step; skips backgrounds", () => {
+  const fx = (n) =>
+    readFileSync(new URL(`./fixtures/${n}`, import.meta.url), "utf8");
+  assert.deepEqual(failuresFromCucumber(fx("cucumber.json"), "/repo"), [
+    "specs/story-001-x/features/F-001.feature::Sad path",
+    "specs/story-001-x/features/F-001.feature::Undefined path",
+  ]);
+});
+
+test("failuresFromLines trims, drops blanks, sorts", () => {
+  assert.deepEqual(failuresFromLines(" b \n\na\n"), ["a", "b"]);
+});
+
+test("failuresFromVitest counts a load-broken file (status failed, no failed assertions)", () => {
+  const json = JSON.stringify({
+    testResults: [
+      { name: "/repo/src/broken.test.ts", status: "failed", assertionResults: [] },
+      {
+        name: "/repo/src/ok.test.ts",
+        status: "passed",
+        assertionResults: [{ status: "passed", fullName: "works" }],
+      },
+    ],
+  });
+  assert.deepEqual(failuresFromVitest(json, "/repo"), [
+    "src/broken.test.ts::(file failed to run)",
+  ]);
+});
+
+test("regress diffs failures of the working tree against a base sha via a worktree", () => {
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
+  writeFileSync(join(root, "failures.txt"), "a\nb\n");
+  git("add", ".");
+  git("commit", "-qm", "base");
+  writeFileSync(join(root, "failures.txt"), "a\nc\n"); // working tree: b fixed, c new
+  const r = regress({
+    root,
+    base: "HEAD",
+    cmd: "cat failures.txt",
+    runner: "lines",
+  });
+  assert.deepEqual(r.base, ["a", "b"]);
+  assert.deepEqual(r.head, ["a", "c"]);
+  assert.deepEqual(r.regressions, ["c"]);
+  assert.equal(git("worktree", "list").split("\n").length, 1); // temp worktree removed
+});
+
+test("regress reads a report file when --report-file is given", () => {
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
+  writeFileSync(join(root, "gen.sh"), 'printf "x\\n" > out.txt');
+  git("add", ".");
+  git("commit", "-qm", "base");
+  writeFileSync(join(root, "gen.sh"), 'printf "x\\ny\\n" > out.txt');
+  const r = regress({
+    root,
+    base: "HEAD",
+    cmd: "sh gen.sh",
+    runner: "lines",
+    reportFile: "out.txt",
+  });
+  assert.deepEqual(r.regressions, ["y"]);
+});
+
+test("regress honours absolute report file paths", () => {
+  const reportDir = mkdtempSync(join(tmpdir(), "report-"));
+  const reportPath = join(reportDir, "results.txt");
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
+  writeFileSync(join(root, "gen.sh"), `printf "x\\n" > ${reportPath}`);
+  git("add", ".");
+  git("commit", "-qm", "base");
+  writeFileSync(join(root, "gen.sh"), `printf "x\\ny\\n" > ${reportPath}`);
+  const r = regress({
+    root,
+    base: "HEAD",
+    cmd: "sh gen.sh",
+    runner: "lines",
+    reportFile: reportPath,
+  });
+  assert.deepEqual(r.regressions, ["y"]);
+});
+
+test("regress fails closed when the base run doesn't write its report file (stale head report must not be reused)", () => {
+  const reportDir = mkdtempSync(join(tmpdir(), "report-"));
+  const reportPath = join(reportDir, "results.txt");
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
+  // base commit's gen.sh writes nothing at all
+  writeFileSync(join(root, "gen.sh"), "true\n");
+  git("add", ".");
+  git("commit", "-qm", "base");
+  // working tree's gen.sh writes the shared absolute report file
+  writeFileSync(join(root, "gen.sh"), `printf "x\\ny\\n" > ${reportPath}`);
+  assert.throws(
+    () =>
+      regress({
+        root,
+        base: "HEAD",
+        cmd: "sh gen.sh",
+        runner: "lines",
+        reportFile: reportPath,
+      }),
+    /not parseable|could not run|ENOENT/i,
+  );
+});
+
+test("regress leaves nothing behind when git worktree add fails", () => {
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
+  writeFileSync(join(root, "f.txt"), "a\n");
+  git("add", ".");
+  git("commit", "-qm", "base");
+  const before = readdirSync(tmpdir()).filter((n) =>
+    n.startsWith("ledger-regress-"),
+  ).length;
+  assert.throws(
+    () =>
+      regress({
+        root,
+        base: "not-a-real-sha-xyz",
+        cmd: "echo",
+        runner: "lines",
+      }),
+    /not-a-real-sha-xyz|fatal/,
+  );
+  const after = readdirSync(tmpdir()).filter((n) =>
+    n.startsWith("ledger-regress-"),
+  ).length;
+  assert.equal(
+    after,
+    before,
+    "temp dir should be cleaned up on git worktree add failure",
+  );
+  assert.equal(
+    git("worktree", "list").split("\n").length,
+    1,
+    "only main worktree should exist",
+  );
+});
+
+test("regress throws with diagnostic on unparseable runner output", () => {
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
+  writeFileSync(join(root, "f.txt"), "a\n");
+  git("add", ".");
+  git("commit", "-qm", "base");
+  assert.throws(
+    () =>
+      regress({
+        root,
+        base: "HEAD",
+        cmd: "echo not-json",
+        runner: "vitest",
+      }),
+    /not parseable|echo not-json/,
+  );
+});
+
+test("regress fails closed when the suite exits non-zero reporting zero failures", () => {
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
+  writeFileSync(join(root, "f.txt"), "a\n");
+  git("add", ".");
+  git("commit", "-qm", "base");
+  assert.throws(
+    () => regress({ root, base: "HEAD", cmd: "exit 3", runner: "lines" }),
+    /exited 3 but reported zero failures/,
+  );
+});
+
+test("regress matches base and head ids when tmpdir is a symlink (realpath'd worktree)", () => {
+  const root = fixtureProject();
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
+  // Runner reports realpath'd absolute names, like vitest does.
+  writeFileSync(
+    join(root, "gen.sh"),
+    `printf '{"testResults":[{"name":"%s/x.test.ts","status":"failed","assertionResults":[{"status":"failed","fullName":"t"}]}]}' "$(pwd -P)" > out.json\nexit 1\n`,
+  );
+  git("add", ".");
+  git("commit", "-qm", "base");
+  const realTmp = mkdtempSync(join(tmpdir(), "real-tmp-"));
+  const linkTmp = join(mkdtempSync(join(tmpdir(), "link-holder-")), "link");
+  symlinkSync(realTmp, linkTmp, "dir");
+  const saved = process.env.TMPDIR;
+  process.env.TMPDIR = linkTmp;
+  try {
+    const r = regress({
+      root,
+      base: "HEAD",
+      cmd: "sh gen.sh",
+      runner: "vitest",
+      reportFile: "out.json",
+    });
+    assert.deepEqual(r.head, ["x.test.ts::t"]);
+    assert.deepEqual(r.base, ["x.test.ts::t"]);
+    assert.deepEqual(r.regressions, []);
+  } finally {
+    if (saved === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = saved;
+  }
+});
+
+test("regress flags base failures of already-verified stories as suspect_base", () => {
+  const root = fixtureProject();
+  const specs = join(root, "specs");
+  writeFileSync(
+    join(specs, "stories.json"),
+    JSON.stringify({ stories: [{ id: "US-001", phase: "verified" }] }),
+  );
+  const git = (...a) =>
+    execFileSync("git", a, { cwd: root, stdio: "pipe" }).toString().trim();
+  git("init", "-q");
+  git("config", "user.email", "t@t");
+  git("config", "user.name", "t");
+  git("config", "commit.gpgsign", "false");
+  writeFileSync(join(root, "failures.txt"), "a.test.ts::@US-001 broken\nb\n");
+  git("add", ".");
+  git("commit", "-qm", "base");
+  writeFileSync(join(root, "failures.txt"), "b\n");
+  const r = regress({
+    root,
+    base: "HEAD",
+    cmd: "cat failures.txt",
+    runner: "lines",
+    specs,
+  });
+  assert.deepEqual(r.regressions, []);
+  assert.deepEqual(r.suspect_base, ["a.test.ts::@US-001 broken"]);
+  // No stories.json knowledge → nothing flagged.
+  const r2 = regress({
+    root,
+    base: "HEAD",
+    cmd: "cat failures.txt",
+    runner: "lines",
+  });
+  assert.deepEqual(r2.suspect_base, []);
+});
+
+test("backlogAdd steals a stale lock and still assigns the next id", () => {
+  const specs = join(fixtureProject(), "specs");
+  writeFileSync(join(specs, ".backlog.lock"), "999999");
+  const old = new Date(Date.now() - 60_000);
+  utimesSync(join(specs, ".backlog.lock"), old, old);
+  const a = backlogAdd(specs, { title: "t", severity: "info", kind: "doc" });
+  assert.equal(a.id, "BL-001");
+  assert.equal(existsSync(join(specs, ".backlog.lock")), false);
+});
+
+test("readJournal skips malformed lines instead of throwing", () => {
+  const specs = join(fixtureProject(), "specs");
+  const good = JSON.stringify({ ts: "2026-08-30T00:00:00Z", kind: "decision", summary: "ok" });
+  writeFileSync(join(specs, "journal.jsonl"), `{"ts":"2026-08-30T00{"tr\n${good}\n`);
+  const entries = readJournal(specs);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].summary, "ok");
+});
+
+test("CLI: failures and usage work outside a specs project", () => {
+  const real = fileURLToPath(new URL("./ledger.mjs", import.meta.url));
+  const outside = mkdtempSync(join(tmpdir(), "nospecs-"));
+  const f = spawnSync(process.execPath, [real, "failures", "--runner", "lines"], {
+    cwd: outside,
+    input: "b\na\n",
+    encoding: "utf8",
+  });
+  assert.equal(f.status, 0, f.stderr);
+  assert.equal(f.stdout, "a\nb\n");
+  const u = spawnSync(process.execPath, [real], { cwd: outside, encoding: "utf8" });
+  assert.equal(u.status, 2, u.stderr);
+  assert.match(u.stderr, /usage:/);
+});
+
+test("CLI entry works when invoked through a symlink", () => {
+  const root = fixtureProject();
+  const real = fileURLToPath(new URL("./ledger.mjs", import.meta.url));
+  const link = join(root, "ledger-link.mjs");
+  symlinkSync(real, link);
+  const specs = join(root, "specs");
+  const r = spawnSync(
+    process.execPath,
+    [
+      link,
+      "log",
+      "--kind",
+      "decision",
+      "--summary",
+      "via symlink",
+      "--specs",
+      specs,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /"kind":"decision"/);
+  const journal = readFileSync(join(specs, "journal.jsonl"), "utf8");
+  assert.match(journal, /"summary":"via symlink"/);
+});

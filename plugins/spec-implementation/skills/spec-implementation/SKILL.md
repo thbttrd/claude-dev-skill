@@ -1,6 +1,6 @@
 ---
 name: spec-implementation
-version: 3.1.0
+version: 3.2.1
 description: >
   Per-Operation GREEN-phase executor with story-end wrap-up gates. For ONE
   Operation of ONE story (US-NNN Op-X) at a time, writes the minimal
@@ -24,7 +24,7 @@ description: >
 
 Executes a story's `PLAN.md` against its pre-written failing tests, **one Operation at a time**. Each invocation processes a single Op's GREEN (and optional REFACTOR), then exits — the next invocation picks up the next Op. Once every Operation in the story is GREEN, invoking this skill **without an `Op-X` arg** runs the three story-level quality gates (Simplify, Code Review, Verify) and flips the story's project-level `phase` to `"green"`.
 
-The story is the unit of *planning, audit, and shipping*. The Operation is the unit of *execution*. Quality gates run per story, not per Op.
+The story is the unit of _planning, audit, and shipping_. The Operation is the unit of _execution_. Quality gates run per story, not per Op.
 
 The architecture principle: `specs/ARCHITECTURE.md` defines the structure. All code follows module boundaries and dependency rules — `/spec-implementation` does not invent module placements; it follows what `PLAN.md`'s Structure section prescribes.
 
@@ -34,15 +34,16 @@ The UI principle: mockups and screen specs define the look and feel. UI componen
 
 ## Pre-Flight
 
-| Check                                                                | Action                                                                                                                                          |
-| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/V*/` directory exists                                          | Hard-stop with the migration command.                                                                                                           |
-| `specs/stories.json` does not exist                                  | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                |
-| Target story id missing                                              | Ask via `AskUserQuestion` (default: stories whose `phase = red`).                                                                              |
-| Story's `phase` is not `red` or `green`                              | Hard-stop unless story is `US-000` AND `phase = planned` AND repo is empty (see Foundation Auto-Chain below).                                  |
-| `specs/story-NNN-slug/PLAN.md` does not exist                        | Hard-stop with the appropriate message.                                                                                                         |
-| Any dependency in `depends_on_story_ids` is not `verified` and not `is_foundation: true` | Hard-stop with the dependency name and the suggested fix.                                                                |
-| `state.json.schema_version < 2`                                      | Run the v1 → v2 migration (see `references/state-schema.md`) atomically, then continue.                                                         |
+| Check                                                                                    | Action                                                                                                                                                                                                                                                                     |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/V*/` directory exists                                                              | Hard-stop with the migration command.                                                                                                                                                                                                                                      |
+| `specs/stories.json` does not exist                                                      | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                                                                                                                                            |
+| Target story id missing                                                                  | Ask via `AskUserQuestion` (default: stories whose `phase = red`).                                                                                                                                                                                                          |
+| Story's `phase` is not `red` or `green`                                                  | Hard-stop unless story is `US-000` AND `phase = planned` AND repo is empty (see Foundation Auto-Chain below).                                                                                                                                                              |
+| `specs/story-NNN-slug/PLAN.md` does not exist                                            | Hard-stop with the appropriate message.                                                                                                                                                                                                                                    |
+| Any dependency in `depends_on_story_ids` is not `verified` and not `is_foundation: true` | Hard-stop with the dependency name and the suggested fix.                                                                                                                                                                                                                  |
+| `state.json.schema_version < 2`                                                          | Run the v1 → v2 migration (see `references/state-schema.md`) atomically, then continue.                                                                                                                                                                                    |
+| `specs/autopilot.json` has `"active": true` (or env `AUTOPILOT=1`)                       | Follow `references/autopilot-contract.md` §1–2 for this whole invocation: no `AskUserQuestion`, take the _(Recommended)_ option, journal decisions and gates, stop only on the contract's hard conditions. Journaling (§3) and toolchain resolution (§4) apply regardless. |
 
 ### Foundation Auto-Chain
 
@@ -75,7 +76,7 @@ If Op-X passed explicitly:
   Else                                              → enter PER-OP MODE for Op-X.
 
 If no Op-X arg:
-  If any op.operation_phase = red AND implementation_status ≠ green:
+  If any op.operation_phase = red (or tests_status = "manual" and implementation_status ≠ green):
     Pick first such op → enter PER-OP MODE.
   Elif all ops ∈ {green, refactored} AND quality_gates not all true:
     → enter STORY-END MODE (run Simplify + Code Review + Verify).
@@ -84,6 +85,8 @@ If no Op-X arg:
   Else:
     → "Nothing to implement. State: <summary>."
 ```
+
+The cursor rule is shared: `current_operation` = first Op whose `operation_phase ∉ {green, refactored}`; `null` only when every Op is GREEN.
 
 The picker writes its choice to `state.json.current_operation`.
 
@@ -127,10 +130,12 @@ For one Operation Op-X (resolved by the picker), execute these phases in order; 
 
 Run the Op-X-filtered suites:
 
-- `bun bdd --tags="@US-NNN and @Op-X"`
-- `bun test --grep="@US-NNN.*@Op-X"`
+- `<BDD>` with the Op filter (contract §4)
+- `<TEST> -t "@US-NNN.*@Op-X"`
 
 Both MUST FAIL (these were written by `/test-setup US-NNN Op-X`). If any test passes, something is off — investigate before proceeding (likely an earlier Op accidentally implemented this Op's behaviour, or the test is misclassified).
+
+Ops whose rows are all `manual` have nothing to run here; proceed to GREEN (the deliverable is the artefact the manual rows describe).
 
 ### Phase 2 — GREEN: write the minimum implementation
 
@@ -145,9 +150,8 @@ Constraints:
 
 After writing the code, run:
 
-- `bun test --grep="@US-NNN"` — full per-story suite. Op-X's tests must pass; earlier Ops' tests must still pass.
-- `bun bdd --tags="@US-NNN"` — same.
-- For previously verified stories, run their tags too (or run the unfiltered suite if it's fast enough). NO regressions allowed.
+- `<TEST> -t "@US-NNN"` and `<BDD>` (story filter) — Op-X's tests pass; earlier Ops' tests still pass.
+- Regression baseline (contract §4): `RPT=$(mktemp) && node "$LEDGER" regress --base HEAD --runner vitest --cmd "<TEST> --reporter=json --outputFile=$RPT" --report-file "$RPT"` and the cucumber equivalent. Exit 0 required. A regression in a story already `verified` is hard stop `regression` under autopilot; otherwise back out and re-think.
 
 If anything fails:
 
@@ -163,14 +167,16 @@ feat(US-NNN): implement Op-X — <operation title>
 
 (Or `feat(foundation): <what>` for shared infrastructure inside US-000.)
 
+Journal: `node "$LEDGER" log --kind commit --sha $(git rev-parse --short HEAD) --summary "feat(US-NNN): implement Op-X"` (contract §3, §5).
+
 ### Phase 3 — REFACTOR (optional, only if PLAN.md prescribes)
 
 If the Operation's REFACTOR sub-section is non-empty, perform it now: clean obvious duplication, improve names, extract helpers — without changing behaviour.
 
 After refactoring:
 
-- `bun test --grep="@US-NNN"` — still passes.
-- `bun bdd --tags="@US-NNN"` — still passes.
+- `<TEST> -t "@US-NNN"` — still passes.
+- `<BDD>` (story filter) — still passes.
 - Module boundary compliance — no cross-BM imports introduced.
 
 Commit:
@@ -178,6 +184,8 @@ Commit:
 ```
 refactor(US-NNN): Op-X — <what>
 ```
+
+Journal: `node "$LEDGER" log --kind commit --sha $(git rev-parse --short HEAD) --summary "refactor(US-NNN): Op-X"` (contract §3, §5).
 
 ### Phase 4 — Update state.json (per-op)
 
@@ -191,8 +199,8 @@ After GREEN (and optional REFACTOR):
 - `implementation.last_commit = <sha>`
 - `implementation.ops_completed.append("Op-X")`
 - `implementation.started_at = <now>` (only on the very first GREEN; do not overwrite if already set)
-- For every `test_plan_rows[T-N]` where `op = "Op-X"`: set `passing = true`
-- Advance `current_operation` to the next op where `operation_phase = "red"`, or `null` if every Op is now GREEN
+- For every `test_plan_rows[T-N]` where `op = "Op-X"` and `type ≠ "manual"`: set `passing = true`.
+- Advance `current_operation` to the first Op whose `operation_phase ∉ {green, refactored}`, or `null` if every Op is now GREEN.
 
 ### Phase 5 — Self-Review, Report and offer next step
 
@@ -205,6 +213,8 @@ After GREEN (and optional REFACTOR):
 
 Fix failures before proceeding. This is the default GREEN gate; `/spec-implementation-verification` is an opt-in deep audit on top of it.
 
+Journal the self-review: `node "$LEDGER" log --kind gate --gate self-review --verdict <PASS|PASS_WITH_WARNINGS> --story US-NNN --op Op-X --stage spec-implementation --summary "<n>/4 checks"` (contract §3, §5). Any unchecked item not fixed → `node "$LEDGER" backlog add`.
+
 ```
 US-NNN — Op-X GREEN
   Files implemented:  N (<paths>)
@@ -214,7 +224,7 @@ US-NNN — Op-X GREEN
   Next pending op:    Op-(X+1) | (none — story-end gates available)
 ```
 
-Use `AskUserQuestion`:
+Outside autopilot, use `AskUserQuestion`:
 
 - **Header: "Next"** — "Op-X is GREEN. What's next?"
   - "Move to next op — /test-setup US-NNN" (Recommended; auto-picks next pending op for RED)
@@ -222,13 +232,13 @@ Use `AskUserQuestion`:
   - "Run story-end gates" (only shown when every op is GREEN — Simplify + Code Review + Verify)
   - "Done for now"
 
-If running in a ralph-loop, skip the AskUserQuestion and emit `<promise>GREEN_COMPLETE_US-NNN_Op-X</promise>`. If every Op is now GREEN, also emit `<promise>STORY_OPS_COMPLETE_US-NNN</promise>` so the loop knows story-end mode is next.
+Under autopilot (contract §2), skip the question and emit `<promise>GREEN_COMPLETE_US-NNN_Op-X</promise>`; if every Op is now GREEN also emit `<promise>STORY_OPS_COMPLETE_US-NNN</promise>` so autopilot knows story-end mode is next.
 
 ### When an Operation Fails
 
 1. Log the error in `state.json.errors[]`.
 2. Set `Op-X.implementation_status = "blocked"`. Leave `operation_phase` at `red`.
-3. If running outside ralph-loop, ask the user; otherwise mark and exit so the next loop iteration can retry.
+3. Journal `--kind action --summary "Op-X blocked: <error>"`. Outside autopilot ask the user; under autopilot retry once from Phase 1 (journal `retry 1/2`), then a second time (`retry 2/2`); still failing → hard stop `op_blocked` (contract §2).
 
 ---
 
@@ -244,9 +254,9 @@ Invoke the marketplace's Simplify skill (or `/simplify`) on files modified durin
 git diff --name-only $BASE_SHA..HEAD | grep -v '^specs/'
 ```
 
-`BASE_SHA` is the parent of the first `test(US-NNN):` commit (the very first commit of `/test-setup US-NNN Op-1`). Re-run the full per-story suite (`bun test --grep="@US-NNN"` + `bun bdd --tags="@US-NNN"`) afterwards; everything must still pass. If Simplify made commits, also run the unfiltered suite to confirm no other regressions.
+`BASE_SHA` is the parent of the first `test(US-NNN):` commit (the very first commit of `/test-setup US-NNN Op-1`). Re-run the full per-story suite (`<TEST> -t "@US-NNN"` + `<BDD>` story filter) afterwards; everything must still pass. If Simplify made commits, also run the unfiltered suite to confirm no other regressions.
 
-Update `state.json.quality_gates.simplified = true`.
+Update `state.json.quality_gates.simplified = true`. Journal the gate: `node "$LEDGER" log --kind gate --gate simplify --verdict PASS --summary "<n> files simplified"`. Every simplification deliberately not applied → `node "$LEDGER" backlog add --title "<one line>" --kind simplification --severity info`.
 
 ### Gate 2 — Code Review
 
@@ -259,24 +269,22 @@ The reviewer audits the whole story's diff for:
 - Safeguards compliance (invariants, performance, security, data rules from PLAN.md's second S section).
 - Code quality (no obvious bugs, no missed edge cases, no over-implementation beyond Op scope).
 
-Act on critical findings; warnings are at the user's discretion. Update `state.json.quality_gates.reviewed = true`. Persist findings to `state.json.quality_gates.review_findings`.
+Act on critical findings. Every warning not acted on → `node "$LEDGER" backlog add --title "<one line>" --kind <bug|refactor|…> --severity warning --gate code-review --report <path>`; persist the ids in `state.json.quality_gates.review_findings[]`. Journal the gate verdict. Update `state.json.quality_gates.reviewed = true`.
 
 ### Gate 3 — Story Verification (end-to-end)
 
 Run the per-story Verification checklist from PLAN.md:
 
-1. `bun test` — all unit + integration tests pass (story + previously verified stories).
-2. `bun bdd` — all Gherkin scenarios for this story pass; previously verified stories don't regress.
-3. `bun lint && bun typecheck` — clean.
-4. Start the app: `bun dev`.
-5. Run the per-story `curl` walkthrough (`./verification/curl-walkthrough.sh` if present).
-6. (If UI) Run the Playwright walkthrough described in STORY.md AC. Use Playwright MCP if available.
-7. Verify architecture compliance: files in correct modules, no cross-module violations.
-8. (If UI) Verify visual compliance: mockup layouts followed, design tokens applied.
+1. `<TEST>` — unit + integration (story + previously verified stories) — evaluated through `node "$LEDGER" regress --base $BASE_SHA …` (contract §4): zero regressions.
+2. `<BDD>` — same, cucumber runner.
+3. `<LINT> && <TYPES>` — clean (skip with a journaled decision if the script is absent).
+4. Architecture compliance: files in the modules PLAN.md's Structure assigns; no cross-module imports (`<LINT>` boundary rules if present, else grep imports).
 
-Populate `state.json.quality_gates.verification_results` with each check's outcome.
+Live-app checks (start the app, `curl`, Playwright, visual compliance) belong to `/verification-and-validation` only — do not duplicate them here.
 
-Update `state.json.quality_gates.verified = true`.
+Populate `state.json.quality_gates.verification_results` with `{ tests_regressions, bdd_regressions, lint_passed, types_passed, architecture_ok }`.
+
+Update `state.json.quality_gates.verified = true`. Journal the gate: `node "$LEDGER" log --kind gate --gate verify --verdict PASS --summary "<n>/4 checks"` (contract §3, §5).
 
 ### Story Completion
 
@@ -290,8 +298,8 @@ When all three `quality_gates.{simplified, reviewed, verified}` are `true`:
    - Append `{ phase: "green", at: "<today>" }` to `stories[i].history`.
    - Update `project.updated_at`.
 4. Regenerate `specs/STORIES.md`.
-5. Emit `<promise>IMPLEMENTATION_COMPLETE_US-NNN</promise>` for ralph-loop detection.
-6. Use `AskUserQuestion`:
+5. Emit `<promise>IMPLEMENTATION_COMPLETE_US-NNN</promise>`.
+6. Outside autopilot, use `AskUserQuestion`:
    - **Header: "Done"** — "US-NNN is GREEN. What's next?"
      - "Run /verification-and-validation US-NNN (Recommended)" — the mandatory final E2E pass that flips `phase` to `verified`
      - "Run /spec-implementation-verification US-NNN" — opt-in story-end deep audit on top of the three gates just passed; worth it for `US-000` and high-stakes full-rigor stories
@@ -302,7 +310,7 @@ When all three `quality_gates.{simplified, reviewed, verified}` are `true`:
 
 ## Autonomous Loop Execution
 
-Designed for a bash loop that invokes `claude -p` repeatedly:
+Unattended runs are driven by `/autopilot` (see `references/autopilot-contract.md`). The legacy `claude -p` bash loop still works: it just needs `AUTOPILOT=1` in the environment.
 
 ```bash
 #!/bin/bash
@@ -314,7 +322,7 @@ while [ $ITERATION -lt $MAX_ITERATIONS ]; do
   ITERATION=$((ITERATION + 1))
   echo "=== Iteration $ITERATION ==="
 
-  OUTPUT=$(claude -p "Use the spec-implementation skill on $STORY. \
+  OUTPUT=$(AUTOPILOT=1 claude -p "Use the spec-implementation skill on $STORY. \
     Read specs/story-${STORY:3}-*/state.json to determine where you left off. \
     Follow: pre-flight → smart-default picker → per-op mode OR story-end mode → state.json updates." \
     --dangerously-skip-permissions)
@@ -346,8 +354,6 @@ fix(US-003): correct percentage calculation
 refactor(foundation): extract shared DB connection pool
 ```
 
-NEVER add a `Co-Authored-By` trailer.
-
 ---
 
 ## Decision Rules
@@ -360,8 +366,8 @@ NEVER add a `Co-Authored-By` trailer.
 
 ### When to ask the user
 
-- Ralph-loop mode: never — decide and document in `state.json`.
-- Outside the loop: ask when tests are ambiguous about expected behaviour, or when the architecture would need to change to make a test pass (re-invoke `/research-and-architecture` for a divergence ADR).
+- Under autopilot: never (contract §2).
+- Outside autopilot: ask when tests are ambiguous about expected behaviour, or when the architecture would need to change to make a test pass (re-invoke `/research-and-architecture` for a divergence ADR).
 
 ### When to skip a quality gate
 

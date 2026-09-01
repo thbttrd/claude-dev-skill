@@ -6,6 +6,18 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.3.1] — 2026-08-31
+
+### Fixed
+
+- Contract §4 resync: `mktemp` report paths for `ledger regress` (concurrent sessions no longer share `/tmp/ledger-*.json`), story-wide BDD selection falls back to the story's feature directory path when feature files carry no `@US-NNN` tag (e.g. `/migrate-specs` onboarding), and base failures of already-`verified` stories are "suspect base failures" — never grandfathered by the regression baseline.
+
+## [2.3.0] — 2026-08-30
+
+### Added
+
+- `manual` Test Plan type for out-of-repo assertions; toolchain placeholders; pipeline contract (autopilot, journaling).
+
 ## [2.2.0] — 2026-08-22
 
 ### Added

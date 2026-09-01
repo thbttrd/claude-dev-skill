@@ -25,47 +25,59 @@ In **v2** (introduced by `test-setup` 3.0.0 / `spec-implementation` 3.0.0 / new 
 
   "plan": {
     "plan_file": "specs/story-NNN-slug/PLAN.md",
-    "operations_count": 4
+    "operations_count": 4,
   },
 
-  "current_operation": "Op-2",                                  // NEW in v2: cursor for the smart-default picker
+  "current_operation": "Op-2", // NEW in v2: cursor for the smart-default picker
 
   "operations": {
     "Op-1": {
       "title": "Authenticate against the user store",
-      "covers_scenarios": ["User logs in with valid credentials", "User logs in with invalid credentials"],
+      "covers_scenarios": [
+        "User logs in with valid credentials",
+        "User logs in with invalid credentials",
+      ],
 
-      "operation_phase": "refactored",                          // NEW in v2: pending | red_a | red_b | red | green | refactored
-      "tests_status": "red",                                    // existing: pending | in_progress | red
-      "stub_status": "created",                                 // existing: pending | created
-      "implementation_status": "green",                         // existing: pending | in_progress | green | blocked
+      "operation_phase": "refactored", // NEW in v2: pending | red_a | red_b | red | green | refactored
+      "tests_status": "red", // existing: pending | in_progress | red | manual
+      "stub_status": "created", // existing: pending | created
+      "implementation_status": "green", // existing: pending | in_progress | green | blocked
 
-      "red_audit":   {                                          // NEW in v2: per-Op audit verdict from /test-setup-verification
+      "red_audit": {
+        // NEW in v2: per-Op audit verdict from /test-setup-verification
         "verdict": "PASS | PASS_WITH_WARNINGS | FAIL",
         "at": "ISO 8601",
-        "report_path": "specs/story-NNN-slug/verification/red-audit-Op-1.md"
+        "report_path": "specs/story-NNN-slug/verification/red-audit-Op-1.md",
       },
-      "green_audit": {                                          // NEW in v2: per-Op audit verdict from /spec-implementation-verification
+      "green_audit": {
+        // NEW in v2: per-Op audit verdict from /spec-implementation-verification
         "verdict": "PASS | PASS_WITH_WARNINGS | FAIL",
         "at": "ISO 8601",
-        "report_path": "specs/story-NNN-slug/verification/green-audit-Op-1.md"
+        "report_path": "specs/story-NNN-slug/verification/green-audit-Op-1.md",
       },
 
       "started_at": "ISO 8601",
-      "completed_at": "ISO 8601 or null"
+      "completed_at": "ISO 8601 or null",
     },
-    "Op-2": { "...": "..." }
+    "Op-2": { "...": "..." },
   },
 
   "test_plan_rows": {
     "T-01": {
       "type": "BDD",
-      "op": "Op-1",                                             // NEW in v2: Op tag from PLAN.md's Test Plan table
+      "op": "Op-1", // NEW in v2: Op tag from PLAN.md's Test Plan table
       "file": "e2e/steps/auth.steps.ts",
       "written": true,
-      "passing": false
+      "passing": false,
     },
-    "T-02": { "type": "unit", "op": "Op-1", "...": "..." }
+    "T-02": { "type": "unit", "op": "Op-1", "...": "..." },
+    "T-07": {
+      "type": "manual",
+      "op": "Op-4",
+      "file": "specs/story-NNN-slug/verification/qa-report.md",
+      "written": false,
+      "passing": false,
+    },
   },
 
   "errors": [
@@ -75,8 +87,8 @@ In **v2** (introduced by `test-setup` 3.0.0 / `spec-implementation` 3.0.0 / new 
       "details": "Expected status 401 but got 500",
       "attempts": 1,
       "resolved": false,
-      "timestamp": "ISO 8601"
-    }
+      "timestamp": "ISO 8601",
+    },
   ],
 
   "summary": {
@@ -84,15 +96,15 @@ In **v2** (introduced by `test-setup` 3.0.0 / `spec-implementation` 3.0.0 / new 
     "operations_red": 1,
     "operations_green": 0,
     "tests_written": 6,
-    "last_commit": null
-  }
+    "last_commit": null,
+  },
 }
 ```
 
 The `phase_local` field reflects which sub-skill is operating on the story. It is distinct from the project-level `phase` in `specs/stories.json#stories[i].phase` (`backlog | scoped | specced | planned | red | green | verified`). The two evolve in lockstep but answer different questions:
 
-- **`phase_local`** — *which skill is currently writing to this story*
-- **`stories[i].phase`** — *what the project-level kanban shows for this story*
+- **`phase_local`** — _which skill is currently writing to this story_
+- **`stories[i].phase`** — _what the project-level kanban shows for this story_
 
 ---
 
@@ -114,13 +126,13 @@ pending → red_a (BDD steps written, tests fail)
 
 ## Phases Handled by Each Skill
 
-| Skill                               | Reads `phase_local` | Writes `phase_local` to                           | Project-level `phase` set to |
-| ----------------------------------- | ------------------- | ------------------------------------------------- | ---------------------------- |
-| `/test-setup`                       | (creates state.json) | `test_setup` (sticky until all ops `red`); flips to `executing` only when **every** Op reaches `operation_phase = "red"` | `red` (on first Op's RED-A) |
-| `/test-setup-verification`          | `test_setup` or `executing` | unchanged                                          | unchanged                    |
-| `/spec-implementation`              | `executing`         | `executing` (sticky until story-end gates pass); flips to `verifying` after gates | unchanged in per-op mode; `green` after story-end gates |
-| `/spec-implementation-verification` | `executing` or `verifying` | unchanged                                          | unchanged                    |
-| `/verification-and-validation`      | `verifying`         | `verifying` → `verified` after E2E passes         | `verified`                   |
+| Skill                               | Reads `phase_local`         | Writes `phase_local` to                                                                                                  | Project-level `phase` set to                            |
+| ----------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| `/test-setup`                       | (creates state.json)        | `test_setup` (sticky until all ops `red`); flips to `executing` only when **every** Op reaches `operation_phase = "red"` | `red` (on first Op's RED-A)                             |
+| `/test-setup-verification`          | `test_setup` or `executing` | unchanged                                                                                                                | unchanged                                               |
+| `/spec-implementation`              | `executing`                 | `executing` (sticky until story-end gates pass); flips to `verifying` after gates                                        | unchanged in per-op mode; `green` after story-end gates |
+| `/spec-implementation-verification` | `executing` or `verifying`  | unchanged                                                                                                                | unchanged                                               |
+| `/verification-and-validation`      | `verifying`                 | `verifying` → `verified` after E2E passes                                                                                | `verified`                                              |
 
 A story's `state.json` is created by `/test-setup` when the project-level `phase` is `planned` (i.e., a `PLAN.md` exists). It does NOT exist before that.
 
@@ -132,7 +144,7 @@ When invoked without an explicit `Op-X` arg, each skill resolves the target Oper
 
 ```
 /test-setup US-NNN:
-  pick first op where operation_phase ∈ {pending, red_a}
+  pick first op where operation_phase ∉ {red, green, refactored}
   if none → "All ops are RED. Did you mean /spec-implementation US-NNN?"
 
 /test-setup-verification US-NNN:
@@ -165,7 +177,7 @@ operation_phase transitions (one cursor per Operation):
                                       ↘ blocked (can retry → in_progress / red)
 
 operations[Op-X] companion-field transitions (kept for backwards compat):
-  tests_status:           pending → in_progress → red
+  tests_status:           pending → in_progress → red (or manual when every row is manual)
   stub_status:            pending → created
   implementation_status:  pending → in_progress → green | blocked
 
@@ -252,7 +264,7 @@ mv specs/story-NNN-slug/state.json.tmp specs/story-NNN-slug/state.json
 - After Op-X's RED-A is committed → `Op-X.operation_phase = "red_a"`, `tests_status = "in_progress"`.
 - After Op-X's RED-B is committed → `Op-X.operation_phase = "red_b"`, `tests_status = "in_progress"`.
 - After every test file is written → append to `test_plan_rows` with `written: true, passing: false, op: "Op-X"`.
-- When Op-X is fully RED → `Op-X.operation_phase = "red"`, `tests_status = "red"`, `stub_status = "created"`, advance `current_operation` to the next pending op.
+- When Op-X is fully RED → `Op-X.operation_phase = "red"`, `tests_status = "red"`, `stub_status = "created"`, advance `current_operation` to the first Op whose `operation_phase ∉ {green, refactored}` (or `null` if every Op is GREEN); rows typed manual are recorded but never written.
 - When **every** Op has reached `operation_phase = "red"` → flip `phase_local` to `"executing"` (handoff to `/spec-implementation`).
 - After every error encountered → append to `errors[]`.
 

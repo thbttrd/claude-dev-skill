@@ -94,10 +94,10 @@ Concrete, ordered steps the agent will execute. Each operation is one TDD cycle 
 **Covers scenarios:** <Scenario name(s) from .feature file>
 **Module:** <module name from Structure>
 
-- **RED-A (BDD steps):** create/modify `e2e/steps/study-session.steps.ts`. Bind `Given <pattern>`, `When <pattern>`, `Then <pattern>` to real Playwright/`request` actions (real navigation, real API calls, real DOM assertions — no empty-callback placeholders). Run `bun bdd` → MUST FAIL. Commit: `test(US-NNN): add BDD steps for <scenario>`.
-- **RED-B (unit/integration):** create `<test file path>`. Test type: <sociable unit with fakes | integration with real DB>. Assert <behaviour>. Hand-written fakes: <list>. Run `bun test` → MUST FAIL. Commit: `test(US-NNN): add failing tests for <scenario>`.
-- **GREEN:** implement the minimum in `<source file path>` to pass both. Place code in the correct module per Structure. Run `bun test && bun bdd` → ALL PASS. Commit: `feat(US-NNN): implement <what>`.
-- **REFACTOR (optional):** clean obvious duplication, naming. `bun test && bun bdd` still PASS. Commit: `refactor(US-NNN): <what>`.
+- **RED-A (BDD steps):** create/modify `e2e/steps/study-session.steps.ts`. Bind `Given <pattern>`, `When <pattern>`, `Then <pattern>` to real Playwright/`request` actions (real navigation, real API calls, real DOM assertions — no empty-callback placeholders). Run `<BDD>` (contract §4) → MUST FAIL. Commit: `test(US-NNN): add BDD steps for <scenario>`.
+- **RED-B (unit/integration):** create `<test file path>`. Test type: <sociable unit with fakes | integration with real DB>. Assert <behaviour>. Hand-written fakes: <list>. Run `<TEST>` (contract §4) → MUST FAIL. Commit: `test(US-NNN): add failing tests for <scenario>`.
+- **GREEN:** implement the minimum in `<source file path>` to pass both. Place code in the correct module per Structure. Run `<TEST>` and `<BDD>` (contract §4) → ALL PASS. Commit: `feat(US-NNN): implement <what>`.
+- **REFACTOR (optional):** clean obvious duplication, naming. `<TEST>` and `<BDD>` (contract §4) still PASS. Commit: `refactor(US-NNN): <what>`.
 
 ### Operation 2 — …
 
@@ -142,7 +142,7 @@ How testing is approached for this story (the *how*, not the *what*). Anchored t
 
 ## Test Plan
 
-The exact tests to write for this story (the *what*). Each row is one test, traceable to a scenario or invariant **and tagged with the Operation that owns it**. `/test-setup US-NNN [Op-X]` reads only the rows whose `Op` column matches the requested Operation; `/spec-implementation US-NNN [Op-X]` makes those rows green; `/verification-and-validation US-NNN` re-runs the whole table as part of the QA pass.
+The exact tests to write for this story (the *what*). Each row is one test, traceable to a scenario or invariant **and tagged with the Operation that owns it**. `/test-setup US-NNN [Op-X]` reads only the rows whose `Op` column matches the requested Operation; `/spec-implementation US-NNN [Op-X]` makes those rows green; `/verification-and-validation US-NNN` re-runs the whole table as part of the QA pass. Type ∈ BDD | unit | integration | bench | manual.
 
 | ID    | Op    | Type         | Scenario / invariant                                  | File                                                            | Asserts                                                       |
 | ----- | ----- | ------------ | ----------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------- |
@@ -163,12 +163,13 @@ The `Op` column anchors each test to the Operation that introduces it, so per-Op
 
 After all Operations are GREEN:
 
-1. `bun test` — all unit + integration tests pass (story + previously verified stories).
-2. `bun bdd` — all Gherkin scenarios for this story pass; previously verified stories don't regress.
-3. `bun lint && bun typecheck` — clean.
-4. Start the app: `bun dev`. Run `curl` walkthrough (script in `./verification/curl-walkthrough.sh` if needed).
+1. `<TEST>` — all unit + integration tests pass (story + previously verified stories).
+2. `<BDD>` — all Gherkin scenarios for this story pass; previously verified stories don't regress.
+3. `<LINT> && <TYPES>` — clean.
+4. Start the app: `<DEV>`. Run `curl` walkthrough (script in `./verification/curl-walkthrough.sh` if needed).
 5. Run the Playwright walkthrough described in STORY.md AC-N (if UI).
-6. Write `./verification/qa-report.md` summarising tests passed, scenarios verified, fixes applied.
+6. Walk every `manual` Test Plan row; record each in qa-report.md.
+7. Write `./verification/qa-report.md` summarising tests passed, scenarios verified, fixes applied.
 
 ## Completion criteria
 

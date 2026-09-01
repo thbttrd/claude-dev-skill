@@ -23,6 +23,13 @@ jobs:
       - name: Run validate.sh
         run: ./scripts/validate.sh
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: dev-ledger unit tests
+        run: node --test plugins/dev-ledger/skills/dev-ledger/scripts/ledger.test.mjs
+
   changelog-bump-guard:
     name: every plugin change has a CHANGELOG entry
     runs-on: ubuntu-latest

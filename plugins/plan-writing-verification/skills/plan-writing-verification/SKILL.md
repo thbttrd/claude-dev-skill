@@ -1,6 +1,6 @@
 ---
 name: plan-writing-verification
-version: 2.1.0
+version: 2.2.1
 description: >
   Per-story verification of the output of /plan-writing for completeness,
   REASONS-canvas compliance, TDD prescription, Test Plan traceability, and
@@ -27,12 +27,13 @@ The verification runs in a **fresh agent** so the review has no context bias fro
 
 ## Pre-Flight
 
-| Check                                                 | Action                                                                                                                                          |
-| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/V*/` directory exists                           | Hard-stop with the migration command.                                                                                                           |
-| `specs/stories.json` does not exist                   | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                |
-| Target story id missing                               | Ask the user which story to verify (default: stories whose `phase = planned`).                                                                  |
-| `specs/story-NNN-slug/PLAN.md` does not exist         | Hard-stop. Print: `Story US-NNN has no PLAN.md yet. Run /plan-writing US-NNN first.`                                                            |
+| Check                                                              | Action                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/V*/` directory exists                                        | Hard-stop with the migration command.                                                                                                                                                                                                                                      |
+| `specs/stories.json` does not exist                                | Hard-stop. Print: `No specs/stories.json found. Run /high-level-scoping first.`                                                                                                                                                                                            |
+| Target story id missing                                            | Ask the user which story to verify (default: stories whose `phase = planned`).                                                                                                                                                                                             |
+| `specs/story-NNN-slug/PLAN.md` does not exist                      | Hard-stop. Print: `Story US-NNN has no PLAN.md yet. Run /plan-writing US-NNN first.`                                                                                                                                                                                       |
+| `specs/autopilot.json` has `"active": true` (or env `AUTOPILOT=1`) | Follow `references/autopilot-contract.md` §1–2 for this whole invocation: no `AskUserQuestion`, take the _(Recommended)_ option, journal decisions and gates, stop only on the contract's hard conditions. Journaling (§3) and toolchain resolution (§4) apply regardless. |
 
 ## When to Run
 
@@ -42,13 +43,13 @@ The verification runs in a **fresh agent** so the review has no context bias fro
 
 ## What Gets Verified
 
-| Artifact      | Expected Location                                              |
-| ------------- | -------------------------------------------------------------- |
-| PLAN.md       | `specs/story-NNN-slug/PLAN.md`                                 |
-| STORY.md      | `specs/story-NNN-slug/STORY.md` — for cross-checks             |
-| Feature files | `specs/story-NNN-slug/features/F-NNN-*.feature`                |
-| Architecture  | `specs/ARCHITECTURE.md` — for module-assignment compliance     |
-| Tracker       | `specs/stories.json` — for phase + dependency cross-checks     |
+| Artifact      | Expected Location                                          |
+| ------------- | ---------------------------------------------------------- |
+| PLAN.md       | `specs/story-NNN-slug/PLAN.md`                             |
+| STORY.md      | `specs/story-NNN-slug/STORY.md` — for cross-checks         |
+| Feature files | `specs/story-NNN-slug/features/F-NNN-*.feature`            |
+| Architecture  | `specs/ARCHITECTURE.md` — for module-assignment compliance |
+| Tracker       | `specs/stories.json` — for phase + dependency cross-checks |
 
 ## Execution
 
@@ -211,9 +212,10 @@ FAIL = critical issues that must be fixed before /test-setup
 ### After the Agent Returns
 
 1. Present the report to the user.
-2. If **FAIL**: list critical issues; ask if they want to fix now (loops back into `/plan-writing US-NNN` update mode).
-3. If **PASS WITH WARNINGS**: show warnings; ask whether to address or proceed.
-4. If **PASS**: confirm readiness and suggest running `/test-setup US-NNN`.
+2. Journal the verdict: `node "$LEDGER" log --kind gate --gate plan-verification --verdict <PASS|PASS_WITH_WARNINGS|FAIL> --report <report path> --story US-NNN --summary "<one line>"`.
+3. **FAIL**: list critical issues. Outside autopilot ask whether to fix now (loops back into `/plan-writing US-NNN` — re-runs are allowed while the story's phase is `planned`). Under autopilot: hard stop `verifier_fail` (contract §2).
+4. **PASS_WITH_WARNINGS**: file every warning — `node "$LEDGER" backlog add --title "<warning>" --severity warning --kind <spec-gap|test-gap|refactor|doc|bug> --gate plan-verification --report <report path> --story US-NNN` — print the ids, then proceed as PASS. Outside autopilot you may instead offer to address them now.
+5. **PASS**: confirm readiness and suggest running `/test-setup US-NNN`.
 
 ## What This Skill Does NOT Do
 
