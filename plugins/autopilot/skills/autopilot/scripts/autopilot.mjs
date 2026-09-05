@@ -339,22 +339,34 @@ export function matchSentinel(text, stage, story, op) {
 
   const entry = STAGES[stage];
   if (!entry) return null;
-  const template = op == null && entry.sentinel_story_end ? entry.sentinel_story_end : entry.sentinel;
-  const rendered = renderTemplate(template, story, op);
+  const rendered = renderTemplate(sentinelTemplateFor(entry, op), story, op);
   const re = new RegExp(`${escapeRegExp(rendered)}(?![\\w-])`);
   return re.test(text) ? rendered : null;
 }
 
+function sentinelTemplateFor(entry, op) {
+  return op == null && entry.sentinel_story_end ? entry.sentinel_story_end : entry.sentinel;
+}
+
+// Stages with no story-end mode: always need a real Op id. Asking for one of
+// these with op == null is a caller bug, not a resolvable pipeline state —
+// throw instead of returning an unrenderable "…_Op-X" sentinel the conductor
+// could never match (see resolvePlanned's zero-Operation stop for the actual
+// pipeline-state version of "no Op id").
+const PER_OP_ONLY_STAGES = new Set(["test-setup", "spec-implementation-verification"]);
+
 function stageResult(story, stage, op, rigor) {
   const entry = STAGES[stage];
-  const template = op == null && entry.sentinel_story_end ? entry.sentinel_story_end : entry.sentinel;
+  if (op == null && PER_OP_ONLY_STAGES.has(stage)) {
+    throw new Error(`stageResult: ${stage} requires an Op id, got null`);
+  }
   return {
     story,
     stage,
     op: op ?? null,
     skill: entry.skill,
     agent: entry.agent,
-    sentinel: renderTemplate(template, story, op),
+    sentinel: renderTemplate(sentinelTemplateFor(entry, op), story, op),
     rigor,
     args: op == null ? story : `${story} ${op}`,
   };
@@ -406,7 +418,15 @@ function resolvePlanned(specs, story, dir, rigor) {
   if (story === "US-000" && !existsSync(join(root, "package.json"))) {
     return stageResult(story, "repo-initialization", null, rigor);
   }
-  return stageResult(story, "test-setup", firstOpId(specs, story, dir), rigor);
+  const op = firstOpId(specs, story, dir);
+  if (!op) {
+    return {
+      stop: true,
+      reason: "spec_contradiction",
+      detail: "PLAN.md lists no Operations (no '### Operation N' heading) and no state.json exists",
+    };
+  }
+  return stageResult(story, "test-setup", op, rigor);
 }
 
 function resolveRed(specs, story, rigor) {

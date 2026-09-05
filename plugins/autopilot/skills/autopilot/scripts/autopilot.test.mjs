@@ -330,6 +330,23 @@ test("next: planned non-foundation story with package.json present → test-setu
   assert.equal(result.sentinel, "RED_COMPLETE_US-001_Op-1");
 });
 
+test("next: planned story whose PLAN.md has no Operations → stop spec_contradiction", () => {
+  const { root, specs } = fixtureProject();
+  writeFileSync(join(root, "package.json"), "{}\n");
+  setStory(specs, "US-001", { phase: "planned" });
+  const dir = storyDir(specs, "US-001");
+  mkdirSync(join(dir, "verification"), { recursive: true });
+  writeFileSync(join(dir, "verification", "plan-audit.md"), "PASS\n");
+  writeFileSync(join(dir, "PLAN.md"), "# Plan\n\nNo operations here.\n");
+
+  const result = nextStage(specs, dryRun("US-001"));
+  assert.deepEqual(result, {
+    stop: true,
+    reason: "spec_contradiction",
+    detail: "PLAN.md lists no Operations (no '### Operation N' heading) and no state.json exists",
+  });
+});
+
 test("next: red — cursor rules", () => {
   const { specs } = fixtureProject();
   setStory(specs, "US-001", { phase: "red" }); // light rigor
