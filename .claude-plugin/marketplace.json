@@ -10,16 +10,22 @@
   },
   "plugins": [
     {
+      "name": "autopilot",
+      "source": "./plugins/autopilot",
+      "description": "Unattended driver for the story pipeline. /autopilot US-NNN [--until US-MMM] runs spec → plan → per-Operation RED/GREEN → story-end gates → E2E for one story or a DAG-ordered chain, one fresh subagent per stage, never asking a question: warnings become backlog items, hard failures stop the run, every step is journaled. Bundles the invest-assessor, story-verifier, lazy-simplifier and story-reviewer agents. Triggers on \"/autopilot\", \"run the pipeline unattended\", \"autopilot US-003\", \"resume autopilot\".",
+      "version": "1.0.0"
+    },
+    {
       "name": "d2-architect",
       "source": "./plugins/d2-architect",
       "description": "Generate architecture diagrams via a four-phase pipeline — view planning (decide whether the architecture wants a single overview or an overview + zoom-ins), TALA auto-layout for a whiteboard-quality first pass, hand-coded HTML + SVG for…",
-      "version": "2.5.0"
+      "version": "2.5.1"
     },
     {
       "name": "dev-ledger",
       "source": "./plugins/dev-ledger",
       "description": "Journal + backlog + regression CLI for story-based projects (specs/journal.jsonl, specs/backlog.json, BL-NNN ids, ledger regress).",
-      "version": "1.0.1"
+      "version": "1.0.2"
     },
     {
       "name": "high-level-scoping",
@@ -43,13 +49,13 @@
       "name": "plan-writing",
       "source": "./plugins/plan-writing",
       "description": "Plans the implementation of one **user story** at a time (US-NNN) — not a release, not a wave. Reads the story's STORY.md + features + the project-wide ARCHITECTURE.md and produces a single PLAN.md in the **REASONS canvas** format (Requirements / Entities / Approach / Structure / Operations / Norms / Safeguards) plus an explicit Test Strategy and Test Plan. Plans are dry — zero code. Each Operation prescribes RED-A → RED-B → GREEN → REFACTOR. Every Test Plan row is tagged with the Operation that owns it (the new `Op` column), so per-Operation skills can filter the table deterministically. The story DAG lives in specs/stories.json (depends_on_story_ids); this skill does not produce any DAG artifact of its own. Use this skill after a story is specced (phase = specced), before /test-setup. Triggers on: \"plan US-NNN\", \"plan this story\", \"write the plan\", \"/plan-writing US-NNN\", or any request to produce an implementation plan for a single story.",
-      "version": "2.3.1"
+      "version": "2.4.0"
     },
     {
       "name": "plan-writing-verification",
       "source": "./plugins/plan-writing-verification",
       "description": "Per-story verification of the output of /plan-writing for completeness, REASONS-canvas compliance, TDD prescription, Test Plan traceability, and architecture alignment. Spawns a fresh agent to audit specs/story-NNN-slug/PLAN.md against the plan template, the story's STORY.md + .feature files, and specs/ARCHITECTURE.md. Checks that every REASONS section is populated, every Operation prescribes RED-A → RED-B → GREEN → REFACTOR, every Test Plan row is traceable to a scenario / AC / safeguard, and module assignments respect ARCHITECTURE.md. Produces a structured compliance report. Use this skill after running /plan-writing US-NNN, before /test-setup US-NNN. Triggers on: \"verify the plan\", \"check plan quality\", \"audit the plan\", \"is the plan ready\", \"validate plan before test-setup\", \"/plan-writing-verification US-NNN\".",
-      "version": "2.2.1"
+      "version": "2.3.0"
     },
     {
       "name": "repo-initialization",
@@ -79,7 +85,7 @@
       "name": "spec-implementation",
       "source": "./plugins/spec-implementation",
       "description": "Per-Operation GREEN-phase executor with story-end wrap-up gates. For ONE Operation of ONE story (US-NNN Op-X) at a time, writes the minimal implementation that makes that Operation's failing tests pass, then optionally REFACTORs. Operations are sequential: RED → GREEN → REFACTOR → next op. Reads PLAN.md (REASONS canvas Operation X) and state.json. The Op-X arg is optional; with no Op-X, the skill auto-picks the next op whose tests are RED but implementation is pending. When invoked without Op-X AND all ops are GREEN, the skill enters story-end mode and runs the three story-level quality gates (Simplify / Code Review / Verify), then flips the story's phase to \"green\" in specs/stories.json. If invoked for the Foundation Story (US-000) against an empty repo where state phase = planned, auto-chains /repo-initialization first. Tracks progress in specs/story-NNN-slug/state.json. Use after /test-setup US-NNN Op-X (Op-X is RED). Triggers on: \"implement Op-X\", \"GREEN Op-2 of US-001\", \"spec-implement next op\", \"/spec-implementation US-NNN\", \"/spec-implementation US-NNN Op-X\", \"run the story-end gates for US-NNN\".",
-      "version": "3.2.1"
+      "version": "3.3.0"
     },
     {
       "name": "spec-implementation-verification",
@@ -91,19 +97,19 @@
       "name": "spec-writing",
       "source": "./plugins/spec-writing",
       "description": "Story-based spec-writing skill that produces, for one user story at a time, a `STORY.md` (INVEST-shaped User Story + Acceptance Criteria + Rules) plus one or more Cucumber-compatible `.feature` files with full Gherkin scenarios. Runs an INVEST gate (Phase 0) before any spec generation. Output lives at `specs/story-NNN-slug/`. Use this skill whenever the user wants to spec a specific story, define behaviour for a feature, capture acceptance criteria, or says things like \"spec story US-001\", \"/spec-writing US-NNN\", \"let's spec out the auth story\", \"write the Gherkin for this feature\". Also trigger when the user wants to update or refine an existing story's spec, add new rules, or audit acceptance-criteria coverage.",
-      "version": "2.2.1"
+      "version": "3.0.0"
     },
     {
       "name": "spec-writing-verification",
       "source": "./plugins/spec-writing-verification",
       "description": "Per-story verification of the output of /spec-writing for completeness, coherence, INVEST compliance, and template fidelity. Spawns a fresh agent to audit specs/story-NNN-slug/STORY.md + specs/story-NNN-slug/features/*.feature against the spec-writing skill's templates and rules. Produces a structured compliance report with pass/fail verdicts, specific findings, and actionable recommendations (fix or proceed to /plan-writing). Use this skill after running /spec-writing for a specific story, before running /plan-writing for that same story. Also triggers on: \"verify the spec for US-NNN\", \"audit the story spec\", \"check INVEST compliance\", \"are the specs ready\", \"validate spec before planning\".",
-      "version": "2.2.1"
+      "version": "2.3.0"
     },
     {
       "name": "test-setup",
       "source": "./plugins/test-setup",
       "description": "Per-Operation RED-phase scaffolder. For ONE Operation of ONE story (US-NNN Op-X) at a time, writes the BDD step definitions and unit/integration tests prescribed by that Operation's row(s) in PLAN.md (REASONS canvas Test Plan), plus the minimal source stubs the new tests need to compile. Tests are real — they call actual API endpoints, service methods, and functions — but those implementations are empty stubs, so tests fail at assertion time, not because of missing imports. Operates after /plan-writing US-NNN, before /spec-implementation US-NNN Op-X. The Op-X arg is optional; with no Op-X, the skill auto-picks the next pending Operation from state.json. Triggers on: \"set up tests for US-NNN\", \"RED Op-2 of US-001\", \"scaffold the next failing test\", \"/test-setup US-NNN\", \"/test-setup US-NNN Op-X\".",
-      "version": "3.2.1"
+      "version": "3.2.2"
     },
     {
       "name": "test-setup-verification",

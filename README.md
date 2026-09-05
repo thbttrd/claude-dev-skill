@@ -12,7 +12,7 @@ The plan for each story is a **structured prompt in the [REASONS canvas](https:/
 
 The full rationale and design doc lives in [`PROPOSAL-story-based-workflow.md`](./PROPOSAL-story-based-workflow.md).
 
-Every skill journals its decisions and gate results to `specs/journal.jsonl` and files un-applied findings as `BL-NNN` items in `specs/backlog.json` — implement first, audit after. The pipeline contract (`references/autopilot-contract.md`, identical in every pipeline plugin) defines unattended behaviour so `/autopilot` (separate plugin) can drive a story end-to-end.
+Every skill journals its decisions and gate results to `specs/journal.jsonl` and files un-applied findings as `BL-NNN` items in `specs/backlog.json` — implement first, audit after. The pipeline contract (`references/autopilot-contract.md`, identical in every pipeline plugin) defines unattended behaviour so `/autopilot US-NNN` can drive a story end-to-end — see the Autopilot section below.
 
 ### Per-Operation cycle
 
@@ -80,8 +80,8 @@ The skills are organised into **project-wide** (one-time / re-runnable) and **pe
 | `high-level-scoping`                     | 2.2.0   | Personas, epics, INVEST story backlog, story DAG anchored on `US-000` (Foundation Story), and a `rigor` tier (`light`/`full`) per story. Produces `specs/stories.json` + `specs/STORIES.md` + `specs/PROJECT.md` + lightweight `specs/ARCHITECTURE.md`.           |
 | `research-and-architecture`              | 2.1.0   | Project-wide `specs/ARCHITECTURE.md` following [MIM AA](./plugins/research-and-architecture/skills/research-and-architecture/references/mim-architecture.md). Evolves additively as new stories require new modules. Ends with a mandatory self-review checklist. |
 | `research-and-architecture-verification` | 2.1.0   | **Opt-in deep audit** of the architecture for MIM AA compliance, template completeness, and consistency with `stories.json`. The most worthwhile of the deep audits — run it at least once before `US-000` is implemented.                                        |
-| `ui-specs` (`--design-system`)           | 2.1.0   | Project-wide `specs/DESIGN.md` (Google-Stitch / VoltAgent 9-section format). One-time, re-runnable to swap brand.                                                                                                                                                 |
-| `repo-initialization`                    | 2.2.0   | Scaffolds the repo from `specs/ARCHITECTURE.md` + `specs/PROJECT.md` + the Foundation Story (`US-000`). Tooling, hooks, CLAUDE.md, README.md. Ends with a mandatory self-review checklist.                                                                        |
+| `ui-specs` (`--design-system`)           | 2.1.1   | Project-wide `specs/DESIGN.md` (Google-Stitch / VoltAgent 9-section format). One-time, re-runnable to swap brand.                                                                                                                                                 |
+| `repo-initialization`                    | 2.2.1   | Scaffolds the repo from `specs/ARCHITECTURE.md` + `specs/PROJECT.md` + the Foundation Story (`US-000`). Tooling, hooks, CLAUDE.md, README.md. Ends with a mandatory self-review checklist.                                                                        |
 | `repo-initialization-verification`       | 2.1.0   | **Opt-in deep audit** of the scaffold against `specs/ARCHITECTURE.md` — `US-000`'s own tests exercise the scaffold right after, so audit only when something feels off.                                                                                           |
 
 ### Per-story loop
@@ -90,31 +90,37 @@ Run this loop for every story (the Foundation Story `US-000` first, then each su
 
 | #   | Skill                              | Version | What it does                                                                                                                                                                                                                                                                                                                             |
 | --- | ---------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `spec-writing`                     | 2.2.0   | Per-story `STORY.md` (User Story + INVEST + AC + Rules) + Cucumber-compatible `.feature` files. Rigor-aware INVEST gate (single-batch for light stories, fully interactive for full); light stories chain straight into `/plan-writing` compact mode. Ends with a mandatory self-review checklist.                                       |
-| 1.5 | `spec-writing-verification`        | 2.2.0   | **Opt-in deep audit** of the story spec for INVEST + Gherkin completeness. For `US-000` and high-stakes full-rigor stories.                                                                                                                                                                                                              |
-| 1.6 | `ui-specs US-NNN`                  | 2.1.0   | Per-story HTML mockups + screen specs (only for stories with UI). 2-3 variants side-by-side, user picks one. Auto-invoked by `/spec-writing` when a story has UI.                                                                                                                                                                        |
-| 2   | `plan-writing`                     | 2.3.0   | Per-story `PLAN.md` in REASONS canvas + Test Strategy + Test Plan. Compact mode for light-rigor stories (full R/A/O + Test Plan, one-liner E/S/N/S). Each Operation prescribes RED-A → RED-B → GREEN → REFACTOR. Test Plan rows are tagged with the Operation that owns them (`Op` column). Ends with a mandatory self-review checklist. |
-| 2.5 | `plan-writing-verification`        | 2.2.0   | **Opt-in deep audit** of the plan for REASONS-canvas compliance, TDD prescription, Test Plan traceability, and architecture alignment. For `US-000` and high-stakes full-rigor stories.                                                                                                                                                  |
-| 3   | `test-setup`                       | 3.2.0   | **Per-Operation** RED phase. Takes `US-NNN [Op-X]`; with no `Op-X`, auto-picks the next pending Op from `state.json`. Writes only that Op's failing BDD steps + unit tests + lazy stubs. Ends with a mandatory self-review checklist (real tests, RED at assertion time, traceable).                                                     |
-| 3.5 | `test-setup-verification`          | 3.2.0   | **Opt-in deep audit** of one Op's RED state. For `US-000` and full-rigor Ops with tricky test infrastructure.                                                                                                                                                                                                                            |
-| 4   | `spec-implementation`              | 3.2.0   | **Per-Operation** GREEN phase, with story-end wrap-up gates. Per-op invocation writes the minimum impl + optional REFACTOR for one Op, ending with a mandatory self-review checklist. When invoked without `Op-X` after every Op is GREEN, runs Simplify / Code Review / Verify and flips story phase to `green`.                        |
-| 4.5 | `spec-implementation-verification` | 1.2.0   | **Opt-in deep audit** of one Op's GREEN state (scope, architecture compliance, no regressions), or of the whole story in story-end mode. For `US-000` and full-rigor Ops touching security / data rules / invariants.                                                                                                                    |
-| 5   | `verification-and-validation`      | 2.1.0   | **The one mandatory gate.** E2E verification — runs the full test suite, starts the app, exercises every endpoint with `curl`, walks every UI scenario via Playwright MCP, and FIXES deviations. Flips story phase to `verified`. Every story passes it, light or full rigor.                                                            |
+| 1   | `spec-writing`                     | 3.0.0   | Per-story `STORY.md` (User Story + INVEST + AC + Rules) + Cucumber-compatible `.feature` files. Phase 0 INVEST gate is produced by the bundled `invest-assessor` agent (from `autopilot`); light stories chain straight into `/plan-writing` compact mode. Ends with a mandatory self-review checklist. |
+| 1.5 | `spec-writing-verification`        | 2.3.0   | **Opt-in deep audit** of the story spec for INVEST + Gherkin completeness. For `US-000` and high-stakes full-rigor stories. |
+| 1.6 | `ui-specs US-NNN`                  | 2.1.1   | Per-story HTML mockups + screen specs (only for stories with UI). 2-3 variants side-by-side, user picks one. Auto-invoked by `/spec-writing` when a story has UI. |
+| 2   | `plan-writing`                     | 2.4.0   | Per-story `PLAN.md` in REASONS canvas + Test Strategy + Test Plan. Compact mode for light-rigor stories (full R/A/O + Test Plan, one-liner E/S/N/S). Each Operation prescribes RED-A → RED-B → GREEN → REFACTOR. Test Plan rows are tagged with the Operation that owns them (`Op` column). Ends with a mandatory self-review checklist. |
+| 2.5 | `plan-writing-verification`        | 2.3.0   | **Opt-in deep audit** of the plan for REASONS-canvas compliance, TDD prescription, Test Plan traceability, and architecture alignment. For `US-000` and high-stakes full-rigor stories. |
+| 3   | `test-setup`                       | 3.2.2   | **Per-Operation** RED phase. Takes `US-NNN [Op-X]`; with no `Op-X`, auto-picks the next pending Op from `state.json`. Writes only that Op's failing BDD steps + unit tests + lazy stubs. Ends with a mandatory self-review checklist (real tests, RED at assertion time, traceable). |
+| 3.5 | `test-setup-verification`          | 3.2.1   | **Opt-in deep audit** of one Op's RED state. For `US-000` and full-rigor Ops with tricky test infrastructure. |
+| 4   | `spec-implementation`              | 3.3.0   | **Per-Operation** GREEN phase, with story-end wrap-up gates. Per-op invocation writes the minimum impl + optional REFACTOR for one Op, ending with a mandatory self-review checklist. Story-end Gate 1 (Simplify) and Gate 2 (Code Review) run the bundled `lazy-simplifier` / `story-reviewer` agents (from `autopilot`); Gate 3 (Verify) then flips story phase to `green`. |
+| 4.5 | `spec-implementation-verification` | 1.2.1   | **Opt-in deep audit** of one Op's GREEN state (scope, architecture compliance, no regressions), or of the whole story in story-end mode. For `US-000` and full-rigor Ops touching security / data rules / invariants. |
+| 5   | `verification-and-validation`      | 2.1.1   | **The one mandatory gate.** E2E verification — runs the full test suite, starts the app, exercises every endpoint with `curl`, walks every UI scenario via Playwright MCP, and FIXES deviations. Flips story phase to `verified`. Every story passes it, light or full rigor. |
 
 ### Orthogonal tooling
 
 | Skill            | Version | What it does                                                                                                                                                                 |
 | ---------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `migrate-specs`  | 1.0.0   | Audits any existing spec/architecture/plan/design layout and migrates it to the canonical `specs/` tree. Use when onboarding an existing repo onto the story-based pipeline. |
-| `d2-architect`   | 2.5.0   | Architecture diagrams via TALA + hand-coded HTML/SVG polish + agent-driven readability review.                                                                               |
+| `d2-architect`   | 2.5.1   | Architecture diagrams via TALA + hand-coded HTML/SVG polish + agent-driven readability review.                                                                               |
 | `html-architect` | 1.3.0   | Hand-coded HTML/SVG diagrams for layouts where auto-layout struggles.                                                                                                        |
 
 ### Traceability
 
 | Skill                     | Version | What it does                                                                                                                                                                                                                                                                                           |
 | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `dev-ledger`              | 1.0.0   | Journal (`specs/journal.jsonl`) + backlog (`specs/backlog.json`) + regression CLI (`ledger.mjs`) used by every other pipeline skill to record decisions, gate verdicts, findings, and commits, and to compute a regression baseline. `/dev-ledger [US-NNN]` prints the project (or per-story) journal. |
-| `dev-ledger` (`/backlog`) | 1.0.0   | Lists open `BL-NNN` backlog items filed by verifiers and gates, or implements one by id with a minimal RED → GREEN → REFACTOR cycle and resolves it.                                                                                                                                                   |
+| `dev-ledger`              | 1.0.2   | Journal (`specs/journal.jsonl`) + backlog (`specs/backlog.json`) + regression CLI (`ledger.mjs`) used by every other pipeline skill to record decisions, gate verdicts, findings, and commits, and to compute a regression baseline. `/dev-ledger [US-NNN]` prints the project (or per-story) journal. |
+| `dev-ledger` (`/backlog`) | 1.0.2   | Lists open `BL-NNN` backlog items filed by verifiers and gates, or implements one by id with a minimal RED → GREEN → REFACTOR cycle and resolves it.                                                                                                                                                   |
+
+### Autopilot
+
+| Skill       | Version | What it does |
+| ----------- | ------- | ------------ |
+| `autopilot` | 1.0.0   | `/autopilot US-NNN [--until US-MMM]` — runs the per-story loop unattended once scoping and architecture are validated: requires `dev-ledger` (the conductor hard-stops `tooling_not_ready` without it); one fresh subagent per stage, INVEST via the `invest-assessor` agent, spec/plan audits via `story-verifier`, per-Op RED → GREEN, story-end `lazy-simplifier` + `story-reviewer` gates, then the mandatory E2E gate. Warnings become `BL-NNN` items, hard failures stop the run with a report, every step lands in `specs/journal.jsonl`. Pauses after each verified story by default (`--stop-policy hard-failures` to chain through). |
 
 ## Documentation layout
 
@@ -139,6 +145,9 @@ specs/
 │   ├── features/F-000-walking-skeleton.feature
 │   ├── mockups/UI-F-000-*.html               # only if UI
 │   ├── ui/UI-F-000-*.md                      # only if UI
+│   ├── verification/spec-audit.md            # only after /spec-writing-verification (or autopilot's story-verifier)
+│   ├── verification/plan-audit.md            # only after /plan-writing-verification (or autopilot's story-verifier)
+│   ├── verification/code-review.md           # only after the story-end Code Review gate (autopilot's story-reviewer)
 │   ├── verification/qa-report.md             # only after /verification-and-validation
 │   └── state.json                            # per-story phase + checkpoints
 ├── story-001-…/

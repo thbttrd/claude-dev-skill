@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [2.3.0] — 2026-09-05
+
+### Added
+
+- Report persisted to verification/plan-audit.md; PLAN_AUDIT_COMPLETE sentinel; under /autopilot the audit runs in the story-verifier agent.
+
 ## [2.2.1] — 2026-08-31
 
 ### Fixed

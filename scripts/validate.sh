@@ -85,8 +85,20 @@ canon_sum="$(sha256sum "$ROOT/$CONTRACT_CANONICAL" | cut -d' ' -f1)"
 for name in "${PIPELINE_PLUGINS[@]}"; do
   copy="$ROOT/plugins/$name/skills/$name/references/autopilot-contract.md"
   [ -f "$copy" ] || { fail "$name: missing references/autopilot-contract.md (run scripts/sync-contract.sh)"; continue; }
-  [ "$(sha256sum "$copy" | cut -d' ' -f1)" = "$canon_sum" ] || fail "$name: autopilot-contract.md differs from canonical (run scripts/sync-contract.sh)"
   grep -q "autopilot-contract.md" "$ROOT/plugins/$name/skills/$name/SKILL.md" || fail "$name: SKILL.md does not reference references/autopilot-contract.md"
+done
+
+# 6. Every copy of the contract anywhere under plugins/, on or off the roster, must match canonical.
+while IFS= read -r copy; do
+  [ "$(sha256sum "$copy" | cut -d' ' -f1)" = "$canon_sum" ] || fail "$copy: differs from canonical (run scripts/sync-contract.sh)"
+done < <(find -L "$ROOT/plugins" -path '*/references/autopilot-contract.md')
+
+# 7. Bundled agents: frontmatter name matches file name, description present
+for agent in "$ROOT"/plugins/*/agents/*.md; do
+  [ -f "$agent" ] || continue
+  aname="$(basename "$agent" .md)"
+  [ "$(skill_field "$agent" name)" = "$aname" ] || fail "$agent: frontmatter name ≠ $aname"
+  [ -n "$(skill_field "$agent" description)" ] || fail "$agent: frontmatter description missing"
 done
 
 echo ""

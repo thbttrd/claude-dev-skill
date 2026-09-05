@@ -1,6 +1,6 @@
 ---
 name: plan-writing
-version: 2.3.1
+version: 2.4.0
 description: >
   Plans the implementation of one **user story** at a time (US-NNN) — not a
   release, not a wave. Reads the story's STORY.md + features + the project-wide
@@ -200,7 +200,7 @@ Regenerate `specs/STORIES.md` so the kanban shows the new phase.
    - [ ] Every Gherkin scenario has ≥ 1 BDD row; every AC has ≥ 1 row; every observable Safeguard has a row
    - [ ] No code in the plan; module assignments match `specs/ARCHITECTURE.md`
    - [ ] Operations count within budget (≤ 6 full, ≤ 3 light) or explicitly resolved with the user
-   Journal the self-review: `node "$LEDGER" log --kind gate --gate self-review --verdict <PASS|PASS_WITH_WARNINGS> --story US-NNN --stage plan-writing --summary "<n>/6 checks"` (contract §3, §5). Any unchecked item not fixed → `ledger backlog add`.
+   Journal the self-review: `node "$LEDGER" log --kind gate --gate self-review --verdict <PASS|PASS_WITH_WARNINGS> --story US-NNN --stage plan-writing --summary "<n>/6 checks"` (contract §3, §5). Any unchecked item not fixed → `ledger backlog add --title "<unchecked item>" --severity warning --kind <bug|test-gap|refactor> --story US-NNN`.
 2. Report to the user:
    - Story: US-NNN — title (+ rigor tier)
    - Operations count
@@ -212,6 +212,8 @@ Regenerate `specs/STORIES.md` so the kanban shows the new phase.
      - "Run the deep audit — /plan-writing-verification US-NNN" — opt-in fresh-agent audit; recommended for `US-000` and other full-rigor, high-stakes stories, skippable otherwise
      - "Adjust the plan" — describe changes; loop back
      - "Plan another story" — pick a new story
+
+Under autopilot (contract §2), skip the question and emit `<promise>PLAN_COMPLETE_US-NNN</promise>`.
 
 ---
 

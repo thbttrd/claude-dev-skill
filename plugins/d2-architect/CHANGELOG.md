@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [2.5.1] — 2026-09-05
+
+### Fixed
+
+- Agent frontmatter: `description` single-quoted so it parses as YAML (it contained a `: ` sequence).
+
 ## [2.5.0] — 2026-04-26
 
 ### Added

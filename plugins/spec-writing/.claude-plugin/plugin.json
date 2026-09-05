@@ -1,7 +1,7 @@
 {
   "name": "spec-writing",
-  "version": "2.2.1",
-  "description": "Story-based spec-writing skill that produces, for one user story at a time, a `STORY.md` (INVEST-shaped User Story + Acceptance Criteria + Rules) plus one or more Cucumber-compatible `.feature` files with full Gherkin scenarios. Runs an INVEST gate (Phase 0) before any spec generation. Output lives at `specs/story-NNN-slug/`. Use this skill whenever the user wants to spec a specific story, define behaviour for a feature, capture acceptance criteria, or says things like \"spec story US-001\", \"/spec-writing US-NNN\", \"let's spec out the auth story\", \"write the Gherkin for this feature\". Also trigger when the user wants to update or refine an existing story's spec, add new rules, or audit acceptance-criteria coverage.",
+  "version": "3.0.0",
+  "description": "Story-based spec-writing skill that produces, for one user story at a time, a `STORY.md` (INVEST-shaped User Story + Acceptance Criteria + Rules) plus one or more Cucumber-compatible `.feature` files with full Gherkin scenarios. Runs an INVEST gate (Phase 0) via the bundled `invest-assessor` agent (from the `autopilot` plugin) before any spec generation, scaled by the story's rigor tier (light stories get a single-batch confirmation seeded by the agent's table and chain straight into /plan-writing compact mode; full stories confirm the agent's table interactively letter by letter). Ends with a mandatory self-review checklist walk. Output lives at `specs/story-NNN-slug/`. Use this skill whenever the user wants to spec a specific story, define behaviour for a feature, capture acceptance criteria, or says things like \"spec story US-001\", \"/spec-writing US-NNN\", \"let's spec out the auth story\", \"write the Gherkin for this feature\". Also trigger when the user wants to update or refine an existing story's spec, add new rules, or audit acceptance-criteria coverage.",
   "author": {
     "name": "thbttrd"
   },

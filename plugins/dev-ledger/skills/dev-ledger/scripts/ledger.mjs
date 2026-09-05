@@ -367,6 +367,7 @@ export function backlogWontfix(specs, id, { reason }, now = new Date()) {
 }
 
 export function formatBacklog(items) {
+  if (!items.length) return "(no backlog items)\n";
   return (
     items
       .map(

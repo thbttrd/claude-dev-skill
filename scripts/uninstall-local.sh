@@ -43,7 +43,10 @@ unlink_if_ours() {
 for name in "${PLUGINS[@]}"; do
   plugin_dir="$ROOT/plugins/$name"
   info "uninstalling $name"
-  unlink_if_ours "$HOME/.claude/skills/$name"
+  for skill_src in "$plugin_dir/skills/"*/; do
+    [ -d "$skill_src" ] || continue
+    unlink_if_ours "$HOME/.claude/skills/$(basename "${skill_src%/}")"
+  done
   if [ -d "$plugin_dir/agents" ]; then
     for agent in "$plugin_dir/agents/"*.md; do
       [ -f "$agent" ] || continue

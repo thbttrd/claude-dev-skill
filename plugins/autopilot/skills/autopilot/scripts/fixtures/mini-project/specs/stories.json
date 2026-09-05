@@ -1,0 +1,136 @@
+{
+  "schema_version": "2.0.0",
+  "project": {
+    "name": "Mini Project",
+    "description": "A tiny fixture project used by autopilot.mjs's tests.",
+    "created_at": "2026-09-01",
+    "updated_at": "2026-09-01",
+    "scaffolded_at": null,
+    "repo_branch": null
+  },
+  "personas": [
+    {
+      "id": "P-001",
+      "name": "Test User",
+      "role": "developer",
+      "goals": ["ship a tiny app"],
+      "pain_points": ["nothing works yet"],
+      "tech_savviness": "high",
+      "primary": true
+    }
+  ],
+  "epics": [
+    {
+      "id": "E-001",
+      "title": "Greeting",
+      "description": "Say hello and goodbye.",
+      "persona_ids": ["P-001"],
+      "priority": "must-have",
+      "business_impact": "low",
+      "story_ids": ["US-000", "US-001", "US-002"]
+    }
+  ],
+  "stories": [
+    {
+      "id": "US-000",
+      "slug": "foundation",
+      "title": "Foundation",
+      "is_foundation": true,
+      "epic_id": "E-001",
+      "as_a": "developer",
+      "i_want": "a scaffolded repo",
+      "so_that": "later stories have something to build on",
+      "priority": "must-have",
+      "business_impact": "low",
+      "acceptance_criteria": [
+        "the repo builds",
+        "a smoke test passes"
+      ],
+      "depends_on_story_ids": [],
+      "invest": {
+        "i": false,
+        "n": false,
+        "v": false,
+        "e": false,
+        "s": false,
+        "t": false,
+        "checked_at": null
+      },
+      "phase": "scoped",
+      "rigor": "full",
+      "history": [{ "phase": "scoped", "at": "2026-09-01" }]
+    },
+    {
+      "id": "US-001",
+      "slug": "hello",
+      "title": "Say hello",
+      "is_foundation": false,
+      "epic_id": "E-001",
+      "as_a": "developer",
+      "i_want": "to print hello",
+      "so_that": "I know the app runs",
+      "priority": "should-have",
+      "business_impact": "low",
+      "acceptance_criteria": [
+        "running the app prints hello",
+        "the exit code is 0"
+      ],
+      "depends_on_story_ids": ["US-000"],
+      "invest": {
+        "i": false,
+        "n": false,
+        "v": false,
+        "e": false,
+        "s": false,
+        "t": false,
+        "checked_at": null
+      },
+      "phase": "scoped",
+      "rigor": "light",
+      "history": [{ "phase": "scoped", "at": "2026-09-01" }]
+    },
+    {
+      "id": "US-002",
+      "slug": "bye",
+      "title": "Say goodbye",
+      "is_foundation": false,
+      "epic_id": "E-001",
+      "as_a": "developer",
+      "i_want": "to print goodbye",
+      "so_that": "the app has a clean exit message",
+      "priority": "could-have",
+      "business_impact": "low",
+      "acceptance_criteria": [
+        "running the app prints goodbye",
+        "the exit code is 0"
+      ],
+      "depends_on_story_ids": ["US-001"],
+      "invest": {
+        "i": false,
+        "n": false,
+        "v": false,
+        "e": false,
+        "s": false,
+        "t": false,
+        "checked_at": null
+      },
+      "phase": "scoped",
+      "rigor": "light",
+      "history": [{ "phase": "scoped", "at": "2026-09-01" }]
+    }
+  ],
+  "architecture": {
+    "modules": [
+      {
+        "id": "M-001",
+        "name": "cli",
+        "description": "the whole mini app",
+        "responsibilities": ["print greetings"],
+        "depends_on": []
+      }
+    ],
+    "diagram_path": "specs/architecture.png",
+    "tech_stack": { "runtime": "node" },
+    "adrs": []
+  }
+}

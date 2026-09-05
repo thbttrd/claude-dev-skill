@@ -4,6 +4,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [1.0.2] — 2026-09-05
+
+### Fixed
+
+- `backlog list` prints `(no backlog items)` instead of nothing when the list is empty.
+
 ## [1.0.1] — 2026-08-31
 
 ### Fixed

@@ -1,6 +1,6 @@
 ---
 name: spec-implementation
-version: 3.2.1
+version: 3.3.0
 description: >
   Per-Operation GREEN-phase executor with story-end wrap-up gates. For ONE
   Operation of ONE story (US-NNN Op-X) at a time, writes the minimal
@@ -213,7 +213,7 @@ After GREEN (and optional REFACTOR):
 
 Fix failures before proceeding. This is the default GREEN gate; `/spec-implementation-verification` is an opt-in deep audit on top of it.
 
-Journal the self-review: `node "$LEDGER" log --kind gate --gate self-review --verdict <PASS|PASS_WITH_WARNINGS> --story US-NNN --op Op-X --stage spec-implementation --summary "<n>/4 checks"` (contract §3, §5). Any unchecked item not fixed → `node "$LEDGER" backlog add`.
+Journal the self-review: `node "$LEDGER" log --kind gate --gate self-review --verdict <PASS|PASS_WITH_WARNINGS> --story US-NNN --op Op-X --stage spec-implementation --summary "<n>/4 checks"` (contract §3, §5). Any unchecked item not fixed → `node "$LEDGER" backlog add --title "<unchecked item>" --severity warning --kind <bug|test-gap|refactor> --story US-NNN --op Op-X`.
 
 ```
 US-NNN — Op-X GREEN
@@ -248,26 +248,52 @@ Triggered when the picker resolves to "all ops green AND quality_gates not all t
 
 ### Gate 1 — Simplify
 
-Invoke the marketplace's Simplify skill (or `/simplify`) on files modified during this story.
+If `state.json.quality_gates.simplified` is already `true` (the `/autopilot` conductor ran the `lazy-simplifier` stage), skip this gate.
+
+`BASE_SHA` is the parent of the first `test(US-NNN):` commit (the very first commit of `/test-setup US-NNN Op-1`).
+
+Otherwise, dispatch the agent:
+
+```
+Agent({ subagent_type: "lazy-simplifier", prompt: "Simplify story US-NNN. BASE_SHA=<sha>." })
+```
+
+The agent scopes itself to `git diff $BASE_SHA..HEAD | grep -v '^specs/'`, re-runs the full per-story suite plus `ledger regress` — everything must still pass — commits its own simplifications, journals the gate, and sets `state.json.quality_gates.simplified = true` itself; this skill does not write either.
+
+After the agent returns, re-read `state.json.quality_gates.simplified`. If it is not `true`, treat the gate as failed: outside autopilot, ask the user; under autopilot, journal an action and run the fallback below once.
+
+**Fallback** (the Agent tool refuses `subagent_type: "lazy-simplifier"` — `autopilot` is not installed — or the gate failed above): invoke the marketplace's Simplify skill (or `/simplify`) on files modified during this story inline.
 
 ```bash
 git diff --name-only $BASE_SHA..HEAD | grep -v '^specs/'
 ```
 
-`BASE_SHA` is the parent of the first `test(US-NNN):` commit (the very first commit of `/test-setup US-NNN Op-1`). Re-run the full per-story suite (`<TEST> -t "@US-NNN"` + `<BDD>` story filter) afterwards; everything must still pass. If Simplify made commits, also run the unfiltered suite to confirm no other regressions.
+Re-run the full per-story suite (`<TEST> -t "@US-NNN"` + `<BDD>` story filter) afterwards; everything must still pass. If Simplify made commits, also run the unfiltered suite to confirm no other regressions.
 
 Update `state.json.quality_gates.simplified = true`. Journal the gate: `node "$LEDGER" log --kind gate --gate simplify --verdict PASS --summary "<n> files simplified"`. Every simplification deliberately not applied → `node "$LEDGER" backlog add --title "<one line>" --kind simplification --severity info`.
 
 ### Gate 2 — Code Review
 
-Dispatch a code-review subagent. The diff range is `BASE_SHA → HEAD_SHA` for this story (the SHA before the first `test(US-NNN):` commit through the latest `refactor(US-NNN):` or `feat(US-NNN):` commit).
+If `state.json.quality_gates.reviewed` is already `true` (the `/autopilot` conductor ran the `story-reviewer` stage), skip this gate.
 
-The reviewer audits the whole story's diff for:
+Otherwise, dispatch the agent:
+
+```
+Agent({ subagent_type: "story-reviewer", prompt: "Review story US-NNN. BASE_SHA=<sha>." })
+```
+
+The diff range is `BASE_SHA → HEAD_SHA` for this story (the SHA before the first `test(US-NNN):` commit through the latest `refactor(US-NNN):` or `feat(US-NNN):` commit). The reviewer audits the whole story's diff for:
 
 - Architecture compliance (no cross-BM imports, module boundaries respected, public APIs only).
 - Norms compliance (naming, logging, defensive coding per PLAN.md's N section).
 - Safeguards compliance (invariants, performance, security, data rules from PLAN.md's second S section).
 - Code quality (no obvious bugs, no missed edge cases, no over-implementation beyond Op scope).
+
+The agent fixes criticals in place, files warnings as backlog items, persists the ids in `state.json.quality_gates.review_findings[]`, journals the gate verdict, and sets `state.json.quality_gates.reviewed = true` itself; this skill does not write any of those.
+
+After the agent returns, re-read `state.json.quality_gates.reviewed`. If it is not `true`, treat the gate as failed: outside autopilot, ask the user; under autopilot, journal an action and run the fallback below once.
+
+**Fallback** (the Agent tool refuses `subagent_type: "story-reviewer"` — `autopilot` is not installed — or the gate failed above): dispatch a `general-purpose` subagent with the same audit bullet list above.
 
 Act on critical findings. Every warning not acted on → `node "$LEDGER" backlog add --title "<one line>" --kind <bug|refactor|…> --severity warning --gate code-review --report <path>`; persist the ids in `state.json.quality_gates.review_findings[]`. Journal the gate verdict. Update `state.json.quality_gates.reviewed = true`.
 
@@ -360,9 +386,7 @@ refactor(foundation): extract shared DB connection pool
 
 ### When to use subagents
 
-- **Code Review gate (Gate 2)**: always — fresh context prevents blind spots.
-- **Simplify gate (Gate 1)**: inline (lightweight).
-- **Verify gate (Gate 3)**: inline (just running commands).
+Gate 1: lazy-simplifier agent. Gate 2: story-reviewer agent. Gate 3: inline.
 
 ### When to ask the user
 
@@ -371,7 +395,7 @@ refactor(foundation): extract shared DB connection pool
 
 ### When to skip a quality gate
 
-Never. All three gates are mandatory for every story.
+Never — except a gate the `/autopilot` conductor already flipped in `state.json.quality_gates` (see Gate 1 / Gate 2), which ran, just not from inside this skill.
 
 ### `--force`
 
@@ -384,4 +408,4 @@ Never. All three gates are mandatory for every story.
 - It does not write tests (`/test-setup` does that).
 - It does not flip `phase` to `verified` (`/verification-and-validation` does that).
 - It does not loop over multiple Operations in a single per-op invocation — one invocation, one Op (or one story-end gates pass).
-- It does not skip the story-end gates — they are mandatory for every story.
+- It does not skip the story-end gates — they are mandatory for every story, except a gate the `/autopilot` conductor already flipped in `state.json.quality_gates`, which ran, just not from inside this skill.
