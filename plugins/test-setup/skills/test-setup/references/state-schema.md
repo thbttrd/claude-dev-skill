@@ -42,6 +42,7 @@ In **v2** (introduced by `test-setup` 3.0.0 / `spec-implementation` 3.0.0 / new 
       "tests_status": "red", // existing: pending | in_progress | red | manual
       "stub_status": "created", // existing: pending | created
       "implementation_status": "green", // existing: pending | in_progress | green | blocked
+      "confirm_only": false, // NEW in 3.3.0: true when /spec-implementation found every Op test already green at Phase 1 — no feat commit, no per-Op audit
 
       "red_audit": {
         // NEW in v2: per-Op audit verdict from /test-setup-verification
@@ -235,6 +236,7 @@ After /v-and-v               | verified               | verified
 
 When a v1 `state.json` (no `schema_version` or `schema_version: 1`) is found:
 
+0. **No `operations` map at all** (the `/migrate-specs` shape: `{story_id, phase, history, checkpoints}`): build it from PLAN.md before anything else. One entry per `### Operation N` heading — `title` from the heading text after the dash, `covers_scenarios` from the quoted `- "…"` lines (or the `**Covers scenarios:**` line) of that section. If `stories.json#stories[i].phase` is `red` the RED suite already exists (a v1 `/test-setup` wrote it): set every Op to `operation_phase: "red"`, `tests_status: "red"`, `stub_status: "created"`, `implementation_status: "pending"`, `phase_local: "executing"`, `current_operation: "Op-1"`; otherwise every Op is `pending` and `phase_local` is `test_setup`. `test_plan_rows`: one row per Test Plan row of PLAN.md tagged with that Op (`written: true, passing: false` when the RED suite exists, `written: false` otherwise). Preserve the legacy `history` and `checkpoints` fields verbatim. Journal the rebuild as a decision (`state.json rebuilt from PLAN.md: N Ops, RED suite pre-exists|absent`). Then continue with step 1 on the map you just built. Before writing a `red` state, run the Op-filtered suites once (contract §4, with the path fallbacks) and confirm they are RED — an Op whose suite is green at this point is `pending`, not `red`.
 1. Walk `operations`. For each Op, derive `operation_phase` from existing fields:
    - `tests_status = "pending"` → `operation_phase = "pending"`
    - `tests_status = "in_progress"` → `operation_phase = "red_b"` (best-effort)
@@ -244,7 +246,7 @@ When a v1 `state.json` (no `schema_version` or `schema_version: 1`) is found:
 3. Set `current_operation` to the first Op whose `operation_phase` is not `green`/`refactored`.
 4. For each `test_plan_rows[T-N]` lacking `op`, attempt to read PLAN.md's Test Plan and back-fill the `Op` column. If the PLAN.md has no `Op` column either, leave `op` as `null` and emit a one-time warning.
 5. Bump `schema_version` to `2`.
-6. Atomic write (temp file + rename). No user action required.
+6. Atomic write (temp file + rename). Commit it: `chore(US-NNN): migrate state.json to v2 from PLAN.md` — this commit is the story's diff base for a later `/autopilot` run.
 
 ---
 
