@@ -21,7 +21,7 @@ AP="$(find -L "$HOME/.claude/skills" "$HOME/.claude/plugins" -path '*/autopilot/
 LEDGER="$(find -L "$HOME/.claude/skills" "$HOME/.claude/plugins" -path '*/dev-ledger/scripts/ledger.mjs' -not -path '*archive*' 2>/dev/null | head -1)"
 ```
 
-Empty `AP` → print `Install autopilot: /plugin install autopilot@claude-dev-skill` and stop. Empty `LEDGER` → print `Install dev-ledger: /plugin install dev-ledger@claude-dev-skill` and stop; `autopilot.mjs` journals through it and refuses to run without it (contract §5). Run everything from the project root — the one holding `specs/`.
+Either one empty → print the install command (`Install autopilot: /plugin install autopilot@claude-dev-skill` / `Install dev-ledger: /plugin install dev-ledger@claude-dev-skill`), write **no file** — there is no run to stop and nothing to journal — and end with `<promise>AUTOPILOT_STOP_tooling_not_ready</promise>`. `dev-ledger` is not optional: `autopilot.mjs` journals through it and refuses to run without it (contract §5). Run everything from the project root — the one holding `specs/`.
 
 ## 3. Usage
 
@@ -53,14 +53,16 @@ The script runs the whole check list itself (trackers present, story scoped, dep
 This is the whole conductor. Execute it literally.
 
 ```
-1. N = node "$AP" next
+1. N = node "$AP" next                                  # once, at the start of the run
+2. Handle N — it is one of three shapes, and R.next in step 6 is the same three:
      N.done → node "$AP" stop --reason <N.reason>
                node "$AP" report                        # prints the human report
                end with <promise>AUTOPILOT_PAUSED_<N.reason></promise>          # story_end | until_reached
      N.stop → node "$AP" stop --reason <N.reason> --summary "<N.detail>"
                node "$AP" report
                end with <promise>AUTOPILOT_STOP_<N.reason></promise>
-2. If N.story changed since the last iteration, compute SLUG and BASE_SHA for it (§6).
+     a stage → if N.story differs from the previous iteration's story (or this is the first),
+               compute SLUG and BASE_SHA for N.story (§6) before dispatching anything for it.
 3. node "$AP" stage-start --story <N.story> --stage <N.stage> [--op <N.op>] --agent <N.agent>
 4. OUT = dispatch ONE subagent per the §6 table (Agent tool, subagent_type = N.agent), plus NOTE if set.
         Capture its FULL final message as OUT — sentinels are matched against that text and nothing else.
@@ -68,12 +70,14 @@ This is the whole conductor. Execute it literally.
      OUT contains AUTOPILOT_STOP_<reason>   → R = node "$AP" stage-end --outcome stop --reason <reason>
      OUT contains N.sentinel                → R = node "$AP" stage-end --outcome sentinel [--verdict "<verdict>"]
      neither                                → R = node "$AP" stage-end --outcome no_sentinel --tail "<last 400 chars of OUT>"
-6. R.action == "continue" → N = R.next ; NOTE = "" ; goto 3      # next is already in R — do not call `next` again
+6. R.action == "continue" → N = R.next ; NOTE = "" ; goto 2      # next is already in R — do not call `next` again
    R.action == "retry"    → NOTE = "Previous attempt ended without its sentinel; its last output was: <last 400 chars of OUT>"
-                            goto 1                               # `next` re-resolves; stage-start logs attempt 2
+                            goto 3                               # same N, identical stage-start args: the script counts attempt 2
    R.action == "stop"     → node "$AP" report
                             end with <promise>AUTOPILOT_STOP_<R.reason></promise>   # already stopped by the script
 ```
+
+Two jump targets are load-bearing. `continue` re-enters at **step 2**, not step 3: `R.next` carries the same three shapes as `next`, and under `--stop-policy hard-failures` it can already be the first stage of the *following* story — dispatching it with the previous story's `SLUG` and `BASE_SHA` would write the audit report into the wrong directory. `retry` re-enters at **step 3** with the same `N` and byte-identical `stage-start` arguments: that is how the script knows this is attempt 2 of the same stage rather than a fresh one. Never call `next` for a retry.
 
 `--verdict` is for the `invest` stage only: pass the text after `INVEST_VERDICT: ` exactly as the agent wrote it (`PASS`, `RE-TIER light`, `RE-TIER full`, `SPLIT`, `FAIL S: …`). The script turns it into the `stories.json` write, the re-tier, or the `split_required` / `spec_contradiction` stop. Every other stage omits `--verdict`.
 
@@ -130,7 +134,7 @@ Contract §2 defines the first six; the rest are the conductor's own.
 | `op_blocked`         | `STOP`    | An Operation is still `blocked` after 2 retries.                              |
 | `regression`         | `STOP`    | `ledger regress` found a regression in a story already `verified`.            |
 | `spec_contradiction` | `STOP`    | The spec cannot be satisfied as written (also: an INVEST `FAIL`, a `PLAN.md` with no Operations, an impossible tracker state). |
-| `tooling_not_ready`  | `STOP`    | The toolchain gate failed — a required script is missing or does not run.     |
+| `tooling_not_ready`  | `STOP`    | The toolchain gate failed — a required script is missing or does not run. Also the conductor's own reason when `AP` or `LEDGER` cannot be located (§2), where nothing is written because no run exists. |
 | `split_required`     | `STOP`    | The story needs splitting (INVEST `S`, or > 6 Operations). Splitting changes the backlog the user validated. |
 | `stage_no_sentinel`  | `STOP`    | A stage returned neither its sentinel nor a stop sentinel, twice.             |
 | `stage_no_progress`  | `STOP`    | A stage ended `ok` but `next` resolved to the same stage again — a loop.      |

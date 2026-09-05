@@ -90,6 +90,8 @@ Every stage runs in a fresh subagent that returns a sentinel (`SPEC_COMPLETE_US-
 node --test skills/autopilot/scripts/autopilot.test.mjs
 ```
 
+**License:** MIT · **Part of:** [`claude-dev-skill`](../../README.md)
+
 ## Changelog
 
 See [`CHANGELOG.md`](./CHANGELOG.md).
