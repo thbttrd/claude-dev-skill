@@ -16,5 +16,6 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ### Changed
 
+- Autopilot hardening from the first live dogfood on finfetch-web (plan 3/3, `.claude/handoffs/dogfood-US-002-report.md`): the pipeline contract resynced across every pipeline plugin (synchronous stages, never-amend, filter fallbacks, baseline lanes, `<E2E>` for UI Ops), `autopilot` 1.1.0, `test-setup` 3.3.0, `spec-implementation` 3.4.0, `spec-implementation-verification` 1.3.0, `dev-ledger` 1.0.3.
 - `scripts/migrate-tracking.mjs` is now a thin shim that delegates to the canonical copy bundled inside `plugins/migrate-specs/`. The legacy invocation `node scripts/migrate-tracking.mjs` keeps working from a clone of the repo, but `/plugin install migrate-specs@claude-dev-skill` is now the recommended entry point because it audits the entire repo (not just the tracking JSON) and runs the migration interactively.
 - README rewritten for the story-based workflow: catalog rows updated, pipeline ordering clarified, `specs/` layout tree added, install flow now mentions `/migrate-specs` for users with existing repos.
