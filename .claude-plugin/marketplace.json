@@ -10,6 +10,12 @@
   },
   "plugins": [
     {
+      "name": "autopilot",
+      "source": "./plugins/autopilot",
+      "description": "Unattended driver for the story pipeline. /autopilot US-NNN [--until US-MMM] runs spec → plan → per-Operation RED/GREEN → story-end gates → E2E for one story or a DAG-ordered chain, one fresh subagent per stage, never asking a question: warnings become backlog items, hard failures stop the run, every step is journaled. Bundles the invest-assessor, story-verifier, lazy-simplifier and story-reviewer agents. Triggers on \"/autopilot\", \"run the pipeline unattended\", \"autopilot US-003\", \"resume autopilot\".",
+      "version": "0.1.0"
+    },
+    {
       "name": "d2-architect",
       "source": "./plugins/d2-architect",
       "description": "Generate architecture diagrams via a four-phase pipeline — view planning (decide whether the architecture wants a single overview or an overview + zoom-ins), TALA auto-layout for a whiteboard-quality first pass, hand-coded HTML + SVG for…",

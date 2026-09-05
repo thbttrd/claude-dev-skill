@@ -52,5 +52,5 @@ skill_field() {
 }
 
 # Plugins that carry a verbatim copy of the pipeline contract.
-PIPELINE_PLUGINS=(spec-writing spec-writing-verification ui-specs plan-writing plan-writing-verification test-setup test-setup-verification spec-implementation spec-implementation-verification verification-and-validation repo-initialization)
+PIPELINE_PLUGINS=(spec-writing spec-writing-verification ui-specs plan-writing plan-writing-verification test-setup test-setup-verification spec-implementation spec-implementation-verification verification-and-validation repo-initialization autopilot)
 CONTRACT_CANONICAL="plugins/dev-ledger/skills/dev-ledger/references/autopilot-contract.md"
