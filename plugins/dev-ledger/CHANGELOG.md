@@ -4,6 +4,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [1.0.4] — 2026-09-05
+
+### Changed
+
+- Contract §3: journal a `commit` line only after `git commit` exits 0 (`git commit … && ledger log`), with the two commitlint rules agents trip on (header ≤ 100 chars, lowercase subject); §4 leftover servers: `pkill -u "$(id -u)" -f 'entry\.mjs$'` — an unscoped `pkill` on a shared host kills a rootless container's identical process (dogfood run 2, P4/P5).
+
 ## [1.0.3] — 2026-09-05
 
 ### Changed

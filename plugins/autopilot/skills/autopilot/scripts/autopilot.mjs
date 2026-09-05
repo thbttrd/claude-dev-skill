@@ -211,6 +211,12 @@ export function preflight(specs, opts = {}) {
     if (dirty.length) {
       errors.push(`working tree not clean: ${dirty.slice(0, 3).join(", ")}`);
     }
+    const tracked = spawnSync("git", ["ls-files", "--error-unmatch", "specs/autopilot.json"], { cwd: root, stdio: "ignore" });
+    if (tracked.status === 0) {
+      errors.push(
+        'specs/autopilot.json is tracked — run: git rm --cached specs/autopilot.json && git commit -m "chore: untrack autopilot run state" (it is local run state)',
+      );
+    }
   }
 
   const ap = readAutopilot(specs);
@@ -509,7 +515,9 @@ export function nextEligibleStory(stories, afterId, untilId) {
 }
 
 function resolveVerified(specs, ap, story, stories) {
-  if (story === ap.until) return { done: true, reason: "until_reached", story };
+  // A story that just reached `verified` under a story-end policy pauses as
+  // story_end even when it is also --until: until_reached is reserved for the
+  // chain being exhausted (dogfood run 2, P1).
   const storyEndPolicy = String(ap.stop_policy ?? "").includes("story-end");
   if (
     storyEndPolicy &&
@@ -518,6 +526,7 @@ function resolveVerified(specs, ap, story, stories) {
   ) {
     return { done: true, reason: "story_end", story };
   }
+  if (story === ap.until) return { done: true, reason: "until_reached", story };
   const next = nextEligibleStory(stories, story, ap.until);
   return next ? resolveForStory(specs, ap, next) : { done: true, reason: "until_reached", story };
 }
@@ -618,13 +627,19 @@ function excludeAutopilotJson(root) {
   return true;
 }
 
-// The story's diff base for the simplify / code-review gates: HEAD when a run
-// first picks the story up, recorded once and carried across resumes so a
-// later run never moves the base past the story's own commits.
+// The story's diff base for the simplify / code-review gates, recorded once
+// and carried across resumes. A story first picked up by a run after work on
+// it was already committed (a migrated repo, a pre-1.1.0 run) starts at the
+// parent of its first commit — HEAD would make the story diff specs-only
+// (dogfood run 2, P2).
 function recordBaseSha(specs, ap, story) {
   ap.base_sha ??= {};
   if (ap.base_sha[story]) return;
-  const sha = gitOut(dirname(specs), ["rev-parse", "HEAD"]);
+  const root = dirname(specs);
+  const first = gitOut(root, [
+    "log", "--reverse", "-E", `--grep=^(test|feat|fix|refactor|chore)\\(${story}\\)`, "--format=%H",
+  ])?.split("\n")[0];
+  const sha = (first && gitOut(root, ["rev-parse", `${first}^`])) || gitOut(root, ["rev-parse", "HEAD"]);
   if (sha) ap.base_sha[story] = sha;
 }
 
@@ -902,6 +917,9 @@ export async function stageEnd(specs, opts, deps = {}) {
   }
 
   if (!next.done && !next.stop && next.story !== current.story) recordBaseSha(specs, ap, next.story);
+  // The run is over: nothing is running any more, so a following `stop`
+  // belongs to the run, not to the stage that happened to finish last (P3).
+  if (next.done || next.stop) ap.current = null;
   writeJson(autopilotPath(specs), ap);
   return { action: "continue", next };
 }

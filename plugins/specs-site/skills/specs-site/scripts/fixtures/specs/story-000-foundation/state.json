@@ -1,0 +1,109 @@
+{
+  "story_id": "US-000",
+  "schema_version": 2,
+  "phase_local": "executing",
+  "branch": "main",
+  "started_at": "2026-09-04",
+  "completed_at": null,
+  "iteration": 1,
+  "plan": {
+    "plan_file": "specs/story-000-foundation/PLAN.md",
+    "operations_count": 2
+  },
+  "current_operation": "Op-2",
+  "operations": {
+    "Op-1": {
+      "title": "Greet",
+      "covers_scenarios": [
+        "Greeting a visitor",
+        "Greeting by name"
+      ],
+      "operation_phase": "green",
+      "tests_status": "red",
+      "stub_status": "created",
+      "implementation_status": "green",
+      "confirm_only": false,
+      "red_audit": {
+        "verdict": null,
+        "at": null,
+        "report_path": null
+      },
+      "green_audit": {
+        "verdict": "PASS",
+        "at": "2026-09-05T10:03:30Z",
+        "report_path": "specs/story-000-foundation/verification/green-audit-Op-1.md"
+      },
+      "started_at": "2026-09-04",
+      "completed_at": "2026-09-05T10:04:00Z"
+    },
+    "Op-2": {
+      "title": "Persist",
+      "covers_scenarios": [
+        "Remembering a visitor"
+      ],
+      "operation_phase": "red",
+      "tests_status": "red",
+      "stub_status": "created",
+      "implementation_status": "pending",
+      "confirm_only": false,
+      "red_audit": {
+        "verdict": null,
+        "at": null,
+        "report_path": null
+      },
+      "green_audit": {
+        "verdict": null,
+        "at": null,
+        "report_path": null
+      },
+      "started_at": "2026-09-04",
+      "completed_at": null
+    }
+  },
+  "test_plan_rows": {
+    "T-01": {
+      "type": "BDD",
+      "op": "Op-1",
+      "scenario": "Greeting a visitor",
+      "file": "tests/steps/greet.steps.ts",
+      "written": true,
+      "passing": true
+    },
+    "T-02": {
+      "type": "BDD",
+      "op": "Op-2",
+      "scenario": "Remembering a visitor",
+      "file": "tests/steps/greet.steps.ts",
+      "written": true,
+      "passing": false
+    },
+    "T-03": {
+      "type": "manual",
+      "op": "Op-2",
+      "scenario": "Operator checks the log",
+      "file": "specs/story-000-foundation/verification/qa-report.md",
+      "written": false,
+      "passing": false
+    }
+  },
+  "errors": [],
+  "summary": {
+    "operations_total": 2,
+    "operations_red": 1,
+    "operations_green": 1,
+    "tests_written": 3,
+    "last_commit": "abc1234"
+  },
+  "decisions": [
+    {
+      "at": "2026-09-05T10:04:30Z",
+      "op": "Op-1",
+      "summary": "Confirm-only GREEN: Op-1 behaviour already delivered by the scaffold; no production code change."
+    }
+  ],
+  "quality_gates": {
+    "simplified": false,
+    "reviewed": false,
+    "verified": false
+  }
+}

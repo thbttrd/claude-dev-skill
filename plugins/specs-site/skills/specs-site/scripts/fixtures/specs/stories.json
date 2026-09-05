@@ -1,0 +1,153 @@
+{
+  "schema_version": "2.0.0",
+  "project": {
+    "name": "Mini Project",
+    "description": "A tiny fixture project the specs-site tests render.",
+    "created_at": "2026-09-01",
+    "updated_at": "2026-09-05",
+    "scaffolded_at": "2026-09-01",
+    "repo_branch": "main"
+  },
+  "personas": [
+    {
+      "id": "P-001",
+      "name": "Test User",
+      "role": "developer",
+      "goals": [
+        "ship a tiny app"
+      ],
+      "pain_points": [
+        "nothing works yet"
+      ],
+      "tech_savviness": "high",
+      "primary": true
+    }
+  ],
+  "epics": [
+    {
+      "id": "E-001",
+      "title": "Greeting",
+      "description": "Say hello and goodbye.",
+      "persona_ids": [
+        "P-001"
+      ],
+      "priority": "must-have",
+      "business_impact": "low",
+      "story_ids": [
+        "US-000",
+        "US-001"
+      ]
+    }
+  ],
+  "stories": [
+    {
+      "id": "US-000",
+      "slug": "foundation",
+      "title": "Foundation",
+      "is_foundation": true,
+      "epic_id": "E-001",
+      "as_a": "developer",
+      "i_want": "a greeting page",
+      "so_that": "visitors feel welcome",
+      "priority": "must-have",
+      "business_impact": "low",
+      "acceptance_criteria": [
+        "a visitor is greeted",
+        "the greeting is remembered"
+      ],
+      "depends_on_story_ids": [],
+      "invest": {
+        "i": true,
+        "n": true,
+        "v": true,
+        "e": true,
+        "s": true,
+        "t": true,
+        "checked_at": "2026-09-05"
+      },
+      "phase": "red",
+      "rigor": "full",
+      "artifacts": {
+        "story_doc": "specs/story-000-foundation/STORY.md",
+        "plan": "specs/story-000-foundation/PLAN.md",
+        "feature_files": [
+          "specs/story-000-foundation/features/F-001-greeting.feature"
+        ],
+        "mockups": [
+          "specs/story-000-foundation/mockups/home.html"
+        ],
+        "ui_specs": [
+          "specs/story-000-foundation/ui/UI-F-001-home.md"
+        ],
+        "qa_report": null
+      },
+      "history": [
+        {
+          "phase": "scoped",
+          "at": "2026-09-01"
+        },
+        {
+          "phase": "specced",
+          "at": "2026-09-02"
+        },
+        {
+          "phase": "planned",
+          "at": "2026-09-03"
+        },
+        {
+          "phase": "red",
+          "at": "2026-09-04"
+        }
+      ]
+    },
+    {
+      "id": "US-001",
+      "slug": "farewell",
+      "title": "Farewell",
+      "is_foundation": false,
+      "epic_id": "E-001",
+      "as_a": "developer",
+      "i_want": "a goodbye page",
+      "so_that": "visitors leave happy",
+      "priority": "should-have",
+      "business_impact": "low",
+      "acceptance_criteria": [],
+      "depends_on_story_ids": [
+        "US-000"
+      ],
+      "invest": {
+        "i": false,
+        "n": false,
+        "v": false,
+        "e": false,
+        "s": false,
+        "t": false,
+        "checked_at": null
+      },
+      "phase": "scoped",
+      "rigor": "light",
+      "artifacts": {
+        "story_doc": null,
+        "plan": null,
+        "feature_files": [],
+        "mockups": [],
+        "ui_specs": [],
+        "qa_report": null
+      },
+      "history": [
+        {
+          "phase": "scoped",
+          "at": "2026-09-01"
+        }
+      ]
+    }
+  ],
+  "architecture": {
+    "tech_stack": {
+      "runtime": "node"
+    },
+    "adrs": [
+      "ADR-001"
+    ]
+  }
+}

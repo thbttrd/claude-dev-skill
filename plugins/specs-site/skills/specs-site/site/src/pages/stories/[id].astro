@@ -1,0 +1,90 @@
+---
+import { getCollection } from "astro:content";
+import Base from "../../layouts/Base.astro";
+import Chip from "../../components/Chip.astro";
+import Markdown from "../../components/Markdown.astro";
+import Feature from "../../components/Feature.astro";
+import { gateVerdicts, listFiles, opProgress, readBacklog, readJournal, readState, readStories, storyDir } from "../../lib/specs.mjs";
+import { readFeatures } from "../../lib/gherkin.mjs";
+
+export function getStaticPaths() {
+  return readStories().data.stories.map((s) => ({ params: { id: s.id } }));
+}
+
+const { id } = Astro.params;
+const story = readStories().data.stories.find((s) => s.id === id);
+if (!story) return new Response(`unknown story ${id}`, { status: 404 });
+const dir = storyDir(story);
+const state = readState(dir);
+const ops = opProgress(state.data);
+const features = dir ? readFeatures(dir) : [];
+const journal = readJournal().filter((e) => e.story === id);
+const gates = [...gateVerdicts(journal, id)];
+const items = readBacklog().data.items.filter((i) => i.source?.story === id);
+const docIds = dir ? (await getCollection("docs", (d) => d.id.startsWith(`${dir}/`))).map((d) => d.id).sort() : [];
+const verificationDocs = docIds.filter((d) => d.startsWith(`${dir}/verification/`));
+const uiDocs = docIds.filter((d) => d.startsWith(`${dir}/ui/`));
+const mockups = dir ? listFiles(`${dir}/mockups`, [".html"]) : [];
+const screenshots = dir ? listFiles(`${dir}/verification`, [".png", ".jpg", ".jpeg", ".gif", ".webp"]) : [];
+const rows = Object.entries(state.data?.test_plan_rows ?? {});
+const tabs = ["story", "features", "plan", "state", "verification", "ui", "backlog"];
+---
+<Base title={`${story.id} ${story.title}`}>
+  <h1>{story.id} — {story.title} <Chip value={story.phase} /> <Chip value={story.rigor} kind="info" /></h1>
+  <p class="muted">As a {story.as_a}, I want {story.i_want}, so that {story.so_that}.{story.depends_on_story_ids?.length > 0 && <> Depends on {story.depends_on_story_ids.map((d) => <><a href={`/stories/${d}`}>{d}</a> </>)}</>}</p>
+  {!dir && <p class="error">No specs/story-{story.id.slice(3)}-* directory yet.</p>}
+  {state.error && <p class="error">{state.error}</p>}
+  <nav class="tabs">{tabs.map((t) => <a href={`#${t}`}>{t}</a>)}</nav>
+
+  <section id="story"><h2>Story</h2>{dir ? <Markdown id={`${dir}/STORY`} /> : <p class="muted">not specced</p>}
+    {story.acceptance_criteria?.length > 0 && <><h3>Acceptance criteria (stories.json)</h3><ol>{story.acceptance_criteria.map((a) => <li>{a}</li>)}</ol></>}
+  </section>
+
+  <section id="features"><h2>Features</h2>
+    {features.length === 0 && <p class="muted">no .feature files</p>}
+    {features.map((f) => <Feature feature={f} state={state.data} />)}
+  </section>
+
+  <section id="plan"><h2>Plan</h2>{dir ? <Markdown id={`${dir}/PLAN`} missing="not planned" /> : <p class="muted">not planned</p>}</section>
+
+  <section id="state"><h2>State</h2>
+    {ops.length === 0 ? <p class="muted">no state.json yet</p> : (
+      <div class="table-wrap"><table>
+        <thead><tr><th>Op</th><th>Title</th><th>Phase</th><th>RED audit</th><th>GREEN audit</th></tr></thead>
+        <tbody>{ops.map((o) => <tr><td>{o.id}</td><td>{o.title}{o.confirm_only && <> <Chip value="confirm-only" kind="info" /></>}</td><td><Chip value={o.phase} /></td><td><Chip value={o.red_audit} /></td><td><Chip value={o.green_audit} /></td></tr>)}</tbody>
+      </table></div>
+    )}
+    <h3>Gates</h3>
+    <p>{gates.length === 0 ? <span class="muted">none journaled</span> : gates.map(([g, v]) => <><Chip value={`${g}${v.op ? ` ${v.op}` : ""} ${v.verdict}`} kind={v.verdict} /> </>)}</p>
+    {state.data?.quality_gates && <p class="small muted">quality_gates: {JSON.stringify(state.data.quality_gates)}</p>}
+    {rows.length > 0 && <><h3>Test Plan rows</h3><div class="table-wrap"><table>
+      <thead><tr><th>ID</th><th>Type</th><th>Op</th><th>Scenario</th><th>File</th><th>Written</th><th>Passing</th></tr></thead>
+      <tbody>{rows.map(([rid, r]) => <tr><td>{rid}</td><td>{r.type}</td><td>{r.op}</td><td>{r.scenario}</td><td><code>{r.file}</code></td><td>{String(r.written)}</td><td><Chip value={String(r.passing)} kind={r.passing ? "green" : r.type === "manual" ? "manual" : "red"} /></td></tr>)}</tbody>
+    </table></div></>}
+    {state.data?.decisions?.length > 0 && <><h3>Decisions</h3><ul>{state.data.decisions.map((d) => <li><span class="muted small">{d.at} {d.op}</span> {d.summary}</li>)}</ul></>}
+    {state.data?.errors?.length > 0 && <><h3>Errors</h3><ul>{state.data.errors.map((e) => <li class="error">{e.operation}: {e.message} <span class="small">{e.details}</span></li>)}</ul></>}
+    <h3>Journal ({journal.length}) <a class="small" href={`/journal#${id}`}>filter →</a></h3>
+    <div class="table-wrap"><table><tbody>{journal.slice(-30).reverse().map((e) => <tr><td class="ts small">{e.ts}</td><td>{e.op}</td><td>{e.stage}</td><td><Chip value={e.kind} kind={e.verdict ?? "pending"} /></td><td>{e.summary}</td></tr>)}</tbody></table></div>
+  </section>
+
+  <section id="verification"><h2>Verification</h2>
+    {verificationDocs.length === 0 && screenshots.length === 0 && <p class="muted">no reports yet</p>}
+    {verificationDocs.map((d) => <details open><summary><code>{d.slice(dir.length + 1)}.md</code></summary><Markdown id={d} /></details>)}
+    {screenshots.length > 0 && <><h3>Screenshots</h3><div class="grid">{screenshots.map((p) => <figure class="card"><a href={`/assets/${p}`}><img src={`/assets/${p}`} alt={p} loading="lazy" /></a><figcaption class="small muted">{p.split("/").at(-1)}</figcaption></figure>)}</div></>}
+  </section>
+
+  <section id="ui"><h2>UI specs &amp; mockups</h2>
+    {uiDocs.length === 0 && mockups.length === 0 && <p class="muted">none</p>}
+    {uiDocs.map((d) => <details open><summary><code>{d.slice(dir.length + 1)}.md</code></summary><Markdown id={d} /></details>)}
+    {mockups.map((m) => <figure><figcaption class="small muted">{m.split("/").at(-1)} · <a href={`/assets/${m}`}>open</a></figcaption><iframe class="mockup" src={`/assets/${m}`} title={m} loading="lazy"></iframe></figure>)}
+  </section>
+
+  <section id="backlog"><h2>Backlog ({items.length})</h2>
+    {items.length === 0 ? <p class="muted">no items sourced from this story</p> : (
+      <div class="table-wrap"><table>
+        <thead><tr><th>Id</th><th>Status</th><th>Severity</th><th>Kind</th><th>Op</th><th>Title</th></tr></thead>
+        <tbody>{items.map((i) => <tr><td><a href={`/backlog/${i.id}`}>{i.id}</a></td><td><Chip value={i.status} kind={i.status === "done" ? "green" : i.status === "wontfix" ? "pending" : "warn"} /></td><td><Chip value={i.severity} /></td><td>{i.kind}</td><td>{i.source?.op}</td><td>{i.title}</td></tr>)}</tbody>
+      </table></div>
+    )}
+  </section>
+</Base>

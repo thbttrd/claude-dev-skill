@@ -1,0 +1,31 @@
+---
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import Base from "../../layouts/Base.astro";
+import Chip from "../../components/Chip.astro";
+import { SPECS_DIR, excerpt, readBacklog, readJournal } from "../../lib/specs.mjs";
+
+export function getStaticPaths() {
+  return readBacklog().data.items.map((i) => ({ params: { id: i.id } }));
+}
+
+const { id } = Astro.params;
+const item = readBacklog().data.items.find((i) => i.id === id);
+if (!item) return new Response(`unknown backlog item ${id}`, { status: 404 });
+const journal = readJournal().filter((e) => e.backlog_id === id || (e.summary ?? "").includes(id));
+// The report is a specs-relative path; show the paragraph that mentions the item, or the whole report when none does.
+const reportPath = item.source?.report ? join(SPECS_DIR, item.source.report.replace(/^specs\//, "")) : null;
+const report = reportPath && existsSync(reportPath) ? readFileSync(reportPath, "utf8") : null;
+const snippet = report ? (excerpt(report, id) ?? excerpt(report, item.title.slice(0, 40)) ?? report) : null;
+---
+<Base title={id}>
+  <h1>{id} <Chip value={item.status} kind={item.status === "done" ? "green" : "warn"} /> <Chip value={item.severity} /> <Chip value={item.kind} kind="info" /></h1>
+  <p><strong>{item.title}</strong></p>
+  {item.detail && <p>{item.detail}</p>}
+  <p class="small muted">source: {item.source?.story && <a href={`/stories/${item.source.story}`}>{item.source.story}</a>} {item.source?.op} {item.source?.stage} {item.source?.gate} · created {item.created_at}{item.resolved_at && <> · resolved {item.resolved_at} <code>{item.resolved_sha}</code> — {item.resolution}</>}</p>
+  {item.files?.length > 0 && <ul>{item.files.map((f) => <li><code>{f}</code></li>)}</ul>}
+  <h2>Implement it</h2>
+  <pre><code>/backlog {id}</code></pre>
+  {item.source?.report && <><h2>Source report <span class="muted small">{item.source.report}</span></h2>{snippet ? <pre>{snippet}</pre> : <p class="error">report file not found</p>}</>}
+  {journal.length > 0 && <><h2>Journal</h2><ul>{journal.map((e) => <li><span class="small muted">{e.ts}</span> <Chip value={e.kind} /> {e.summary}</li>)}</ul></>}
+</Base>

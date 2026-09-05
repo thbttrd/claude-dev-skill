@@ -1204,3 +1204,66 @@ test("next: red — full rigor skips the per-Op audit for a confirm-only Op (no 
   assert.equal(result.stage, "spec-implementation");
   assert.equal(result.op, "Op-2");
 });
+
+test("P1: a verified story that is also --until pauses as story_end under hard-failures+story-end, until_reached under hard-failures", async () => {
+  const { specs } = fixtureProject();
+  setStory(specs, "US-000", { phase: "verified" });
+  const base = { active: true, run_id: "r", target: "US-000", until: "US-000", base_sha: {},
+    current: { story: "US-000", stage: "verification-and-validation", op: null, agent: "general-purpose", started_at: "x", attempt: 1 } };
+  assert.deepEqual(nextStage(specs, { ...base, stop_policy: "hard-failures+story-end" }),
+    { done: true, reason: "story_end", story: "US-000" });
+  assert.deepEqual(nextStage(specs, { ...base, stop_policy: "hard-failures" }),
+    { done: true, reason: "until_reached", story: "US-000" });
+  // a resume (current null) of an already-verified until story is still until_reached
+  assert.deepEqual(nextStage(specs, { ...base, stop_policy: "hard-failures+story-end", current: null }),
+    { done: true, reason: "until_reached", story: "US-000" });
+});
+
+test("P3: stage-end that finishes the run clears current, so stop journals the run, not the last stage", async () => {
+  const { specs } = fixtureProject();
+  const now = new Date("2026-09-05T18:00:00Z");
+  await start(specs, { target: "US-000" }, { ledger, now }); // clean tree first; the trackers move below
+  setStory(specs, "US-000", { phase: "green", invest: INVEST_ALL_TRUE });
+  await stageStart(specs, { story: "US-000", stage: "verification-and-validation", agent: "general-purpose" }, { ledger, now });
+  setStory(specs, "US-000", { phase: "verified" }); // what the V&V stage does
+  const r = await stageEnd(specs, { outcome: "sentinel" }, { ledger, now });
+  assert.equal(r.action, "continue");
+  assert.equal(r.next.reason, "story_end");
+  assert.equal(readAutopilot(specs).current, null);
+  const rep = await stop(specs, { reason: r.next.reason }, { ledger, now });
+  const stopLine = ledger.readJournal(specs).findLast((e) => e.kind === "stop");
+  assert.equal(stopLine.stage, "autopilot");
+  assert.equal(stopLine.story, "US-000");
+  assert.match(rep.text, /\n  run — stop \(story_end\)\n/);
+  assert.doesNotMatch(rep.text, /verification-and-validation — stop/);
+});
+
+test("P2: base_sha is the parent of the story's first commit when the story was worked on before this run", async () => {
+  const { root, specs } = fixtureProject();
+  const init = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  writeFileSync(join(root, "a.txt"), "red\n");
+  commitPaths(root, "test(US-000): Op-1 RED", ["a.txt"]);
+  writeFileSync(join(root, "b.txt"), "green\n");
+  commitPaths(root, "feat(US-000): Op-1", ["b.txt"]);
+  setStory(specs, "US-000", { phase: "red", invest: INVEST_ALL_TRUE });
+  writeState(specs, "US-000", { story_id: "US-000", schema_version: 2, operations: { "Op-1": { operation_phase: "green" }, "Op-2": { operation_phase: "red" } } });
+  commitPaths(root, "chore: trackers", ["specs"]);
+  const ap = await start(specs, { target: "US-000" }, { ledger, now: new Date() });
+  assert.equal(ap.base_sha["US-000"], init);
+});
+
+test("P2: base_sha stays HEAD when no commit of the story exists yet", async () => {
+  const { root, specs } = fixtureProject();
+  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  const ap = await start(specs, { target: "US-000" }, { ledger, now: new Date() });
+  assert.equal(ap.base_sha["US-000"], head);
+});
+
+test("P8: preflight refuses when specs/autopilot.json is tracked", () => {
+  const { root, specs } = fixtureProject();
+  writeJson(join(specs, "autopilot.json"), { active: false });
+  commitPaths(root, "oops: tracked run state", ["specs/autopilot.json"]);
+  const r = preflight(specs, { target: "US-000" });
+  assert.equal(r.ok, false);
+  assert.ok(r.errors.some((e) => e.startsWith("specs/autopilot.json is tracked")), r.errors.join("\n"));
+});

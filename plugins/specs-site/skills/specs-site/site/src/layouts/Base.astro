@@ -1,0 +1,24 @@
+---
+import "../styles/global.css";
+import { readStories } from "../lib/specs.mjs";
+interface Props { title: string; }
+const { title } = Astro.props;
+const project = readStories().data.project ?? {};
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} · {project.name ?? "specs"}</title>
+  </head>
+  <body>
+    <header class="top">
+      <strong><a href="/">{project.name ?? "specs"}</a></strong>
+      <nav>
+        <a href="/">Dashboard</a><a href="/architecture">Architecture</a><a href="/design">Design</a><a href="/journal">Journal</a><a href="/backlog">Backlog</a>
+      </nav>
+    </header>
+    <main><slot /></main>
+  </body>
+</html>

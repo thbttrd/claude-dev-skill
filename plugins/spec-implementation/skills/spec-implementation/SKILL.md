@@ -1,6 +1,6 @@
 ---
 name: spec-implementation
-version: 3.4.0
+version: 3.4.1
 description: >
   Per-Operation GREEN-phase executor with story-end wrap-up gates. For ONE
   Operation of ONE story (US-NNN Op-X) at a time, writes the minimal

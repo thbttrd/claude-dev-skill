@@ -1,6 +1,6 @@
 ---
 name: plan-writing-verification
-version: 2.3.1
+version: 2.3.2
 description: >
   Per-story verification of the output of /plan-writing for completeness,
   REASONS-canvas compliance, TDD prescription, Test Plan traceability, and

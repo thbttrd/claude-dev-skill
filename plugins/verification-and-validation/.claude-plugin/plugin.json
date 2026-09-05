@@ -1,6 +1,6 @@
 {
   "name": "verification-and-validation",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "description": "Per-story end-to-end verification of a completed implementation. Runs the full automated test suite, starts the application, exercises every API endpoint with curl, walks every UI scenario via Playwright MCP, and FIXES any deviation found. Operates on ONE story (US-NNN) at a time; when everything passes, flips the story's phase to verified and writes the QA report to specs/story-NNN-slug/verification/qa-report.md. Use after /spec-implementation US-NNN (story phase = green). Optional --all-pending flag to walk every green story in turn. Triggers on: \"verify the app\", \"validate US-NNN\", \"run E2E verification for the story\", \"test the running app\", \"check everything works for US-NNN\", or any request to certify a green story as verified.",
   "author": {
     "name": "thbttrd"

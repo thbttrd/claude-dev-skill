@@ -1,0 +1,14 @@
+---
+import Base from "../layouts/Base.astro";
+import Markdown from "../components/Markdown.astro";
+import { listFiles } from "../lib/specs.mjs";
+const diagrams = listFiles(".", [".png", ".svg"]).filter((p) => !p.startsWith("story-") && !p.startsWith("legacy/"));
+---
+<Base title="Architecture">
+  <h1>Architecture</h1>
+  <Markdown id="ARCHITECTURE" missing="No specs/ARCHITECTURE.md — run /research-and-architecture" />
+  {diagrams.length > 0 && <><h2>Diagrams</h2><div class="grid">{diagrams.map((p) => <figure class="card"><a href={`/assets/${p}`}><img src={`/assets/${p}`} alt={p} loading="lazy" /></a><figcaption class="small muted">{p}</figcaption></figure>)}</div></>}
+  <h2>Project</h2>
+  <Markdown id="PROJECT" missing="No specs/PROJECT.md" />
+  <Markdown id="MIGRATION" missing="" />
+</Base>

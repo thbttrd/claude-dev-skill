@@ -1,0 +1,29 @@
+---
+import Scenario from "./Scenario.astro";
+import { scenarioStatus } from "../lib/specs.mjs";
+interface Props { feature: any; state: any }
+const { feature, state } = Astro.props;
+const status = (c) => (c.kind === "background" ? "pending" : scenarioStatus(state, c.name));
+---
+<section class="feature">
+  {feature.error ? (
+    <div class="error"><strong>{feature.path}</strong> — parse error: {feature.error}</div>
+  ) : (
+    <>
+      <p class="tags">{feature.tags.join(" ")} <span class="muted">{feature.path}</span></p>
+      <h3>{feature.keyword}: {feature.name}</h3>
+      {feature.description && <pre class="muted">{feature.description}</pre>}
+      {feature.children.map((c) =>
+        c.kind === "rule" ? (
+          <div class="feature">
+            <h4>Rule: {c.name}</h4>
+            {c.description && <p class="muted small">{c.description}</p>}
+            {c.children.map((s) => <Scenario s={s} status={status(s)} />)}
+          </div>
+        ) : (
+          <Scenario s={c} status={status(c)} />
+        ),
+      )}
+    </>
+  )}
+</section>

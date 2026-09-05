@@ -1,0 +1,28 @@
+{
+  "active": true,
+  "run_id": "run-2026-09-05T10:00:00.000Z",
+  "target": "US-000",
+  "until": "US-000",
+  "stop_policy": "hard-failures+story-end",
+  "skip_arch_check": false,
+  "base_sha": {
+    "US-000": "0000000000000000000000000000000000000000"
+  },
+  "current": {
+    "story": "US-000",
+    "stage": "spec-implementation",
+    "op": "Op-2",
+    "agent": "general-purpose",
+    "started_at": "2026-09-05T10:05:00.000Z",
+    "attempt": 1
+  },
+  "last_next": {
+    "story": "US-000",
+    "stage": "spec-implementation",
+    "op": "Op-2",
+    "agent": "general-purpose"
+  },
+  "started_at": "2026-09-05T10:00:00.000Z",
+  "stopped_at": null,
+  "stop_reason": null
+}

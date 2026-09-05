@@ -1,0 +1,37 @@
+---
+interface Props { fields: { name: string; label: string; values: string[] }[]; target: string }
+const { fields, target } = Astro.props;
+---
+<form class="filters" data-filters={target}>
+  {fields.map((f) => (
+    <label>{f.label}
+      <select name={f.name}><option value="">all</option>{f.values.map((v) => <option value={v}>{v}</option>)}</select>
+    </label>
+  ))}
+  <label>contains <input type="search" name="q" placeholder="text" /></label>
+  <span class="muted small" data-count></span>
+</form>
+<script>
+  for (const form of document.querySelectorAll<HTMLFormElement>("form[data-filters]")) {
+    const table = document.getElementById(form.dataset.filters!);
+    const rows = table ? Array.from(table.querySelectorAll<HTMLTableRowElement>("tbody tr")) : [];
+    const count = form.querySelector<HTMLElement>("[data-count]")!;
+    const apply = () => {
+      const want = Object.fromEntries(new FormData(form).entries()) as Record<string, string>;
+      const q = (want.q ?? "").toLowerCase();
+      let shown = 0;
+      for (const tr of rows) {
+        const ok = Object.entries(want).every(([k, v]) => k === "q" || !v || tr.dataset[k] === v) && (!q || tr.textContent!.toLowerCase().includes(q));
+        tr.hidden = !ok;
+        if (ok) shown++;
+      }
+      count.textContent = `${shown} / ${rows.length}`;
+    };
+    // deep link: /journal#US-002 preselects the story filter
+    const hash = decodeURIComponent(location.hash.slice(1));
+    const storySel = form.querySelector<HTMLSelectElement>('select[name="story"]');
+    if (hash && storySel && [...storySel.options].some((o) => o.value === hash)) storySel.value = hash;
+    form.addEventListener("input", apply);
+    apply();
+  }
+</script>
