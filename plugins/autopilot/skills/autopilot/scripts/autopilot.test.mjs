@@ -15,15 +15,26 @@ import { fileURLToPath } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   DEFAULT_POLICY,
+  loadLedger,
   locateLedger,
   matchSentinel,
   nextEligibleStory,
   nextStage,
   preflight,
+  readAutopilot,
   readJson,
+  report,
+  stageEnd,
+  stageStart,
+  start,
+  stop,
   storyDir,
   writeJson,
 } from "./autopilot.mjs";
+
+// Loaded once, hermetically, from the in-repo sibling — every run-lifecycle
+// test injects it via deps.ledger instead of letting each call re-locate it.
+const ledger = await loadLedger(locateLedger());
 
 export function fixtureProject() {
   const root = mkdtempSync(join(tmpdir(), "autopilot-"));
@@ -575,4 +586,372 @@ test("CLI: next --story US-000 dry-runs without autopilot.json", () => {
   assert.equal(out.story, "US-000");
   assert.equal(out.stage, "invest");
   assert.equal(out.agent, "invest-assessor");
+});
+
+// ---- run lifecycle: start / stage-start / stage-end / stop / report -------
+
+const INVEST_ALL_TRUE = {
+  i: true,
+  n: true,
+  v: true,
+  e: true,
+  s: true,
+  t: true,
+  checked_at: "2026-09-01",
+};
+
+test("start writes autopilot.json and journals the start (plus decisions for --force / --skip-arch-check)", async () => {
+  const { specs } = fixtureProject();
+  const now = new Date("2026-09-05T10:00:00.000Z");
+
+  const ap = await start(specs, { target: "US-000" }, { ledger, now });
+  assert.deepEqual(ap, {
+    active: true,
+    run_id: `run-${now.toISOString()}`,
+    target: "US-000",
+    until: "US-000",
+    stop_policy: DEFAULT_POLICY,
+    skip_arch_check: false,
+    current: null,
+    last_next: null,
+    started_at: now.toISOString(),
+    stopped_at: null,
+    stop_reason: null,
+  });
+  assert.deepEqual(readAutopilot(specs), ap);
+
+  const journal1 = ledger.readJournal(specs);
+  const startEntry = journal1.find((e) => e.kind === "action" && e.run_id === ap.run_id);
+  assert.ok(startEntry, "expected a start action entry");
+  assert.match(startEntry.summary, /target=US-000 until=US-000 policy=/);
+
+  const now2 = new Date("2026-09-05T11:00:00.000Z");
+  const ap2 = await start(
+    specs,
+    { target: "US-000", force: true, skip_arch_check: true },
+    { ledger, now: now2 },
+  );
+  assert.equal(ap2.active, true);
+  assert.notEqual(ap2.run_id, ap.run_id);
+
+  const journal2 = ledger.readJournal(specs);
+  const forceDecision = journal2.find(
+    (e) => e.kind === "decision" && e.run_id === ap2.run_id && e.summary.includes(ap.run_id),
+  );
+  assert.ok(forceDecision, "expected a decision mentioning the old run_id");
+  const skipDecision = journal2.find(
+    (e) => e.kind === "decision" && e.run_id === ap2.run_id && /skip-arch-check/.test(e.summary),
+  );
+  assert.ok(skipDecision, "expected a decision about --skip-arch-check");
+});
+
+test("start refuses when preflight fails and writes nothing", async () => {
+  const { specs } = fixtureProject();
+  rmSync(join(specs, "ARCHITECTURE.md"));
+
+  const result = await start(specs, { target: "US-000" }, { ledger, now: new Date() });
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.length > 0);
+  assert.equal(existsSync(join(specs, "autopilot.json")), false);
+});
+
+test("stageStart sets current with attempt 1 and journals stage_start with story/op/stage filled", async () => {
+  const { specs } = fixtureProject();
+  const now = new Date("2026-09-05T10:00:00.000Z");
+  const ap0 = await start(specs, { target: "US-000" }, { ledger, now });
+
+  const now2 = new Date("2026-09-05T10:05:00.000Z");
+  const ap = await stageStart(
+    specs,
+    { story: "US-000", stage: "invest", agent: "invest-assessor" },
+    { ledger, now: now2 },
+  );
+  assert.deepEqual(ap.current, {
+    story: "US-000",
+    stage: "invest",
+    op: null,
+    agent: "invest-assessor",
+    started_at: now2.toISOString(),
+    attempt: 1,
+  });
+  assert.deepEqual(readAutopilot(specs).current, ap.current);
+
+  const entry = ledger
+    .readJournal(specs)
+    .find((e) => e.kind === "stage_start" && e.run_id === ap0.run_id);
+  assert.ok(entry);
+  assert.equal(entry.story, "US-000");
+  assert.equal(entry.op, null);
+  assert.equal(entry.stage, "invest");
+  assert.match(entry.summary, /invest US-000 via invest-assessor \(attempt 1\)/);
+});
+
+test("stageEnd sentinel → continue with the next stage and journals stage_end", async () => {
+  const { specs } = fixtureProject();
+  const now = new Date("2026-09-05T10:00:00.000Z");
+  await start(specs, { target: "US-000" }, { ledger, now });
+  await stageStart(
+    specs,
+    { story: "US-000", stage: "spec-writing", agent: "general-purpose" },
+    { ledger, now },
+  );
+
+  setStory(specs, "US-000", { invest: INVEST_ALL_TRUE, phase: "specced" });
+
+  const result = await stageEnd(specs, { outcome: "sentinel" }, { ledger, now });
+  assert.equal(result.action, "continue");
+  assert.equal(result.next.stage, "spec-writing-verification");
+
+  assert.deepEqual(readAutopilot(specs).last_next, result.next);
+  const entry = ledger.readJournal(specs).find((e) => e.kind === "stage_end");
+  assert.ok(entry);
+  assert.match(entry.summary, /spec-writing US-000 ok/);
+});
+
+test("stageEnd sentinel with no tracker progress → stop stage_no_progress", async () => {
+  const { specs } = fixtureProject();
+  const now = new Date("2026-09-05T10:00:00.000Z");
+  await start(specs, { target: "US-000" }, { ledger, now });
+  await stageStart(
+    specs,
+    { story: "US-000", stage: "spec-writing", agent: "general-purpose" },
+    { ledger, now },
+  );
+
+  setStory(specs, "US-000", { invest: INVEST_ALL_TRUE }); // phase stays "scoped"
+
+  const result = await stageEnd(specs, { outcome: "sentinel" }, { ledger, now });
+  assert.equal(result.action, "stop");
+  assert.equal(result.reason, "stage_no_progress");
+
+  const ap = readAutopilot(specs);
+  assert.equal(ap.active, false);
+  assert.equal(ap.stop_reason, "stage_no_progress");
+});
+
+test("stageEnd no_sentinel retries once then stops with stage_no_sentinel", async () => {
+  const { specs } = fixtureProject();
+  const now = new Date("2026-09-05T10:00:00.000Z");
+  await start(specs, { target: "US-000" }, { ledger, now });
+  await stageStart(
+    specs,
+    { story: "US-000", stage: "spec-writing", agent: "general-purpose" },
+    { ledger, now },
+  );
+
+  const retry = await stageEnd(
+    specs,
+    { outcome: "no_sentinel", tail: "no promise block found" },
+    { ledger, now },
+  );
+  assert.deepEqual(retry, { action: "retry", attempt: 2 });
+  assert.equal(readAutopilot(specs).current.attempt, 2);
+
+  const stopped = await stageEnd(specs, { outcome: "no_sentinel", tail: "still nothing" }, { ledger, now });
+  assert.deepEqual(stopped, { action: "stop", reason: "stage_no_sentinel" });
+  const ap = readAutopilot(specs);
+  assert.equal(ap.active, false);
+  assert.equal(ap.stop_reason, "stage_no_sentinel");
+});
+
+test("stageEnd invest verdicts: PASS writes invest flags; RE-TIER also rewrites rigor; SPLIT stops split_required; FAIL stops spec_contradiction", async () => {
+  const now = new Date("2026-09-05T10:00:00.000Z");
+
+  // PASS
+  {
+    const { specs } = fixtureProject();
+    await start(specs, { target: "US-000" }, { ledger, now });
+    await stageStart(
+      specs,
+      { story: "US-000", stage: "invest", agent: "invest-assessor" },
+      { ledger, now },
+    );
+    const result = await stageEnd(specs, { outcome: "sentinel", verdict: "PASS" }, { ledger, now });
+    assert.equal(result.action, "continue");
+    const story = readJson(join(specs, "stories.json")).stories.find((s) => s.id === "US-000");
+    assert.deepEqual(story.invest, {
+      i: true,
+      n: true,
+      v: true,
+      e: true,
+      s: true,
+      t: true,
+      checked_at: "2026-09-05",
+    });
+    assert.equal(story.rigor, "full");
+    const gate = ledger.readJournal(specs).find((e) => e.kind === "gate");
+    assert.equal(gate.verdict, "PASS");
+  }
+
+  // RE-TIER light
+  {
+    const { specs } = fixtureProject();
+    await start(specs, { target: "US-000" }, { ledger, now });
+    await stageStart(
+      specs,
+      { story: "US-000", stage: "invest", agent: "invest-assessor" },
+      { ledger, now },
+    );
+    const result = await stageEnd(
+      specs,
+      { outcome: "sentinel", verdict: "RE-TIER light" },
+      { ledger, now },
+    );
+    assert.equal(result.action, "continue");
+    const story = readJson(join(specs, "stories.json")).stories.find((s) => s.id === "US-000");
+    assert.equal(story.invest.checked_at, "2026-09-05");
+    assert.equal(story.rigor, "light");
+    const decision = ledger.readJournal(specs).find((e) => e.kind === "decision");
+    assert.match(decision.summary, /re-tiered to light by invest-assessor/);
+  }
+
+  // SPLIT
+  {
+    const { specs } = fixtureProject();
+    await start(specs, { target: "US-000" }, { ledger, now });
+    await stageStart(
+      specs,
+      { story: "US-000", stage: "invest", agent: "invest-assessor" },
+      { ledger, now },
+    );
+    const result = await stageEnd(specs, { outcome: "sentinel", verdict: "SPLIT" }, { ledger, now });
+    assert.deepEqual(result, { action: "stop", reason: "split_required" });
+    const ap = readAutopilot(specs);
+    assert.equal(ap.active, false);
+    assert.equal(ap.stop_reason, "split_required");
+  }
+
+  // FAIL
+  {
+    const { specs } = fixtureProject();
+    await start(specs, { target: "US-000" }, { ledger, now });
+    await stageStart(
+      specs,
+      { story: "US-000", stage: "invest", agent: "invest-assessor" },
+      { ledger, now },
+    );
+    const result = await stageEnd(
+      specs,
+      { outcome: "sentinel", verdict: "FAIL S: too big" },
+      { ledger, now },
+    );
+    assert.deepEqual(result, { action: "stop", reason: "spec_contradiction" });
+    const ap = readAutopilot(specs);
+    assert.equal(ap.active, false);
+    assert.equal(ap.stop_reason, "spec_contradiction");
+    const gate = ledger.readJournal(specs).find((e) => e.kind === "gate");
+    assert.equal(gate.verdict, "FAIL");
+  }
+});
+
+test("stageEnd stop passes the subagent's reason through", async () => {
+  const { specs } = fixtureProject();
+  const now = new Date("2026-09-05T10:00:00.000Z");
+  await start(specs, { target: "US-000" }, { ledger, now });
+  await stageStart(
+    specs,
+    { story: "US-000", stage: "invest", agent: "invest-assessor" },
+    { ledger, now },
+  );
+
+  const result = await stageEnd(
+    specs,
+    { outcome: "stop", reason: "verifier_fail" },
+    { ledger, now },
+  );
+  assert.deepEqual(result, { action: "stop", reason: "verifier_fail" });
+  const ap = readAutopilot(specs);
+  assert.equal(ap.active, false);
+  assert.equal(ap.stop_reason, "verifier_fail");
+});
+
+test("report aggregates this run's stages, gates, backlog ids and commits", async () => {
+  const { specs } = fixtureProject();
+  const now = new Date(); // real "now": no git commits exist after this instant
+  const ap = await start(specs, { target: "US-000" }, { ledger, now });
+
+  ledger.log(
+    specs,
+    { kind: "stage_end", summary: "invest US-000 ok", run_id: ap.run_id, story: "US-000", stage: "invest" },
+    now,
+  );
+  ledger.log(
+    specs,
+    {
+      kind: "stage_end",
+      summary: "spec-writing US-000 ok",
+      run_id: ap.run_id,
+      story: "US-000",
+      stage: "spec-writing",
+    },
+    now,
+  );
+  ledger.log(
+    specs,
+    {
+      kind: "gate",
+      gate: "code-review",
+      verdict: "PASS_WITH_WARNINGS",
+      summary: "gate code-review PASS_WITH_WARNINGS",
+      run_id: ap.run_id,
+      story: "US-000",
+    },
+    now,
+  );
+  ledger.backlogAdd(
+    specs,
+    { title: "Extract helper", severity: "warning", kind: "simplification", story: "US-000" },
+    now,
+  );
+
+  const rep = await report(specs, { run_id: ap.run_id }, { ledger });
+  assert.equal(rep.run_id, ap.run_id);
+  assert.equal(rep.target, "US-000");
+  assert.equal(rep.stages.length, 2);
+  assert.equal(rep.gates.length, 1);
+  assert.deepEqual(rep.backlog_ids, ["BL-001"]);
+  assert.ok(Array.isArray(rep.commits));
+  assert.ok(rep.text.includes("BL-001"));
+  assert.ok(rep.text.includes(ap.run_id));
+});
+
+test("CLI: start → stage-start → stage-end → stop round-trips through main", () => {
+  const { specs } = fixtureProject();
+  const script = fileURLToPath(new URL("./autopilot.mjs", import.meta.url));
+  const emptyHome = mkdtempSync(join(tmpdir(), "autopilot-home-"));
+  const env = { ...process.env, HOME: emptyHome, LEDGER: "" };
+  const run = (...args) => {
+    const r = spawnSync(process.execPath, [script, ...args, "--specs", specs], {
+      encoding: "utf8",
+      env,
+    });
+    assert.equal(r.status, 0, r.stderr);
+    return JSON.parse(r.stdout);
+  };
+
+  const started = run("start", "US-000");
+  assert.equal(started.active, true);
+  assert.ok(started.run_id);
+
+  const afterStageStart = run(
+    "stage-start",
+    "--story",
+    "US-000",
+    "--stage",
+    "invest",
+    "--agent",
+    "invest-assessor",
+  );
+  assert.equal(afterStageStart.current.stage, "invest");
+
+  const afterStageEnd = run("stage-end", "--outcome", "sentinel", "--verdict", "PASS");
+  assert.equal(afterStageEnd.action, "continue");
+  assert.equal(afterStageEnd.next.stage, "spec-writing");
+
+  const stopped = run("stop", "--reason", "test_done");
+  assert.equal(stopped.stop_reason, "test_done");
+
+  const ap = readAutopilot(specs);
+  assert.equal(ap.active, false);
+  assert.equal(ap.stop_reason, "test_done");
 });

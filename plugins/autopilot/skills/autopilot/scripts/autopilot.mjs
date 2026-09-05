@@ -543,6 +543,413 @@ export function nextStage(specs, ap) {
   return resolveForStory(specs, ap, story);
 }
 
+// ---- Run lifecycle ------------------------------------------------------------
+
+// Every lifecycle function loads the ledger itself when the caller (a fresh
+// CLI invocation) hasn't already loaded one; `main` loads it once per
+// subcommand and passes it down via deps so a whole `start`..`stop` process
+// group only pays the locate+import cost once per command.
+async function defaultLedger(override) {
+  const path = locateLedger(override);
+  if (!path) {
+    throw new Error("dev-ledger not installed: /plugin install dev-ledger@claude-dev-skill");
+  }
+  return loadLedger(path);
+}
+
+function withAutopilot(specs) {
+  const ap = readAutopilot(specs);
+  if (!ap?.active) {
+    throw new Error("autopilot: no active run (specs/autopilot.json missing or active=false)");
+  }
+  return ap;
+}
+
+function autopilotPath(specs) {
+  return join(specs, "autopilot.json");
+}
+
+function stageArgs(story, op) {
+  return op ? `${story} ${op}` : story;
+}
+
+const todayStr = (now) => now.toISOString().slice(0, 10);
+
+// The invest-assessor agent only emits a verdict word (PASS / RE-TIER tier);
+// unlike the skill-driven stages, which write their own tracker state,
+// autopilot has to turn that verdict into the stories.json write itself.
+function applyInvestPass(specs, story, now, rigor) {
+  const storiesPath = join(specs, "stories.json");
+  const data = readJson(storiesPath);
+  const s = data.stories.find((st) => st.id === story);
+  const today = todayStr(now);
+  s.invest = { i: true, n: true, v: true, e: true, s: true, t: true, checked_at: today };
+  if (rigor) s.rigor = rigor;
+  data.project.updated_at = today;
+  writeJson(storiesPath, data);
+}
+
+export async function start(specs, opts, deps = {}) {
+  const ledger = deps.ledger ?? (await defaultLedger(opts.ledger));
+  const now = deps.now ?? new Date();
+
+  const pf = preflight(specs, {
+    target: opts.target,
+    until: opts.until,
+    stop_policy: opts.stop_policy,
+    skip_arch_check: opts.skip_arch_check,
+    force: opts.force,
+  });
+  if (!pf.ok) return { ok: false, errors: pf.errors };
+
+  const prevAp = readAutopilot(specs);
+  const ap = {
+    active: true,
+    run_id: `run-${now.toISOString()}`,
+    target: pf.target,
+    until: pf.until,
+    stop_policy: pf.stop_policy,
+    skip_arch_check: Boolean(opts.skip_arch_check),
+    current: null,
+    last_next: null,
+    started_at: now.toISOString(),
+    stopped_at: null,
+    stop_reason: null,
+  };
+  writeJson(autopilotPath(specs), ap);
+
+  ledger.log(
+    specs,
+    {
+      kind: "action",
+      summary: `autopilot start target=${ap.target} until=${ap.until} policy=${ap.stop_policy}`,
+      run_id: ap.run_id,
+      story: ap.target,
+      op: null,
+      stage: "autopilot",
+    },
+    now,
+  );
+
+  if (prevAp?.active) {
+    ledger.log(
+      specs,
+      {
+        kind: "decision",
+        summary: `force: took over run ${prevAp.run_id}`,
+        run_id: ap.run_id,
+        story: ap.target,
+        op: null,
+        stage: "autopilot",
+      },
+      now,
+    );
+  }
+
+  if (opts.skip_arch_check) {
+    ledger.log(
+      specs,
+      {
+        kind: "decision",
+        summary: "--skip-arch-check: architecture check bypassed (migrated repo)",
+        run_id: ap.run_id,
+        story: ap.target,
+        op: null,
+        stage: "autopilot",
+      },
+      now,
+    );
+  }
+
+  return ap;
+}
+
+export async function stageStart(specs, opts, deps = {}) {
+  const ledger = deps.ledger ?? (await defaultLedger(opts.ledger));
+  const now = deps.now ?? new Date();
+  const ap = withAutopilot(specs);
+
+  const { story, stage, agent } = opts;
+  const op = opts.op ?? null;
+  const prev = ap.current;
+  const sameStage =
+    prev && prev.story === story && prev.stage === stage && (prev.op ?? null) === op;
+  const attempt = sameStage ? prev.attempt : 1;
+
+  ap.current = { story, stage, op, agent, started_at: now.toISOString(), attempt };
+  writeJson(autopilotPath(specs), ap);
+
+  ledger.log(
+    specs,
+    {
+      kind: "stage_start",
+      summary: `${stage} ${stageArgs(story, op)} via ${agent} (attempt ${attempt})`,
+      run_id: ap.run_id,
+      story,
+      op,
+      stage,
+      agent,
+    },
+    now,
+  );
+
+  return ap;
+}
+
+export async function stageEnd(specs, opts, deps = {}) {
+  const ledger = deps.ledger ?? (await defaultLedger(opts.ledger));
+  const now = deps.now ?? new Date();
+  const ap = withAutopilot(specs);
+  const current = ap.current;
+  const { story, stage, op, agent } = current;
+  const args = stageArgs(story, op);
+
+  if (opts.outcome === "stop") {
+    await stop(specs, { reason: opts.reason }, { ledger, now });
+    return { action: "stop", reason: opts.reason };
+  }
+
+  if (opts.outcome === "no_sentinel") {
+    if (current.attempt === 1) {
+      const tail = (opts.tail ?? "").slice(0, 400);
+      ledger.log(
+        specs,
+        {
+          kind: "action",
+          summary: `retry ${current.attempt + 1}/2: ${stage} returned no sentinel: ${tail}`,
+          run_id: ap.run_id,
+          story,
+          op,
+          stage,
+          agent,
+        },
+        now,
+      );
+      ap.current = { ...current, attempt: 2 };
+      writeJson(autopilotPath(specs), ap);
+      return { action: "retry", attempt: 2 };
+    }
+    await stop(
+      specs,
+      {
+        reason: "stage_no_sentinel",
+        summary: `${stage} ${args} returned no sentinel after 2 attempts`,
+      },
+      { ledger, now },
+    );
+    return { action: "stop", reason: "stage_no_sentinel" };
+  }
+
+  // opts.outcome === "sentinel"
+  ledger.log(
+    specs,
+    {
+      kind: "stage_end",
+      summary: `${stage} ${args} ok`,
+      run_id: ap.run_id,
+      story,
+      op,
+      stage,
+      agent,
+    },
+    now,
+  );
+
+  if (stage === "invest") {
+    const verdict = opts.verdict;
+    if (verdict === "PASS") {
+      applyInvestPass(specs, story, now, null);
+      ledger.log(
+        specs,
+        { kind: "gate", gate: "invest", verdict: "PASS", summary: "gate invest PASS", run_id: ap.run_id, story, op, stage },
+        now,
+      );
+    } else if (verdict?.startsWith("RE-TIER")) {
+      const tier = verdict.split(" ")[1];
+      applyInvestPass(specs, story, now, tier);
+      ledger.log(
+        specs,
+        {
+          kind: "decision",
+          summary: `re-tiered to ${tier} by invest-assessor`,
+          run_id: ap.run_id,
+          story,
+          op,
+          stage,
+        },
+        now,
+      );
+    } else if (verdict === "SPLIT") {
+      await stop(
+        specs,
+        { reason: "split_required", summary: `invest verdict ${verdict}` },
+        { ledger, now },
+      );
+      return { action: "stop", reason: "split_required" };
+    } else if (verdict?.startsWith("FAIL")) {
+      ledger.log(
+        specs,
+        {
+          kind: "gate",
+          gate: "invest",
+          verdict: "FAIL",
+          summary: `gate invest FAIL: ${verdict}`,
+          run_id: ap.run_id,
+          story,
+          op,
+          stage,
+        },
+        now,
+      );
+      await stop(specs, { reason: "spec_contradiction", summary: verdict }, { ledger, now });
+      return { action: "stop", reason: "spec_contradiction" };
+    }
+  }
+
+  const next = nextStage(specs, ap);
+  ap.last_next = next;
+
+  if (!next.done && !next.stop) {
+    const same =
+      next.story === current.story && next.stage === current.stage && (next.op ?? null) === op;
+    if (same) {
+      writeJson(autopilotPath(specs), ap);
+      await stop(
+        specs,
+        { reason: "stage_no_progress", summary: `${stage} ${args} made no progress` },
+        { ledger, now },
+      );
+      return { action: "stop", reason: "stage_no_progress" };
+    }
+  }
+
+  writeJson(autopilotPath(specs), ap);
+  return { action: "continue", next };
+}
+
+export async function stop(specs, opts, deps = {}) {
+  const ledger = deps.ledger ?? (await defaultLedger(opts.ledger));
+  const now = deps.now ?? new Date();
+  const ap = readAutopilot(specs) ?? {};
+
+  if (ap.active === true) {
+    ap.active = false;
+    ap.stopped_at = now.toISOString();
+    ap.stop_reason = opts.reason ?? null;
+    writeJson(autopilotPath(specs), ap);
+  }
+
+  ledger.log(
+    specs,
+    {
+      kind: "stop",
+      summary: opts.summary ? `${opts.reason}: ${opts.summary}` : String(opts.reason),
+      run_id: ap.run_id ?? null,
+      story: ap.current?.story ?? null,
+      op: ap.current?.op ?? null,
+      stage: ap.current?.stage ?? null,
+    },
+    now,
+  );
+
+  return report(specs, { run_id: ap.run_id ?? null }, { ledger, now });
+}
+
+function renderReportText({ run_id, target, until, stop_reason, stages, gates, backlog_ids, commits }) {
+  const block = (label, lines) => `${label}:\n${lines.length ? lines.join("\n") : "  (none)"}`;
+  return (
+    [
+      `autopilot report ${run_id}  target=${target ?? "?"}  until=${until ?? "?"}  stop_reason=${stop_reason ?? "?"}`,
+      "",
+      block(
+        "stages",
+        stages.map((s) => `  ${stageArgs(s.story, s.op)} ${s.stage} — ${s.outcome}`),
+      ),
+      "",
+      block(
+        "gates",
+        gates.map((g) => `  ${stageArgs(g.story, g.op)} ${g.gate} — ${g.verdict}`),
+      ),
+      "",
+      block(
+        "backlog",
+        backlog_ids.map((id) => `  ${id}`),
+      ),
+      "",
+      block(
+        "commits",
+        commits.map((c) => `  ${c.sha} ${c.summary}`),
+      ),
+    ].join("\n") + "\n"
+  );
+}
+
+export async function report(specs, opts, deps = {}) {
+  const ledger = deps.ledger ?? (await defaultLedger(opts.ledger));
+  const { run_id } = opts;
+  const entries = ledger.readJournal(specs).filter((e) => e.run_id === run_id);
+  const ap = readAutopilot(specs);
+  const matchesRun = ap?.run_id === run_id;
+
+  const stages = entries
+    .filter((e) => e.kind === "stage_end" || e.kind === "stop")
+    .map((e) => ({
+      stage: e.stage,
+      story: e.story,
+      op: e.op,
+      outcome: e.kind === "stage_end" ? "ok" : "stop",
+    }));
+
+  const gates = entries
+    .filter((e) => e.kind === "gate")
+    .map((e) => ({ gate: e.gate, verdict: e.verdict, story: e.story, op: e.op, report: e.report ?? null }));
+
+  const backlog_ids = entries.filter((e) => e.kind === "finding" && e.backlog_id).map((e) => e.backlog_id);
+
+  const journaledCommits = entries
+    .filter((e) => e.kind === "commit")
+    .map((e) => ({ sha: e.sha, summary: e.summary }));
+
+  const since = matchesRun ? ap.started_at : [...entries].map((e) => e.ts).sort()[0];
+  let gitCommits = [];
+  if (since) {
+    const r = spawnSync("git", ["log", `--since=${since}`, "--format=%h%x1f%s"], {
+      cwd: dirname(specs),
+      encoding: "utf8",
+    });
+    if (r.status === 0) {
+      gitCommits = (r.stdout ?? "")
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => {
+          const [sha, summary] = line.split("\x1f");
+          return { sha, summary };
+        });
+    }
+  }
+
+  const seen = new Set();
+  const commits = [];
+  for (const c of [...journaledCommits, ...gitCommits]) {
+    if (!c.sha || seen.has(c.sha)) continue;
+    seen.add(c.sha);
+    commits.push(c);
+  }
+
+  const result = {
+    run_id,
+    target: matchesRun ? ap.target : null,
+    until: matchesRun ? ap.until : null,
+    stop_reason: matchesRun ? ap.stop_reason : null,
+    stages,
+    gates,
+    backlog_ids,
+    commits,
+  };
+  result.text = renderReportText(result);
+  return result;
+}
+
 // ---- CLI ---------------------------------------------------------------------
 
 // Local copies of ledger.mjs's parseArgs/findSpecsDir: `preflight` must print
@@ -618,10 +1025,70 @@ export async function main(argv) {
       process.stdout.write(JSON.stringify(nextStage(specs, ap), null, 2) + "\n");
       return 0;
     }
+    case "start": {
+      const specs = findSpecsDir(process.cwd(), opts.specs ?? process.env.LEDGER_SPECS);
+      const ledger = await defaultLedger(opts.ledger);
+      const result = await start(
+        specs,
+        {
+          target: arg1,
+          until: opts.until,
+          stop_policy: opts["stop-policy"],
+          skip_arch_check: Boolean(opts["skip-arch-check"]),
+          force: Boolean(opts.force),
+        },
+        { ledger },
+      );
+      process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+      return result.ok === false ? 1 : 0;
+    }
+    case "stage-start": {
+      const specs = findSpecsDir(process.cwd(), opts.specs ?? process.env.LEDGER_SPECS);
+      const ledger = await defaultLedger(opts.ledger);
+      const result = await stageStart(
+        specs,
+        { story: opts.story, stage: opts.stage, op: opts.op ?? null, agent: opts.agent },
+        { ledger },
+      );
+      process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+      return 0;
+    }
+    case "stage-end": {
+      const specs = findSpecsDir(process.cwd(), opts.specs ?? process.env.LEDGER_SPECS);
+      const ledger = await defaultLedger(opts.ledger);
+      const result = await stageEnd(
+        specs,
+        { outcome: opts.outcome, verdict: opts.verdict, reason: opts.reason, tail: opts.tail },
+        { ledger },
+      );
+      process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+      return 0;
+    }
+    case "stop": {
+      const specs = findSpecsDir(process.cwd(), opts.specs ?? process.env.LEDGER_SPECS);
+      const ledger = await defaultLedger(opts.ledger);
+      const result = await stop(specs, { reason: opts.reason, summary: opts.summary }, { ledger });
+      process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+      return 0;
+    }
+    case "report": {
+      const specs = findSpecsDir(process.cwd(), opts.specs ?? process.env.LEDGER_SPECS);
+      const ledger = await defaultLedger(opts.ledger);
+      const run_id = opts["run-id"] ?? readAutopilot(specs)?.run_id;
+      if (!run_id) throw new Error("autopilot report: no --run-id given and no specs/autopilot.json found");
+      const result = await report(specs, { run_id }, { ledger });
+      process.stdout.write(opts.json ? JSON.stringify(result, null, 2) + "\n" : result.text);
+      return 0;
+    }
     default:
       process.stderr.write(
         "usage: autopilot preflight US-NNN [--specs dir] [--until US-MMM] [--stop-policy p] [--skip-arch-check] [--force] [--ledger path]\n" +
-          "       autopilot next [--story US-NNN] [--until US-MMM] [--stop-policy p] [--specs dir]\n",
+          "       autopilot next [--story US-NNN] [--until US-MMM] [--stop-policy p] [--specs dir]\n" +
+          "       autopilot start US-NNN [--until US-MMM] [--stop-policy p] [--skip-arch-check] [--force] [--specs dir]\n" +
+          "       autopilot stage-start --story US-NNN --stage s [--op Op-N] [--agent a] [--specs dir]\n" +
+          "       autopilot stage-end --outcome sentinel|no_sentinel|stop [--verdict v] [--reason r] [--tail t] [--specs dir]\n" +
+          "       autopilot stop --reason r [--summary s] [--specs dir]\n" +
+          "       autopilot report [--run-id id] [--json] [--specs dir]\n",
       );
       return 2;
   }
