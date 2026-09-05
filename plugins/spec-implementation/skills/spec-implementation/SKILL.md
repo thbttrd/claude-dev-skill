@@ -1,6 +1,6 @@
 ---
 name: spec-implementation
-version: 3.3.0
+version: 3.4.0
 description: >
   Per-Operation GREEN-phase executor with story-end wrap-up gates. For ONE
   Operation of ONE story (US-NNN Op-X) at a time, writes the minimal
@@ -135,6 +135,8 @@ Run the Op-X-filtered suites:
 
 Both MUST FAIL (these were written by `/test-setup US-NNN Op-X`). If any test passes, something is off — investigate before proceeding (likely an earlier Op accidentally implemented this Op's behaviour, or the test is misclassified).
 
+**Confirm-only Op.** If *every* Op-X test is already green here and the cause is legitimate — an earlier story or Op shipped the behaviour and Op-X's rows only pin it — this Op has no GREEN to write. Journal the decision (`Op-X confirm-only: <which tests> green at base because <story/Op that shipped it>`), skip Phase 2's implementation and its `feat` commit (there is nothing to commit), but still run Phase 2's regression baseline (and `<E2E>` if Op-X is a UI Op) so the evidence is journaled, then continue at Phase 4 with `Op-X.confirm_only = true`. A mix — some rows green, some red — is not confirm-only: implement the red ones and mention the green ones in the self-review.
+
 Ops whose rows are all `manual` have nothing to run here; proceed to GREEN (the deliverable is the artefact the manual rows describe).
 
 ### Phase 2 — GREEN: write the minimum implementation
@@ -152,6 +154,8 @@ After writing the code, run:
 
 - `<TEST> -t "@US-NNN"` and `<BDD>` (story filter) — Op-X's tests pass; earlier Ops' tests still pass.
 - Regression baseline (contract §4): `RPT=$(mktemp) && node "$LEDGER" regress --base HEAD --runner vitest --cmd "<TEST> --reporter=json --outputFile=$RPT" --report-file "$RPT"` and the cucumber equivalent. Exit 0 required. A regression in a story already `verified` is hard stop `regression` under autopilot; otherwise back out and re-think.
+- UI Ops also run `<E2E>` (contract §4): if PLAN.md's Structure assigns any file Op-X changed to the UI module, or the Op names a `UI spec`, run `<E2E>` when `package.json` defines it. A failing e2e spec of a story already `verified` is the `regression` hard stop under autopilot — a rendered-text regression is invisible to the unit and BDD lanes (dogfood C1: sr-only text leaking into a cell's text content).
+- Every lane runs synchronously (contract §2 rule 6): never `run_in_background`; a lane that cannot fit the tool timeout is narrowed to this Op's scenarios (`--name`), and the narrowing journaled.
 
 If anything fails:
 
@@ -194,6 +198,7 @@ After GREEN (and optional REFACTOR):
 - `Op-X.operation_phase = "refactored"` (or `"green"` if no refactor done)
 - `Op-X.implementation_status = "green"`
 - `Op-X.completed_at = <now>`
+- `Op-X.confirm_only = true` when Phase 1 declared the Op confirm-only (otherwise leave the field absent)
 - `summary.operations_green++`, `summary.last_commit = <sha>`
 - `implementation.operations_green++`
 - `implementation.last_commit = <sha>`
@@ -379,6 +384,8 @@ feat(US-001): implement Op-2 — submit handler with retry
 fix(US-003): correct percentage calculation
 refactor(foundation): extract shared DB connection pool
 ```
+
+Never `--amend` a commit once it has been journaled (contract §3). The `journal.jsonl` line your commit produces stays uncommitted until the next commit sweeps it in — that trailing line is the expected end state of a stage, not something to fold back with `--amend` (which leaves the journal pointing at a sha no branch reaches).
 
 ---
 

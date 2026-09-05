@@ -6,6 +6,17 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [3.4.0] — 2026-09-05
+
+### Added
+
+- Confirm-only Ops: when every Op-X test is already green at Phase 1, the Op is journaled, no `feat` commit is made, the regression baseline still runs, and `state.json.operations[Op-X].confirm_only = true` lets `/autopilot` skip the per-Op audit (dogfood P14).
+- UI Ops run `<E2E>` in the GREEN self-review (dogfood P17).
+
+### Changed
+
+- Never `--amend` a journaled commit; lanes run synchronously. Contract resync (see `dev-ledger` 1.0.3).
+
 ## [3.3.0] — 2026-09-05
 
 ### Added

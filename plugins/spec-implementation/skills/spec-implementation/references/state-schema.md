@@ -55,6 +55,10 @@ After **every** Operation has reached `operation_phase ∈ {green, refactored}`,
 }
 ```
 
+### `operations[Op-X].confirm_only` (per Op, written in Phase 4)
+
+`true` when Phase 1 found every Op-X test already green at base (an earlier story or Op shipped the behaviour): no `feat(US-NNN): implement Op-X` commit exists, `operation_phase` still advances to `green`, and `/autopilot` skips the per-Op green audit for it. Absent otherwise.
+
 ### `errors[]`
 
 Same shape as `/test-setup`'s schema, scoped per Operation:
