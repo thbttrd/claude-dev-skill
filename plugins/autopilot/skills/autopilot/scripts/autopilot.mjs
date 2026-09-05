@@ -237,6 +237,292 @@ export function preflight(specs, opts = {}) {
   return { ok: true, target, until, stop_policy, warnings };
 }
 
+// ---- Stage resolution --------------------------------------------------------
+
+// One entry per stage name (insertion order matches the pipeline sequence).
+// `skill` is the skill this stage invokes, or null when the stage has no
+// skill of its own (invest / simplify / code-review are driven by a bundled
+// agent instead). `sentinel` is the per-story or per-Op template; the
+// story-end call of `spec-implementation` (op === null) uses
+// `sentinel_story_end` instead of `sentinel`.
+export const STAGES = {
+  invest: {
+    skill: null,
+    agent: "invest-assessor",
+    sentinel: "INVEST_VERDICT: (PASS|RE-TIER (light|full)|SPLIT|FAIL .*)",
+  },
+  "spec-writing": {
+    skill: "spec-writing",
+    agent: "general-purpose",
+    sentinel: "SPEC_COMPLETE_US-NNN",
+  },
+  "spec-writing-verification": {
+    skill: "spec-writing-verification",
+    agent: "story-verifier",
+    sentinel: "SPEC_AUDIT_COMPLETE_US-NNN",
+  },
+  "plan-writing": {
+    skill: "plan-writing",
+    agent: "general-purpose",
+    sentinel: "PLAN_COMPLETE_US-NNN",
+  },
+  "plan-writing-verification": {
+    skill: "plan-writing-verification",
+    agent: "story-verifier",
+    sentinel: "PLAN_AUDIT_COMPLETE_US-NNN",
+  },
+  "repo-initialization": {
+    skill: "repo-initialization",
+    agent: "general-purpose",
+    sentinel: "REPO_INIT_COMPLETE",
+  },
+  "test-setup": {
+    skill: "test-setup",
+    agent: "general-purpose",
+    sentinel: "RED_COMPLETE_US-NNN_Op-X",
+  },
+  "spec-implementation": {
+    skill: "spec-implementation",
+    agent: "general-purpose",
+    sentinel: "GREEN_COMPLETE_US-NNN_Op-X",
+    sentinel_story_end: "IMPLEMENTATION_COMPLETE_US-NNN",
+  },
+  "spec-implementation-verification": {
+    skill: "spec-implementation-verification",
+    agent: "story-verifier",
+    sentinel: "GREEN_AUDIT_COMPLETE_US-NNN_Op-X",
+  },
+  simplify: {
+    skill: null,
+    agent: "lazy-simplifier",
+    sentinel: "SIMPLIFY_COMPLETE_US-NNN",
+  },
+  "code-review": {
+    skill: null,
+    agent: "story-reviewer",
+    sentinel: "REVIEW_COMPLETE_US-NNN",
+  },
+  "verification-and-validation": {
+    skill: "verification-and-validation",
+    agent: "general-purpose",
+    sentinel: "VERIFICATION_COMPLETE_US-NNN",
+  },
+};
+
+const GREEN_PHASES = new Set(["green", "refactored"]);
+const PASSING_VERDICTS = new Set(["PASS", "PASS_WITH_WARNINGS"]);
+
+function renderTemplate(template, story, op) {
+  let out = template.replaceAll("US-NNN", story);
+  if (op) out = out.replaceAll("Op-X", op);
+  return out;
+}
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const AUTOPILOT_STOP_RE = /AUTOPILOT_STOP_([A-Za-z0-9_]+)/;
+const INVEST_VERDICT_RE = /INVEST_VERDICT:\s*(PASS|RE-TIER (?:light|full)|SPLIT|FAIL[^\n<]*)/;
+
+// text may be bare ("SENTINEL") or wrapped ("<promise>SENTINEL</promise>");
+// a plain substring search handles both. The lookahead boundary keeps
+// "…_Op-1" from matching inside "…_Op-10".
+export function matchSentinel(text, stage, story, op) {
+  const stop = AUTOPILOT_STOP_RE.exec(text);
+  if (stop) return { stop: stop[1] };
+
+  if (stage === "invest") {
+    const m = INVEST_VERDICT_RE.exec(text);
+    return m ? m[1].trim() : null;
+  }
+
+  const entry = STAGES[stage];
+  if (!entry) return null;
+  const template = op == null && entry.sentinel_story_end ? entry.sentinel_story_end : entry.sentinel;
+  const rendered = renderTemplate(template, story, op);
+  const re = new RegExp(`${escapeRegExp(rendered)}(?![\\w-])`);
+  return re.test(text) ? rendered : null;
+}
+
+function stageResult(story, stage, op, rigor) {
+  const entry = STAGES[stage];
+  const template = op == null && entry.sentinel_story_end ? entry.sentinel_story_end : entry.sentinel;
+  return {
+    story,
+    stage,
+    op: op ?? null,
+    skill: entry.skill,
+    agent: entry.agent,
+    sentinel: renderTemplate(template, story, op),
+    rigor,
+    args: op == null ? story : `${story} ${op}`,
+  };
+}
+
+function opNum(opId) {
+  return parseInt(String(opId).slice(3), 10);
+}
+
+function sortOpIds(ids) {
+  return [...ids].sort((a, b) => opNum(a) - opNum(b));
+}
+
+// Op ids from PLAN.md's "### Operation N — …" headings, used when
+// state.json doesn't exist yet (the common case while phase is "planned").
+function planOpIds(dir) {
+  const planPath = dir && join(dir, "PLAN.md");
+  if (!planPath || !existsSync(planPath)) return [];
+  const text = readFileSync(planPath, "utf8");
+  return [...text.matchAll(/^### Operation (\d+)/gm)].map((m) => `Op-${m[1]}`);
+}
+
+function firstOpId(specs, story, dir) {
+  const st = readState(specs, story);
+  const ids = st?.operations ? Object.keys(st.operations) : planOpIds(dir);
+  return sortOpIds(ids)[0] ?? null;
+}
+
+function resolveScoped(story, s, rigor) {
+  const inv = s.invest ?? {};
+  const allTrue = Boolean(inv.i && inv.n && inv.v && inv.e && inv.s && inv.t && inv.checked_at);
+  return stageResult(story, allTrue ? "spec-writing" : "invest", null, rigor);
+}
+
+function resolveSpecced(story, dir, rigor) {
+  const auditPath = dir && join(dir, "verification", "spec-audit.md");
+  if (!auditPath || !existsSync(auditPath)) {
+    return stageResult(story, "spec-writing-verification", null, rigor);
+  }
+  return stageResult(story, "plan-writing", null, rigor);
+}
+
+function resolvePlanned(specs, story, dir, rigor) {
+  const auditPath = dir && join(dir, "verification", "plan-audit.md");
+  if (!auditPath || !existsSync(auditPath)) {
+    return stageResult(story, "plan-writing-verification", null, rigor);
+  }
+  const root = dirname(specs);
+  if (story === "US-000" && !existsSync(join(root, "package.json"))) {
+    return stageResult(story, "repo-initialization", null, rigor);
+  }
+  return stageResult(story, "test-setup", firstOpId(specs, story, dir), rigor);
+}
+
+function resolveRed(specs, story, rigor) {
+  const st = readState(specs, story);
+  if (!st) {
+    return {
+      stop: true,
+      reason: "spec_contradiction",
+      detail: `${story} is phase red but has no state.json`,
+    };
+  }
+  const ops = sortOpIds(Object.keys(st.operations ?? {})).map((id) => ({
+    id,
+    ...st.operations[id],
+  }));
+
+  if (rigor === "full") {
+    const needsAudit = ops.find(
+      (op) =>
+        GREEN_PHASES.has(op.operation_phase) && !PASSING_VERDICTS.has(op.green_audit?.verdict),
+    );
+    if (needsAudit) {
+      return stageResult(story, "spec-implementation-verification", needsAudit.id, rigor);
+    }
+  }
+
+  const cur = ops.find((op) => !GREEN_PHASES.has(op.operation_phase));
+  if (cur) {
+    return cur.operation_phase === "red"
+      ? stageResult(story, "spec-implementation", cur.id, rigor)
+      : stageResult(story, "test-setup", cur.id, rigor);
+  }
+
+  if (!st.quality_gates?.simplified) return stageResult(story, "simplify", null, rigor);
+  if (!st.quality_gates?.reviewed) return stageResult(story, "code-review", null, rigor);
+  return stageResult(story, "spec-implementation", null, rigor);
+}
+
+// Lowest-id story with id in (afterId, untilId], eligible to run next: not
+// backlog/verified, and every dependency is either the foundation story or
+// already verified (mirrors the dependency exemption in `preflight`).
+export function nextEligibleStory(stories, afterId, untilId) {
+  const afterNum = storyNum(afterId);
+  const untilNum = storyNum(untilId);
+  const eligible = (s) =>
+    storyNum(s.id) > afterNum &&
+    storyNum(s.id) <= untilNum &&
+    s.phase !== "backlog" &&
+    s.phase !== "verified" &&
+    (s.depends_on_story_ids ?? []).every((depId) => {
+      const dep = stories.find((d) => d.id === depId);
+      return dep?.is_foundation === true || dep?.phase === "verified";
+    });
+  const candidates = stories.filter(eligible).sort((a, b) => storyNum(a.id) - storyNum(b.id));
+  return candidates[0]?.id ?? null;
+}
+
+function resolveVerified(specs, ap, story, stories) {
+  if (story === ap.until) return { done: true, reason: "until_reached", story };
+  const storyEndPolicy = String(ap.stop_policy ?? "").includes("story-end");
+  if (
+    storyEndPolicy &&
+    ap.current?.stage === "verification-and-validation" &&
+    ap.current.story === story
+  ) {
+    return { done: true, reason: "story_end", story };
+  }
+  const next = nextEligibleStory(stories, story, ap.until);
+  return next ? resolveForStory(specs, ap, next) : { done: true, reason: "until_reached", story };
+}
+
+function resolveForStory(specs, ap, storyId) {
+  const data = readJson(join(specs, "stories.json"));
+  const stories = data.stories ?? [];
+  const s = stories.find((st) => st.id === storyId);
+  if (!s) {
+    return { stop: true, reason: "spec_contradiction", detail: `unknown story ${storyId}` };
+  }
+  const rigor = s.rigor ?? "full";
+  const dir = storyDir(specs, storyId);
+
+  switch (s.phase) {
+    case "verified":
+      return resolveVerified(specs, ap, storyId, stories);
+    case "scoped":
+      return resolveScoped(storyId, s, rigor);
+    case "specced":
+      return resolveSpecced(storyId, dir, rigor);
+    case "planned":
+      return resolvePlanned(specs, storyId, dir, rigor);
+    case "red":
+      return resolveRed(specs, storyId, rigor);
+    case "green":
+      return stageResult(storyId, "verification-and-validation", null, rigor);
+    case "backlog":
+      return {
+        stop: true,
+        reason: "spec_contradiction",
+        detail: `${storyId} is still in backlog (preflight should have caught this)`,
+      };
+    default:
+      return {
+        stop: true,
+        reason: "spec_contradiction",
+        detail: `${storyId} has unknown phase ${s.phase}`,
+      };
+  }
+}
+
+// ap is the parsed autopilot.json, or { target, until, stop_policy, current: null }
+// for a dry run. Pure: reads trackers, writes nothing.
+export function nextStage(specs, ap) {
+  const story = ap.current?.story ?? ap.target;
+  return resolveForStory(specs, ap, story);
+}
+
 // ---- CLI ---------------------------------------------------------------------
 
 // Local copies of ledger.mjs's parseArgs/findSpecsDir: `preflight` must print
@@ -289,9 +575,33 @@ export async function main(argv) {
       process.stdout.write(JSON.stringify(result, null, 2) + "\n");
       return result.ok ? 0 : 1;
     }
+    case "next": {
+      const specs = findSpecsDir(process.cwd(), opts.specs ?? process.env.LEDGER_SPECS);
+      let ap;
+      if (opts.story) {
+        // Dry run: ignore any on-disk autopilot.json entirely.
+        ap = {
+          target: opts.story,
+          until: opts.until ?? opts.story,
+          stop_policy: opts["stop-policy"] ?? DEFAULT_POLICY,
+          current: null,
+        };
+      } else {
+        ap = readAutopilot(specs);
+        if (!ap?.active) {
+          process.stderr.write(
+            "autopilot: no active run (specs/autopilot.json missing or active=false) — pass --story US-NNN for a dry run\n",
+          );
+          return 1;
+        }
+      }
+      process.stdout.write(JSON.stringify(nextStage(specs, ap), null, 2) + "\n");
+      return 0;
+    }
     default:
       process.stderr.write(
-        "usage: autopilot preflight US-NNN [--specs dir] [--until US-MMM] [--stop-policy p] [--skip-arch-check] [--force] [--ledger path]\n",
+        "usage: autopilot preflight US-NNN [--specs dir] [--until US-MMM] [--stop-policy p] [--skip-arch-check] [--force] [--ledger path]\n" +
+          "       autopilot next [--story US-NNN] [--until US-MMM] [--stop-policy p] [--specs dir]\n",
       );
       return 2;
   }

@@ -16,6 +16,9 @@ import { execFileSync, spawnSync } from "node:child_process";
 import {
   DEFAULT_POLICY,
   locateLedger,
+  matchSentinel,
+  nextEligibleStory,
+  nextStage,
   preflight,
   readJson,
   storyDir,
@@ -229,4 +232,330 @@ test("preflight names the new path (not the old, not a v1 arrow) when a tracked 
   assert.ok(err, `expected a working-tree-not-clean error, got ${JSON.stringify(result.errors)}`);
   assert.ok(err.includes("specs/PROJECT2.md"));
   assert.ok(!err.includes(" -> "));
+});
+
+// ---- next: the stage resolver ----------------------------------------------
+
+function dryRun(target, patch = {}) {
+  return { target, until: target, stop_policy: DEFAULT_POLICY, current: null, ...patch };
+}
+
+test("next: scoped story without INVEST → invest (invest-assessor)", () => {
+  const { specs } = fixtureProject();
+  const result = nextStage(specs, dryRun("US-000"));
+  assert.deepEqual(result, {
+    story: "US-000",
+    stage: "invest",
+    op: null,
+    skill: null,
+    agent: "invest-assessor",
+    sentinel: "INVEST_VERDICT: (PASS|RE-TIER (light|full)|SPLIT|FAIL .*)",
+    rigor: "full",
+    args: "US-000",
+  });
+});
+
+test("next: scoped story with INVEST all true → spec-writing", () => {
+  const { specs } = fixtureProject();
+  setStory(specs, "US-000", {
+    invest: { i: true, n: true, v: true, e: true, s: true, t: true, checked_at: "2026-09-05" },
+  });
+  const result = nextStage(specs, dryRun("US-000"));
+  assert.equal(result.stage, "spec-writing");
+  assert.equal(result.skill, "spec-writing");
+  assert.equal(result.agent, "general-purpose");
+  assert.equal(result.op, null);
+  assert.equal(result.args, "US-000");
+  assert.equal(result.sentinel, "SPEC_COMPLETE_US-000");
+});
+
+test("next: specced → spec-writing-verification until spec-audit.md exists, then plan-writing", () => {
+  const { specs } = fixtureProject();
+  setStory(specs, "US-000", { phase: "specced" });
+  const ap = dryRun("US-000");
+
+  const before = nextStage(specs, ap);
+  assert.equal(before.stage, "spec-writing-verification");
+  assert.equal(before.agent, "story-verifier");
+  assert.equal(before.sentinel, "SPEC_AUDIT_COMPLETE_US-000");
+
+  const dir = storyDir(specs, "US-000");
+  mkdirSync(join(dir, "verification"), { recursive: true });
+  writeFileSync(join(dir, "verification", "spec-audit.md"), "PASS\n");
+
+  const after = nextStage(specs, ap);
+  assert.equal(after.stage, "plan-writing");
+  assert.equal(after.sentinel, "PLAN_COMPLETE_US-000");
+});
+
+test("next: planned → plan-writing-verification, then repo-initialization for US-000 on an empty repo, then test-setup Op-1", () => {
+  const { root, specs } = fixtureProject();
+  setStory(specs, "US-000", { phase: "planned" });
+  const ap = dryRun("US-000");
+
+  const step1 = nextStage(specs, ap);
+  assert.equal(step1.stage, "plan-writing-verification");
+  assert.equal(step1.sentinel, "PLAN_AUDIT_COMPLETE_US-000");
+
+  const dir = storyDir(specs, "US-000");
+  mkdirSync(join(dir, "verification"), { recursive: true });
+  writeFileSync(join(dir, "verification", "plan-audit.md"), "PASS\n");
+
+  const step2 = nextStage(specs, ap);
+  assert.equal(step2.stage, "repo-initialization");
+  assert.equal(step2.op, null);
+  assert.equal(step2.sentinel, "REPO_INIT_COMPLETE");
+
+  writeFileSync(join(root, "package.json"), "{}\n");
+  const step3 = nextStage(specs, ap);
+  assert.equal(step3.stage, "test-setup");
+  assert.equal(step3.op, "Op-1");
+  assert.equal(step3.args, "US-000 Op-1");
+  assert.equal(step3.sentinel, "RED_COMPLETE_US-000_Op-1");
+});
+
+test("next: planned non-foundation story with package.json present → test-setup Op-1 from PLAN.md headings", () => {
+  const { root, specs } = fixtureProject();
+  writeFileSync(join(root, "package.json"), "{}\n");
+  setStory(specs, "US-001", { phase: "planned" });
+  const dir = storyDir(specs, "US-001");
+  mkdirSync(join(dir, "verification"), { recursive: true });
+  writeFileSync(join(dir, "verification", "plan-audit.md"), "PASS\n");
+  writeFileSync(join(dir, "PLAN.md"), "### Operation 1 — only\n");
+
+  const result = nextStage(specs, dryRun("US-001"));
+  assert.equal(result.stage, "test-setup");
+  assert.equal(result.op, "Op-1");
+  assert.equal(result.args, "US-001 Op-1");
+  assert.equal(result.sentinel, "RED_COMPLETE_US-001_Op-1");
+});
+
+test("next: red — cursor rules", () => {
+  const { specs } = fixtureProject();
+  setStory(specs, "US-001", { phase: "red" }); // light rigor
+  const ap = dryRun("US-001");
+
+  writeState(specs, "US-001", {
+    operations: {
+      "Op-1": { operation_phase: "red" },
+      "Op-2": { operation_phase: "pending" },
+    },
+  });
+  let result = nextStage(specs, ap);
+  assert.equal(result.stage, "spec-implementation");
+  assert.equal(result.op, "Op-1");
+  assert.equal(result.sentinel, "GREEN_COMPLETE_US-001_Op-1");
+
+  writeState(specs, "US-001", {
+    operations: {
+      "Op-1": { operation_phase: "green", green_audit: { verdict: "PASS" } },
+      "Op-2": { operation_phase: "pending" },
+    },
+  });
+  result = nextStage(specs, ap);
+  assert.equal(result.stage, "test-setup");
+  assert.equal(result.op, "Op-2");
+  assert.equal(result.sentinel, "RED_COMPLETE_US-001_Op-2");
+
+  writeState(specs, "US-001", {
+    operations: {
+      "Op-1": { operation_phase: "green" },
+      "Op-2": { operation_phase: "red_b" },
+    },
+  });
+  result = nextStage(specs, ap);
+  assert.equal(result.stage, "test-setup");
+  assert.equal(result.op, "Op-2");
+});
+
+test("next: red — full rigor audits the last GREEN'd op before moving on", () => {
+  const { specs } = fixtureProject();
+  setStory(specs, "US-000", { phase: "red" }); // full rigor
+  const ap = dryRun("US-000");
+
+  writeState(specs, "US-000", {
+    operations: {
+      "Op-1": { operation_phase: "green", green_audit: { verdict: null } },
+      "Op-2": { operation_phase: "pending" },
+    },
+  });
+  let result = nextStage(specs, ap);
+  assert.equal(result.stage, "spec-implementation-verification");
+  assert.equal(result.op, "Op-1");
+  assert.equal(result.sentinel, "GREEN_AUDIT_COMPLETE_US-000_Op-1");
+
+  writeState(specs, "US-000", {
+    operations: {
+      "Op-1": { operation_phase: "green", green_audit: { verdict: "PASS" } },
+      "Op-2": { operation_phase: "pending" },
+    },
+  });
+  result = nextStage(specs, ap);
+  assert.equal(result.stage, "test-setup");
+  assert.equal(result.op, "Op-2");
+});
+
+test("next: red — all ops green → simplify → code-review → spec-implementation story-end", () => {
+  const { specs } = fixtureProject();
+  setStory(specs, "US-001", { phase: "red" }); // light rigor, no audits required
+  const ap = dryRun("US-001");
+  const ops = {
+    "Op-1": { operation_phase: "green" },
+    "Op-2": { operation_phase: "refactored" },
+  };
+
+  writeState(specs, "US-001", { operations: ops });
+  let result = nextStage(specs, ap);
+  assert.equal(result.stage, "simplify");
+  assert.equal(result.op, null);
+  assert.equal(result.agent, "lazy-simplifier");
+  assert.equal(result.sentinel, "SIMPLIFY_COMPLETE_US-001");
+
+  writeState(specs, "US-001", { operations: ops, quality_gates: { simplified: true } });
+  result = nextStage(specs, ap);
+  assert.equal(result.stage, "code-review");
+  assert.equal(result.agent, "story-reviewer");
+  assert.equal(result.sentinel, "REVIEW_COMPLETE_US-001");
+
+  writeState(specs, "US-001", {
+    operations: ops,
+    quality_gates: { simplified: true, reviewed: true },
+  });
+  result = nextStage(specs, ap);
+  assert.equal(result.stage, "spec-implementation");
+  assert.equal(result.op, null);
+  assert.equal(result.sentinel, "IMPLEMENTATION_COMPLETE_US-001");
+});
+
+test("next: red without state.json → stop spec_contradiction", () => {
+  const { specs } = fixtureProject();
+  setStory(specs, "US-001", { phase: "red" });
+  const result = nextStage(specs, dryRun("US-001"));
+  assert.equal(result.stop, true);
+  assert.equal(result.reason, "spec_contradiction");
+  assert.match(result.detail, /state\.json/);
+});
+
+test("next: green → verification-and-validation", () => {
+  const { specs } = fixtureProject();
+  setStory(specs, "US-001", { phase: "green" });
+  const result = nextStage(specs, dryRun("US-001"));
+  assert.equal(result.stage, "verification-and-validation");
+  assert.equal(result.op, null);
+  assert.equal(result.agent, "general-purpose");
+  assert.equal(result.sentinel, "VERIFICATION_COMPLETE_US-001");
+});
+
+test("next: verified target with until=target → done until_reached", () => {
+  const { specs } = fixtureProject();
+  setStory(specs, "US-000", { phase: "verified" });
+  const result = nextStage(specs, dryRun("US-000"));
+  assert.deepEqual(result, { done: true, reason: "until_reached", story: "US-000" });
+});
+
+test("next: verified in this run under hard-failures+story-end → done story_end; under hard-failures → next eligible story's stage", () => {
+  const { specs } = fixtureProject();
+  setStory(specs, "US-000", { phase: "verified" });
+  const ap1 = dryRun("US-000", {
+    until: "US-002",
+    stop_policy: "hard-failures+story-end",
+    current: { story: "US-000", stage: "verification-and-validation" },
+  });
+  const result1 = nextStage(specs, ap1);
+  assert.deepEqual(result1, { done: true, reason: "story_end", story: "US-000" });
+
+  const ap2 = { ...ap1, stop_policy: "hard-failures" };
+  const result2 = nextStage(specs, ap2);
+  assert.equal(result2.story, "US-001");
+  assert.equal(result2.stage, "invest");
+});
+
+test("next: resume after story_end moves to the next eligible story (current null)", () => {
+  const { specs } = fixtureProject();
+  setStory(specs, "US-000", { phase: "verified" });
+  const ap = dryRun("US-000", {
+    until: "US-002",
+    stop_policy: "hard-failures+story-end",
+    current: null,
+  });
+  const result = nextStage(specs, ap);
+  assert.equal(result.story, "US-001");
+  assert.equal(result.stage, "invest");
+});
+
+test("nextEligibleStory skips stories with unverified deps and stops at until", () => {
+  const { specs } = fixtureProject();
+
+  const data = readJson(join(specs, "stories.json"));
+  assert.equal(nextEligibleStory(data.stories, "US-000", "US-001"), "US-001");
+  assert.equal(nextEligibleStory(data.stories, "US-000", "US-000"), null);
+
+  setStory(specs, "US-000", { phase: "verified" });
+  const data2 = readJson(join(specs, "stories.json"));
+  // US-002 depends on US-001, still "scoped" (not foundation) → skipped.
+  assert.equal(nextEligibleStory(data2.stories, "US-000", "US-002"), "US-001");
+
+  setStory(specs, "US-001", { phase: "verified" });
+  const data3 = readJson(join(specs, "stories.json"));
+  assert.equal(nextEligibleStory(data3.stories, "US-001", "US-002"), "US-002");
+});
+
+test("matchSentinel accepts bare and <promise>-wrapped sentinels, extracts INVEST verdicts and AUTOPILOT_STOP reasons", () => {
+  assert.equal(
+    matchSentinel("GREEN_COMPLETE_US-000_Op-1", "spec-implementation", "US-000", "Op-1"),
+    "GREEN_COMPLETE_US-000_Op-1",
+  );
+  assert.equal(
+    matchSentinel(
+      "<promise>GREEN_COMPLETE_US-000_Op-1</promise>",
+      "spec-implementation",
+      "US-000",
+      "Op-1",
+    ),
+    "GREEN_COMPLETE_US-000_Op-1",
+  );
+  // A trailing digit must not falsely match Op-1 as a prefix of Op-10.
+  assert.equal(
+    matchSentinel("GREEN_COMPLETE_US-000_Op-10", "spec-implementation", "US-000", "Op-1"),
+    null,
+  );
+  assert.equal(matchSentinel("nothing here", "spec-implementation", "US-000", "Op-1"), null);
+
+  assert.equal(matchSentinel("INVEST_VERDICT: PASS", "invest", "US-000", null), "PASS");
+  assert.equal(
+    matchSentinel("<promise>INVEST_VERDICT: RE-TIER light</promise>", "invest", "US-000", null),
+    "RE-TIER light",
+  );
+  assert.equal(
+    matchSentinel("INVEST_VERDICT: FAIL S: too big", "invest", "US-000", null),
+    "FAIL S: too big",
+  );
+
+  assert.deepEqual(
+    matchSentinel(
+      "<promise>AUTOPILOT_STOP_spec_contradiction</promise>",
+      "spec-writing",
+      "US-000",
+      null,
+    ),
+    { stop: "spec_contradiction" },
+  );
+  assert.deepEqual(matchSentinel("AUTOPILOT_STOP_verifier_fail", "invest", "US-000", null), {
+    stop: "verifier_fail",
+  });
+});
+
+test("CLI: next --story US-000 dry-runs without autopilot.json", () => {
+  const { specs } = fixtureProject();
+  const script = fileURLToPath(new URL("./autopilot.mjs", import.meta.url));
+  const r = spawnSync(
+    process.execPath,
+    [script, "next", "--story", "US-000", "--specs", specs],
+    { encoding: "utf8" },
+  );
+  assert.equal(r.status, 0, r.stderr);
+  const out = JSON.parse(r.stdout);
+  assert.equal(out.story, "US-000");
+  assert.equal(out.stage, "invest");
+  assert.equal(out.agent, "invest-assessor");
 });
