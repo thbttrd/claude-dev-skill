@@ -609,11 +609,22 @@ export function main(argv) {
         );
       return r.regressions.length || r.suspect_base.length ? 1 : 0;
     }
-    default:
-      process.stderr.write(
-        "usage: ledger <log|journal|backlog|failures|regress> [--specs dir] ...\n",
-      );
-      return 2;
+    default: {
+      const usage =
+        "usage: ledger <command> [--specs dir] ...\n" +
+        "  log      --kind <kind> --summary s [--story US-NNN] [--op Op-N] [--stage s] [--agent a] [--ref path]... [--sha h]\n" +
+        "           kind=gate also needs --gate g --verdict PASS|PASS_WITH_WARNINGS|FAIL [--report p]; kind=finding takes --backlog-id BL-NNN\n" +
+        `           kinds: ${KINDS.join("|")}\n` +
+        "  journal  [--story US-NNN] [--op Op-N] [--kind k] [--since YYYY-MM-DD] [--no-git] [--json]\n" +
+        "  backlog  add --title t --severity info|warning|error --kind k [--file p]... [--detail d] [--report p] [--gate g] [--stage s] [--story US-NNN] [--op Op-N]\n" +
+        "  backlog  [list] [--status s] [--severity s] [--story US-NNN] [--json]\n" +
+        "  backlog  resolve BL-NNN --sha h --resolution r | wontfix BL-NNN --reason r\n" +
+        `           backlog kinds: ${BACKLOG_KINDS.join("|")}\n` +
+        "  failures --runner vitest|cucumber|lines [--report-file p]   (reads stdin without --report-file)\n" +
+        '  regress  --base sha --runner vitest|cucumber --cmd "<suite command>" --report-file p [--json]\n';
+      (opts.help ? process.stdout : process.stderr).write(usage);
+      return opts.help ? 0 : 2;
+    }
   }
 }
 

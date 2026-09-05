@@ -1,6 +1,6 @@
 ---
 name: test-setup-verification
-version: 3.2.1
+version: 3.2.2
 description: >
   Per-Operation verification of /test-setup output for completeness, RED-state
   compliance, and Test Plan traceability. Spawns a fresh agent to audit ONE

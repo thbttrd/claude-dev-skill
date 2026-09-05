@@ -39,6 +39,7 @@ Autopilot is active when `specs/autopilot.json` exists with `"active": true`, or
    - `split_required` — a story needs splitting (INVEST `S`, or > 6 Operations).
 4. **Sentinels stay.** Emit this skill's existing `<promise>…COMPLETE…</promise>` on success exactly as documented in the skill.
 5. **Retries are explicit.** Log every retry (`--kind action --summary "retry N/2: <what>"`).
+6. **Stages finish synchronously.** Never start a tool call with `run_in_background`, and never end a reply while a command you started is still running: a reply without the sentinel is a failed stage, and the retry then runs alongside whatever you left behind, on the same working tree. A lane that cannot fit the tool timeout is narrowed (`--name` on this Op's scenarios, one lane at a time), never backgrounded — journal the narrowing as a decision.
 
 ## 3. Journaling (always, autopilot or not)
 
@@ -55,6 +56,8 @@ Autopilot is active when `specs/autopilot.json` exists with `"active": true`, or
 
 `--story`, `--op`, `--stage` default from `specs/autopilot.json.current` when active; pass them explicitly otherwise. Keep `state.json.decisions[]` writes where the skill already makes them — they are the per-story view; the journal is the project view.
 
+**Commit, then journal — never amend.** The `commit` journal line lands after the commit it records, so a trailing uncommitted `journal.jsonl` line is the normal state at the end of every stage; the next commit sweeps it in. Never `git commit --amend` a commit that has already been journaled — the journal would point at a sha no branch reaches. When `/repo-initialization` installed the post-commit hook (`grep -q ledger .git/hooks/post-commit`), skip the manual `commit` line: the hook already wrote it.
+
 ## 4. Toolchain resolution (always)
 
 Skills write commands as placeholders. Resolve them once per invocation from the project's `package.json`:
@@ -66,15 +69,17 @@ Skills write commands as placeholders. Resolve them once per invocation from the
 | `<LINT>`    | `lint`                | story-end gates, V&V (skip with a journaled decision if absent) |
 | `<TYPES>`   | `typecheck`           | same                                                            |
 | `<DEV>`     | `dev`                 | V&V                                                             |
-| `<E2E>`     | `e2e`                 | V&V (optional)                                                  |
+| `<E2E>`     | `e2e`                 | V&V; the GREEN self-review and green audit of any Op that touches the UI module (see below) |
 
 Run through the package manager the lockfile implies: `bun.lock`/`bun.lockb` → `bun run <script>`, `pnpm-lock.yaml` → `pnpm <script>`, `yarn.lock` → `yarn <script>`, otherwise `npm run <script> --`. Extra args go after `--` for npm.
 
 **Op filtering.** Never edit `specs/**/*.feature` to add tags.
 
 - BDD: if the story's feature files already carry `@Op-X` tags → `<BDD> --tags "@US-NNN and @Op-X"`. Otherwise select by name from the Operation's `Covers scenarios:` line in PLAN.md: `<BDD> --name "^(<scenario 1>|<scenario 2>)$"` (regex-escape the names).
-- BDD story-wide: `<BDD> --tags "@US-NNN"` if the feature files carry the tag (`/spec-writing` always adds it at feature level). If they don't (e.g. a repo onboarded via `/migrate-specs`), select by path instead — the story's features all live in one directory: `<BDD> specs/story-NNN-slug/features/`. Never rely on a tag filter you haven't confirmed selects > 0 scenarios: a tag matching nothing exits 0 and passes vacuously.
-- Unit/integration: tests are named `@US-NNN @Op-X …` by `/test-setup`, so `<TEST> -t "@US-NNN.*@Op-X"` (Vitest/Jest `-t`); story-wide: `-t "@US-NNN"`.
+- BDD story-wide: `<BDD> --tags "@US-NNN"` if the feature files carry the tag (`/spec-writing` always adds it at feature level). If they don't (e.g. a repo onboarded via `/migrate-specs`), select by path instead — the story's features all live in one directory: `<BDD> specs/story-NNN-slug/features/`. If the story owns no `features/` directory either (its scenarios were routed to another story's feature file — `stories.json artifacts.feature_files` is empty), select by name: `<BDD> --name "^(<every scenario from every Op's Covers scenarios line, regex-escaped, joined with |>)$"`. Never rely on a tag filter you haven't confirmed selects > 0 scenarios: a tag matching nothing exits 0 and passes vacuously.
+- Unit/integration: tests are named `@US-NNN @Op-X …` by `/test-setup`, so `<TEST> -t "@US-NNN.*@Op-X"` (Vitest/Jest `-t`); story-wide: `-t "@US-NNN"`. The same rule as BDD applies — never rely on a `-t` filter you haven't confirmed selects > 0 tests (a filter matching nothing exits 0). Suites written before the tags existed (v1 `/test-setup`, `/migrate-specs`): run the RED-B files PLAN.md's Operation names by path — `<TEST> <file>…` — and story-wide, every file the story's Test Plan rows name.
+- UI Operations also run `<E2E>`: when PLAN.md's Structure assigns a file the Op changed to the UI module (or the Op names a `UI spec`), the GREEN self-review and the green audit run `<E2E>` in addition to `<TEST>`/`<BDD>`, when `package.json` defines it. A verified story's e2e spec asserting rendered text is the only lane that sees a text-node regression.
+- Leftover servers: when a lane starts a dev/preview server that must be killed afterwards, anchor the pattern to the end of the command line — `pkill -f 'entry\.mjs$'`. A bare `pkill -f 'dist/server/entry.mjs'` also matches the tool shell that is running the `pkill`, and kills the stage (exit 144).
 - `manual` Test Plan rows are never run by `<TEST>`/`<BDD>`; only `/verification-and-validation` walks them.
 
 **Regression baseline.** The unfiltered suite may be permanently red (RED scaffolds of unstarted stories). "No regression" therefore means: no test fails in the working tree that passed at the base commit. Compute it, never eyeball it:
@@ -85,6 +90,8 @@ RPT=$(mktemp) && node "$LEDGER" regress --base <sha> --runner cucumber --cmd "<B
 ```
 
 (`mktemp`, not a fixed `/tmp` path — concurrent sessions on one machine must not read each other's reports.)
+
+**Lanes.** The baseline is the default `<TEST>` and `<BDD>` lanes exactly as `package.json` defines them. A lane gated by an environment variable (a full-dataset or slow lane that skips itself unless `SOME_VAR` is set) is part of the baseline only when that variable is set in the shell the run started from; a failure — including a suspect base failure — in a lane that is not part of the baseline is a `warning` backlog item (`--kind test-gap`), not the `regression` stop.
 
 `<sha>` is `HEAD` before committing an Op's GREEN (working tree vs last commit), or the story's `BASE_SHA` (parent of its first `test(US-NNN):` commit) at story-end. Exit code 1 = regressions or suspect base failures; each id is printed. A **suspect base failure** is a base-commit failure belonging to a story already `verified` in `specs/stories.json`: that is broken-verified red, not grandfatherable scaffold-RED — under autopilot it is the `regression` hard stop; outside autopilot, fix it before trusting the baseline.
 
