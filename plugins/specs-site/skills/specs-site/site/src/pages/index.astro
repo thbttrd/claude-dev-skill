@@ -1,0 +1,6 @@
+---
+import Base from "../layouts/Base.astro";
+import { readStories } from "../lib/specs.mjs";
+const { data } = readStories();
+---
+<Base title="Dashboard"><h1>{data.project.name}</h1><p class="muted">{data.stories.length} stories</p></Base>
