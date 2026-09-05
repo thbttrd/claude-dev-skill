@@ -3,7 +3,9 @@
 // Node >= 20, stdlib only. Delegates journal/backlog/regress bookkeeping to
 // the sibling dev-ledger plugin's ledger.mjs (located, never vendored).
 import {
+  appendFileSync,
   existsSync,
+  mkdirSync,
   readFileSync,
   readdirSync,
   realpathSync,
@@ -233,6 +235,12 @@ export function preflight(specs, opts = {}) {
   if (opts.skip_arch_check)
     warnings.push("--skip-arch-check used: skipping the /research-and-architecture check");
   if (opts.force) warnings.push("--force used: taking over any active run");
+  const storyMd = story ? join(storyDir(specs, target) ?? "", "STORY.md") : null;
+  if (storyMd && existsSync(storyMd) && /\bTODO\b/.test(readFileSync(storyMd, "utf8"))) {
+    warnings.push(
+      `${target}: STORY.md still carries TODO markers (migrated stub) — the spec/plan audits will run against it; run /spec-writing ${target} to formalise it first`,
+    );
+  }
 
   return { ok: true, target, until, stop_policy, warnings };
 }
@@ -460,7 +468,9 @@ function resolveRed(specs, story, rigor) {
   if (rigor === "full") {
     const needsAudit = ops.find(
       (op) =>
-        GREEN_PHASES.has(op.operation_phase) && !PASSING_VERDICTS.has(op.green_audit?.verdict),
+        GREEN_PHASES.has(op.operation_phase) &&
+        op.confirm_only !== true && // green at base, no production diff: nothing to audit per Op
+        !PASSING_VERDICTS.has(op.green_audit?.verdict),
     );
     if (needsAudit) {
       return stageResult(story, "spec-implementation-verification", needsAudit.id, rigor);
@@ -589,6 +599,35 @@ function stageArgs(story, op) {
 
 const todayStr = (now) => now.toISOString().slice(0, 10);
 
+function gitOut(root, args) {
+  const r = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+  return r.status === 0 ? r.stdout.trim() : null;
+}
+
+// specs/autopilot.json is per-machine run state. Keep it out of `git status`
+// through the repo-local exclude file, not the tracked .gitignore — editing
+// .gitignore would dirty the tree start() just checked was clean.
+function excludeAutopilotJson(root) {
+  const rel = gitOut(root, ["rev-parse", "--git-path", "info/exclude"]);
+  if (!rel) return false;
+  const p = resolve(root, rel);
+  const text = existsSync(p) ? readFileSync(p, "utf8") : "";
+  if (text.split("\n").includes("specs/autopilot.json")) return false;
+  mkdirSync(dirname(p), { recursive: true });
+  appendFileSync(p, `${text && !text.endsWith("\n") ? "\n" : ""}specs/autopilot.json\n`);
+  return true;
+}
+
+// The story's diff base for the simplify / code-review gates: HEAD when a run
+// first picks the story up, recorded once and carried across resumes so a
+// later run never moves the base past the story's own commits.
+function recordBaseSha(specs, ap, story) {
+  ap.base_sha ??= {};
+  if (ap.base_sha[story]) return;
+  const sha = gitOut(dirname(specs), ["rev-parse", "HEAD"]);
+  if (sha) ap.base_sha[story] = sha;
+}
+
 // The invest-assessor agent only emits a verdict word (PASS / RE-TIER tier);
 // unlike the skill-driven stages, which write their own tracker state,
 // autopilot has to turn that verdict into the stories.json write itself.
@@ -624,12 +663,14 @@ export async function start(specs, opts, deps = {}) {
     until: pf.until,
     stop_policy: pf.stop_policy,
     skip_arch_check: Boolean(opts.skip_arch_check),
+    base_sha: { ...(prevAp?.base_sha ?? {}) },
     current: null,
     last_next: null,
     started_at: now.toISOString(),
     stopped_at: null,
     stop_reason: null,
   };
+  recordBaseSha(specs, ap, pf.target);
   writeJson(autopilotPath(specs), ap);
 
   ledger.log(
@@ -675,7 +716,22 @@ export async function start(specs, opts, deps = {}) {
     );
   }
 
-  return ap;
+  if (excludeAutopilotJson(dirname(specs))) {
+    ledger.log(
+      specs,
+      {
+        kind: "action",
+        summary: "added specs/autopilot.json to .git/info/exclude (local run state, never committed)",
+        run_id: ap.run_id,
+        story: ap.target,
+        op: null,
+        stage: "autopilot",
+      },
+      now,
+    );
+  }
+
+  return { ...ap, warnings: pf.warnings };
 }
 
 export async function stageStart(specs, opts, deps = {}) {
@@ -845,6 +901,7 @@ export async function stageEnd(specs, opts, deps = {}) {
     }
   }
 
+  if (!next.done && !next.stop && next.story !== current.story) recordBaseSha(specs, ap, next.story);
   writeJson(autopilotPath(specs), ap);
   return { action: "continue", next };
 }
@@ -853,6 +910,10 @@ export async function stop(specs, opts, deps = {}) {
   const ledger = deps.ledger ?? (await defaultLedger(opts.ledger));
   const now = deps.now ?? new Date();
   const ap = readAutopilot(specs) ?? {};
+  // A stage agent that hard-stops per contract §2.3 has already written
+  // stop_reason and journaled the stop; the conductor's stage-end must not
+  // record the same stop a second time.
+  const alreadyJournaled = opts.reason != null && ap.stop_reason === opts.reason;
 
   if (ap.active === true) {
     ap.active = false;
@@ -861,18 +922,20 @@ export async function stop(specs, opts, deps = {}) {
     writeJson(autopilotPath(specs), ap);
   }
 
-  ledger.log(
-    specs,
-    {
-      kind: "stop",
-      summary: opts.summary ? `${opts.reason}: ${opts.summary}` : String(opts.reason),
-      run_id: ap.run_id ?? null,
-      story: ap.current?.story ?? null,
-      op: ap.current?.op ?? null,
-      stage: ap.current?.stage ?? null,
-    },
-    now,
-  );
+  if (!alreadyJournaled) {
+    ledger.log(
+      specs,
+      {
+        kind: "stop",
+        summary: opts.summary ? `${opts.reason}: ${opts.summary}` : String(opts.reason),
+        run_id: ap.run_id ?? null,
+        story: ap.current?.story ?? ap.target ?? null,
+        op: ap.current?.op ?? null,
+        stage: ap.current?.stage ?? "autopilot",
+      },
+      now,
+    );
+  }
 
   return report(specs, { run_id: ap.run_id ?? null }, { ledger, now });
 }
@@ -885,7 +948,11 @@ function renderReportText({ run_id, target, until, stop_reason, stages, gates, b
       "",
       block(
         "stages",
-        stages.map((s) => `  ${stageArgs(s.story, s.op)} ${s.stage} — ${s.outcome}`),
+        stages.map((s) =>
+          s.outcome === "stop"
+            ? `  ${s.stage == null || s.stage === "autopilot" ? "run" : `${stageArgs(s.story, s.op)} ${s.stage}`} — stop (${s.reason})`
+            : `  ${stageArgs(s.story, s.op)} ${s.stage} — ok`,
+        ),
       ),
       "",
       block(
@@ -926,18 +993,27 @@ export async function report(specs, opts, deps = {}) {
   const ap = readAutopilot(specs);
   const matchesRun = ap?.run_id === run_id;
 
-  const stages = entries
-    .filter((e) => e.kind === "stage_end" || e.kind === "stop")
-    .map((e) => ({
-      stage: e.stage,
-      story: e.story,
-      op: e.op,
-      outcome: e.kind === "stage_end" ? "ok" : "stop",
-    }));
+  const stopReason = (e) => (e.summary ?? "").split(":")[0].trim() || "?";
+  const seenStages = new Set();
+  const stages = [];
+  for (const e of entries) {
+    if (e.kind !== "stage_end" && e.kind !== "stop") continue;
+    const s = { stage: e.stage, story: e.story, op: e.op, outcome: e.kind === "stage_end" ? "ok" : "stop" };
+    if (e.kind === "stop") s.reason = stopReason(e);
+    const key = [s.story, s.op, s.stage, s.outcome].join("|");
+    if (seenStages.has(key)) continue; // the same stage journaled twice (two agents, or agent + conductor) is one line
+    seenStages.add(key);
+    stages.push(s);
+  }
 
-  const gates = entries
-    .filter((e) => e.kind === "gate")
-    .map((e) => ({ gate: e.gate, verdict: e.verdict, story: e.story, op: e.op, report: e.report ?? null }));
+  // One line per gate: the last verdict wins, first appearance keeps its place.
+  const gateByKey = new Map();
+  for (const e of entries.filter((e) => e.kind === "gate")) {
+    gateByKey.set([e.story, e.op, e.gate].join("|"), {
+      gate: e.gate, verdict: e.verdict, story: e.story, op: e.op, report: e.report ?? null,
+    });
+  }
+  const gates = [...gateByKey.values()];
 
   const backlog_ids = entries.filter((e) => e.kind === "finding" && e.backlog_id).map((e) => e.backlog_id);
 
@@ -963,12 +1039,18 @@ export async function report(specs, opts, deps = {}) {
     }
   }
 
-  const seen = new Set();
-  const commits = [];
-  for (const c of [...journaledCommits, ...gitCommits]) {
-    if (!c.sha || seen.has(c.sha)) continue;
-    seen.add(c.sha);
-    commits.push(c);
+  // git's own order first (newest first, as `git log` prints); journaled
+  // shas HEAD no longer reaches (an --amend after journaling) come last,
+  // marked. `rev-parse --verify` is not enough: a dangling pre-amend commit
+  // still exists in the object store until gc — ancestry of HEAD is the test.
+  const root = dirname(specs);
+  const reachable = (sha) =>
+    spawnSync("git", ["merge-base", "--is-ancestor", sha, "HEAD"], { cwd: root, stdio: "ignore" }).status === 0;
+  const sameSha = (a, b) => a.startsWith(b) || b.startsWith(a);
+  const commits = [...gitCommits];
+  for (const c of journaledCommits) {
+    if (!c.sha || commits.some((k) => sameSha(k.sha, c.sha))) continue;
+    commits.push(reachable(c.sha) ? c : { ...c, summary: `${c.summary} (unreachable)`, unreachable: true });
   }
 
   const result = {

@@ -1,6 +1,6 @@
 ---
 name: spec-implementation-verification
-version: 1.2.1
+version: 1.3.0
 description: >
   Per-Operation verification of /spec-implementation output for GREEN-state
   compliance, no over-implementation, architecture alignment, and zero
@@ -113,6 +113,11 @@ Commands resolve per `references/autopilot-contract.md` §4.
    - $REFACTOR_SHA = SHA of Op-X's refactor() commit (or $GREEN_SHA if absent)
    Use `git diff $RED_SHA..$REFACTOR_SHA` to see exactly the production-code
    files Op-X added or modified.
+   If state.operations[Op-X].confirm_only = true there is no feat() commit
+   and the diff range is empty by design: audit the journaled
+   regression-baseline run (specs/journal.jsonl, kind decision
+   "Op-X confirm-only") and the Test Plan rows instead, and do NOT report
+   the missing RED phase as a warning.
 6. specs/story-NNN-slug/state.json — read state.operations[Op-X].
 7. specs/stories.json — find the entry where id = "US-NNN".
 
@@ -125,6 +130,12 @@ Run the test suites:
 Then run the per-story suite (covers earlier Ops):
 - `<TEST> -t "@US-NNN"` → expect: every test PASSES (no regression in earlier Ops)
 - `<BDD>` (story filter) → expect: every test PASSES
+
+If Op-X touched the UI module (PLAN.md Structure) and package.json defines
+`e2e` (contract §4):
+- `<E2E>` → expect: every spec of stories already `verified` PASSES. A
+  rendered-text regression there is a critical issue even when the unit and
+  BDD lanes are green.
 
 Any test failure at this stage is a critical issue.
 
@@ -220,6 +231,7 @@ FAIL = critical issues that must be fixed before moving on
 | bdd   | @US-NNN and @Op-X                   | N         | N      | 0      |
 | unit  | @US-NNN  (full per-story)           | N         | N      | 0      |
 | bdd   | @US-NNN  (full per-story)           | N         | N      | 0      |
+| e2e   | (UI Ops only)                       | N         | N      | 0      |
 
 (Expected: 100% passing across all four lines.)
 
@@ -237,10 +249,11 @@ FAIL = critical issues that must be fixed before moving on
 
 ## Next Step
 
-[Either "Ready for /spec-implementation US-NNN (next op)" if Op-X isn't the
- last, or "Ready for /spec-implementation US-NNN (story-end gates)" if it is,
- or "Fix [N] critical issues first, then re-run /spec-implementation-verification
- US-NNN Op-X"]
+[Derived from state.json, not from habit: the next Op in id order whose
+ operation_phase is red → "Ready for /spec-implementation US-NNN Op-N";
+ pending → "Ready for /test-setup US-NNN Op-N"; none left → "Ready for
+ /spec-implementation US-NNN (story-end gates)"; or "Fix [N] critical
+ issues first, then re-run /spec-implementation-verification US-NNN Op-X"]
 
 ---
 ```

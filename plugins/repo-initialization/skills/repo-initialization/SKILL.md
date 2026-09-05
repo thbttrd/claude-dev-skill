@@ -1,6 +1,6 @@
 ---
 name: repo-initialization
-version: 2.2.1
+version: 2.2.2
 description: >
   Scaffolds a new project repository from `specs/ARCHITECTURE.md`,
   `specs/PROJECT.md`, and the Foundation Story

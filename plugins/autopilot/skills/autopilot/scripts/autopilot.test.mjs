@@ -9,7 +9,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -59,6 +59,12 @@ export function writeState(specs, id, state) {
   const dir = storyDir(specs, id);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "state.json"), JSON.stringify(state, null, 2) + "\n");
+}
+
+export function commitPaths(root, msg, paths) {
+  execFileSync("git", ["add", "--", ...paths], { cwd: root, stdio: "pipe" });
+  execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", msg], { cwd: root, stdio: "pipe" });
+  return execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
 }
 
 test("locateLedger falls back to the in-repo sibling and honours the override", () => {
@@ -656,20 +662,24 @@ test("start writes autopilot.json and journals the start (plus decisions for --f
   const now = new Date("2026-09-05T10:00:00.000Z");
 
   const ap = await start(specs, { target: "US-000" }, { ledger, now });
-  assert.deepEqual(ap, {
+  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: dirname(specs), encoding: "utf8" }).trim();
+  const { warnings, ...onDisk } = ap;
+  assert.deepEqual(warnings, []);
+  assert.deepEqual(onDisk, {
     active: true,
     run_id: `run-${now.toISOString()}`,
     target: "US-000",
     until: "US-000",
     stop_policy: DEFAULT_POLICY,
     skip_arch_check: false,
+    base_sha: { "US-000": head },
     current: null,
     last_next: null,
     started_at: now.toISOString(),
     stopped_at: null,
     stop_reason: null,
   });
-  assert.deepEqual(readAutopilot(specs), ap);
+  assert.deepEqual(readAutopilot(specs), onDisk);
 
   const journal1 = ledger.readJournal(specs);
   const startEntry = journal1.find((e) => e.kind === "action" && e.run_id === ap.run_id);
@@ -1048,4 +1058,149 @@ test("CLI: start → stage-start → stage-end → stop round-trips through main
   const ap = readAutopilot(specs);
   assert.equal(ap.active, false);
   assert.equal(ap.stop_reason, "test_done");
+});
+
+test("stop before any stage journals story=target, stage=autopilot; report renders it as 'run — stop (<reason>)'", async () => {
+  const { specs } = fixtureProject();
+  const now = new Date("2026-09-05T10:00:00.000Z");
+  const ap = await start(specs, { target: "US-000" }, { ledger, now });
+  const rep = await stop(specs, { reason: "spec_contradiction", summary: "no operations map" }, { ledger, now });
+  const entry = ledger.readJournal(specs).find((e) => e.kind === "stop" && e.run_id === ap.run_id);
+  assert.equal(entry.story, "US-000");
+  assert.equal(entry.stage, "autopilot");
+  assert.equal(rep.stages[0].reason, "spec_contradiction");
+  assert.match(rep.text, /run — stop \(spec_contradiction\)/);
+  assert.doesNotMatch(rep.text, /null null/);
+});
+
+test("stop skips its journal line when the stage agent already recorded the same stop_reason (contract §2.3)", async () => {
+  const { specs } = fixtureProject();
+  const now = new Date("2026-09-05T10:00:00.000Z");
+  const ap = await start(specs, { target: "US-000" }, { ledger, now });
+  await stageStart(
+    specs,
+    { story: "US-000", stage: "spec-writing-verification", agent: "story-verifier" },
+    { ledger, now },
+  );
+  // What story-verifier does on FAIL: stop_reason into autopilot.json (active untouched) + one journal stop line.
+  writeJson(join(specs, "autopilot.json"), { ...readAutopilot(specs), stop_reason: "verifier_fail" });
+  ledger.log(
+    specs,
+    { kind: "stop", summary: "verifier_fail: scenario X contradicts rule R2", run_id: ap.run_id, story: "US-000", stage: "spec-writing-verification" },
+    now,
+  );
+
+  const result = await stageEnd(specs, { outcome: "stop", reason: "verifier_fail" }, { ledger, now });
+  assert.deepEqual(result, { action: "stop", reason: "verifier_fail" });
+  const after = readAutopilot(specs);
+  assert.equal(after.active, false);
+  assert.equal(after.stop_reason, "verifier_fail");
+  const stops = ledger.readJournal(specs).filter((e) => e.kind === "stop" && e.run_id === ap.run_id);
+  assert.equal(stops.length, 1);
+  assert.match(stops[0].summary, /contradicts rule R2/);
+});
+
+test("report dedupes duplicate gate and stop lines, keeps git order and marks unreachable journaled shas", async () => {
+  const { specs, root } = fixtureProject();
+  const now = new Date(Date.now() - 5000); // the run started 5 s ago: a commit made now is inside --since
+  const ap = await start(specs, { target: "US-000" }, { ledger, now });
+  const gate = { kind: "gate", gate: "self-review", verdict: "PASS", summary: "4/4", run_id: ap.run_id, story: "US-000", op: "Op-7", stage: "spec-implementation" };
+  ledger.log(specs, gate, now);
+  ledger.log(specs, { ...gate, verdict: "PASS_WITH_WARNINGS", summary: "3/4" }, now);
+  writeFileSync(join(root, "note.txt"), "x\n");
+  const real = commitPaths(root, "feat(US-000): real", ["note.txt"]);
+  // A journaled sha that an --amend left dangling: the object still exists, no branch reaches it.
+  writeFileSync(join(root, "orphan.txt"), "y\n");
+  const orphan = commitPaths(root, "chore: amended away", ["orphan.txt"]);
+  execFileSync("git", ["reset", "-q", "--hard", real], { cwd: root, stdio: "pipe" });
+  ledger.log(specs, { kind: "commit", sha: orphan, summary: "chore: amended away", run_id: ap.run_id, story: "US-000" }, now);
+
+  await stop(specs, { reason: "verifier_fail", summary: "C1" }, { ledger, now: new Date() });
+  await stop(specs, { reason: "verifier_fail" }, { ledger, now: new Date() }); // a second stop with the same reason journals nothing
+
+  const rep = await report(specs, { run_id: ap.run_id }, { ledger });
+  assert.equal(rep.gates.length, 1);
+  assert.equal(rep.gates[0].verdict, "PASS_WITH_WARNINGS", "last verdict wins");
+  assert.equal(rep.stages.filter((s) => s.outcome === "stop").length, 1);
+  assert.match(rep.text, /run — stop \(verifier_fail\)/);
+  assert.equal(rep.commits[0].sha, real);
+  const dead = rep.commits.find((c) => c.sha === orphan);
+  assert.equal(dead.unreachable, true);
+  assert.match(dead.summary, /\(unreachable\)$/);
+  assert.ok(rep.text.includes(`${orphan} chore: amended away (unreachable)`), rep.text);
+});
+
+test("start excludes specs/autopilot.json via .git/info/exclude exactly once and carries base_sha across runs", async () => {
+  const { specs, root } = fixtureProject();
+  const now = new Date("2026-09-05T10:00:00.000Z");
+  const excludePath = join(root, ".git", "info", "exclude");
+  const countExclude = () => readFileSync(excludePath, "utf8").split("\n").filter((l) => l === "specs/autopilot.json").length;
+
+  const ap1 = await start(specs, { target: "US-000" }, { ledger, now });
+  const head1 = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  assert.equal(ap1.base_sha["US-000"], head1);
+  assert.equal(countExclude(), 1);
+  const status = execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" });
+  assert.equal(status.includes("autopilot.json"), false, status);
+
+  await stop(specs, { reason: "user_stop" }, { ledger, now });
+  writeFileSync(join(root, "later.txt"), "x\n");
+  commitPaths(root, "feat(US-000): later", ["later.txt", "specs/journal.jsonl"]);
+
+  const ap2 = await start(specs, { target: "US-000" }, { ledger, now: new Date("2026-09-05T11:00:00.000Z") });
+  assert.equal(ap2.base_sha["US-000"], head1, "base_sha must not move on resume");
+  assert.equal(countExclude(), 1);
+  const excludeActions = ledger.readJournal(specs).filter((e) => e.kind === "action" && /info\/exclude/.test(e.summary));
+  assert.equal(excludeActions.length, 1);
+});
+
+test("start returns preflight warnings alongside the run file", async () => {
+  const { specs } = fixtureProject();
+  const now = new Date("2026-09-05T10:00:00.000Z");
+  const ap = await start(specs, { target: "US-000", skip_arch_check: true }, { ledger, now });
+  assert.ok(ap.warnings.some((w) => /skip-arch-check/.test(w)), JSON.stringify(ap.warnings));
+  assert.equal("warnings" in readAutopilot(specs), false);
+});
+
+test("stageEnd records base_sha for the next story when the chain moves on", async () => {
+  const { specs, root } = fixtureProject();
+  const now = new Date("2026-09-05T10:00:00.000Z");
+  await start(specs, { target: "US-000", until: "US-002", stop_policy: "hard-failures" }, { ledger, now });
+  await stageStart(
+    specs,
+    { story: "US-000", stage: "verification-and-validation", agent: "general-purpose" },
+    { ledger, now },
+  );
+  setStory(specs, "US-000", { phase: "verified" });
+  const result = await stageEnd(specs, { outcome: "sentinel" }, { ledger, now });
+  assert.equal(result.action, "continue");
+  assert.equal(result.next.story, "US-001");
+  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  assert.deepEqual(readAutopilot(specs).base_sha, { "US-000": head, "US-001": head });
+});
+
+test("preflight warns when the target's STORY.md is a migrated TODO stub", () => {
+  const { specs, root } = fixtureProject();
+  const dir = storyDir(specs, "US-000");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "STORY.md"), "# US-000\n\n> As a **TODO — not formalised in v1**,\n");
+  commitPaths(root, "chore: stub STORY.md", ["specs"]);
+  const pf = preflight(specs, { target: "US-000" });
+  assert.equal(pf.ok, true, JSON.stringify(pf));
+  assert.ok(pf.warnings.some((w) => /TODO/.test(w)), pf.warnings.join("\n"));
+});
+
+test("next: red — full rigor skips the per-Op audit for a confirm-only Op (no production diff to audit)", () => {
+  const { specs } = fixtureProject();
+  setStory(specs, "US-000", { phase: "red", rigor: "full" });
+  writeState(specs, "US-000", {
+    schema_version: 2,
+    operations: {
+      "Op-1": { operation_phase: "green", confirm_only: true },
+      "Op-2": { operation_phase: "red" },
+    },
+  });
+  const result = nextStage(specs, dryRun("US-000"));
+  assert.equal(result.stage, "spec-implementation");
+  assert.equal(result.op, "Op-2");
 });

@@ -730,3 +730,12 @@ test("CLI entry works when invoked through a symlink", () => {
   const journal = readFileSync(join(specs, "journal.jsonl"), "utf8");
   assert.match(journal, /"summary":"via symlink"/);
 });
+
+test("CLI: --help prints per-command usage on stdout and exits 0", () => {
+  const cli = fileURLToPath(new URL("./ledger.mjs", import.meta.url));
+  const r = spawnSync(process.execPath, [cli, "--help"], { encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /regress\s+--base/);
+  assert.match(r.stdout, /backlog\s+add --title/);
+  assert.match(r.stdout, /log\s+--kind/);
+});

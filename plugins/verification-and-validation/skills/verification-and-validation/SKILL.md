@@ -1,6 +1,6 @@
 ---
 name: verification-and-validation
-version: 2.1.1
+version: 2.1.2
 description: >
   Per-story end-to-end verification of a completed implementation. Runs the
   full automated test suite, starts the application, exercises every API

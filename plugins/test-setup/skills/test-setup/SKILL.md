@@ -1,6 +1,6 @@
 ---
 name: test-setup
-version: 3.2.2
+version: 3.3.0
 description: >
   Per-Operation RED-phase scaffolder. For ONE Operation of ONE story (US-NNN
   Op-X) at a time, writes the BDD step definitions and unit/integration tests
@@ -42,7 +42,7 @@ The story is the unit of _planning_; the Operation is the unit of _execution_. E
 | `specs/story-NNN-slug/PLAN.md` does not exist                                            | Hard-stop with the same message.                                                                                                                                                                                                                                           |
 | BDD toolchain not wired (first invocation only)                                          | Run the **BDD Toolchain Pre-Flight** gate below. If any check fails, emit `TOOLING_NOT_READY` and stop without writing tests.                                                                                                                                              |
 | Any dependency in `depends_on_story_ids` is not `verified` and not `is_foundation: true` | Hard-stop with the dependency name and the suggested fix.                                                                                                                                                                                                                  |
-| `state.json.schema_version < 2`                                                          | Run the v1 → v2 migration (see `references/state-schema.md`) atomically, then continue.                                                                                                                                                                                    |
+| `state.json.schema_version < 2`                                                          | Run the v1 → v2 migration (see `references/state-schema.md`; a legacy file without an `operations` map is rebuilt from PLAN.md first) atomically, commit it, then continue.                                                                                                                                                                                    |
 | `specs/autopilot.json` has `"active": true` (or env `AUTOPILOT=1`)                       | Follow `references/autopilot-contract.md` §1–2 for this whole invocation: no `AskUserQuestion`, take the _(Recommended)_ option, journal decisions and gates, stop only on the contract's hard conditions. Journaling (§3) and toolchain resolution (§4) apply regardless. |
 
 ## BDD Toolchain Pre-Flight (hard go/no-go gate)
@@ -69,6 +69,8 @@ If no Op-X passed (smart default):
 ```
 
 The chosen Op-X is written to `state.json.current_operation`.
+
+**Pre-existing RED suite.** On a repo onboarded by `/migrate-specs`, or after a v1 `/test-setup`, the tests for Op-X may already exist. Before Phase 2: if every file named in Op-X's RED-A and RED-B sections exists and the Op-filtered suites (contract §4 — tag, then scenario names, then file paths) run RED, do not rewrite them. Record the `test_plan_rows` for Op-X (`written: true, passing: false`), journal the decision `pre-existing RED suite for Op-X: <n> files, <m> failing`, skip Phases 2–4 and continue at Phase 5. If one of those suites is green, Op-X is not RED: fall through to the normal phases for the rows that are green. The picker itself is unchanged — an Op the migration already marked `red` is not re-picked (it says so); this branch covers Ops still `pending` whose files exist.
 
 ---
 

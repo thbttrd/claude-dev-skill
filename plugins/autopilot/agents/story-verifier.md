@@ -66,11 +66,22 @@ Grade each area `PASS` or `FAIL`, then set the overall verdict exactly as the sk
 Judge what is there. An artefact that is merely thin is a warning; an artefact that is wrong,
 missing, or contradicts another is critical.
 
+An Op whose `state.json.operations[Op-X].confirm_only` is `true` had no RED phase by design: its
+tests were green at base because an earlier story or Op shipped the behaviour, and there is no
+`feat(US-NNN): implement Op-X` commit. Under `rigor: full` the conductor does not dispatch you for
+such an Op; if you meet one in story-end mode, audit its journaled regression-baseline run and do
+not file "never went RED" as a warning.
+
 ## Step 3 — Write the report
 
 Write the report to the path you were given, in the skill's exact **Output Format** structure. Create
 the parent directory first (`mkdir -p "$(dirname "$REPORT")"`) — the `verification/` directory often
 does not exist yet.
+
+In the report's *Next Step*, derive the command from `state.json`, not from habit: the next Op in id
+order whose `operation_phase` is `red` → `/spec-implementation US-NNN Op-N`; `pending` →
+`/test-setup US-NNN Op-N`; none left → "story-end gates". On a migrated repo every Op is already
+`red`, so `/test-setup` is never the next step.
 
 ## Step 4 — After the audit (autopilot mode)
 
@@ -102,7 +113,20 @@ node "$LEDGER" backlog add --title "<the warning, one line>" --severity warning 
 
 Print the ids. Warnings never stop the run — file them and continue as `PASS`.
 
-**4. FAIL → hard stop** (contract §2). Write `stop_reason: "verifier_fail"` into
+**4. Commit your outputs** — the report, `state.json`, the backlog and the journal as they stand.
+This is what makes "resume with the same command" work: `start`'s clean-tree check exempts only the
+run's bookkeeping files, so an uncommitted report or `state.json` blocks the next run.
+
+```bash
+git add -A -- specs/ && git commit -m "chore(US-NNN): <spec-audit|plan-audit|green-audit Op-X> — <PASS|PASS_WITH_WARNINGS|FAIL>"
+```
+
+The only dirty paths under `specs/` at this point are yours and the previous stage's trailing journal
+line. The journal line this commit itself produces stays uncommitted — that is the expected state
+(contract §3); never `--amend`. Commit **before** the FAIL stop below too: a hard stop must leave a
+tree the user can resume from.
+
+**5. FAIL → hard stop** (contract §2). Write `stop_reason: "verifier_fail"` into
 `specs/autopilot.json` (atomic write; leave every other field alone), journal it with
 `node "$LEDGER" log --kind stop --summary "verifier_fail: <first critical issue>" --story US-NNN`,
 print the critical issues, and end your message with:
@@ -132,3 +156,5 @@ Substitute the real ids (`US-004`, `Op-2`). The sentinel is the last line, nothi
 - One report, one gate entry, one sentinel per invocation.
 - Never let a tag filter that selects zero scenarios stand in for a passing suite (contract §4).
 - A `FAIL` is a stop, not a retry. Do not re-run the audit hoping for a different verdict.
+- You run synchronously: no background tool calls, no reply while a command is still running (contract §2 rule 6).
+- One commit of your outputs per invocation, before the sentinel or the stop.

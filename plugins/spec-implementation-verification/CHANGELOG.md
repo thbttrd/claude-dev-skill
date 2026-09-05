@@ -6,6 +6,16 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-09-05
+
+### Added
+
+- Per-Op audit runs `<E2E>` for UI Ops; confirm-only Ops are audited on their regression evidence, not flagged for a missing RED phase; the Next Step is derived from `state.json` (dogfood P10/P14/P17).
+
+### Changed
+
+- Contract resync (see `dev-ledger` 1.0.3).
+
 ## [1.2.1] — 2026-08-31
 
 ### Fixed

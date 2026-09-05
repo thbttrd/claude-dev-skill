@@ -1,6 +1,6 @@
 ---
 name: plan-writing
-version: 2.4.0
+version: 2.4.1
 description: >
   Plans the implementation of one **user story** at a time (US-NNN) — not a
   release, not a wave. Reads the story's STORY.md + features + the project-wide

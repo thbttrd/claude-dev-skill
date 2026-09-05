@@ -6,6 +6,18 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [3.3.0] — 2026-09-05
+
+### Added
+
+- v1 → v2 migration step 0: a legacy `state.json` without an `operations` map (the `/migrate-specs` shape) is rebuilt from PLAN.md's `### Operation N` headings, marked RED when the story's phase is `red` and the Op suites confirm it, and committed — the remedy `/autopilot`'s `spec_contradiction` stop names now exists (dogfood P3).
+- Pre-existing RED suite branch: when Op-X's RED-A/RED-B files already exist and run RED, the rows are recorded and Phases 2–4 are skipped (dogfood P4).
+- `operations[Op-X].confirm_only` documented in the schema.
+
+### Changed
+
+- Contract resync (see `dev-ledger` 1.0.3).
+
 ## [3.2.2] — 2026-09-05
 
 ### Fixed
