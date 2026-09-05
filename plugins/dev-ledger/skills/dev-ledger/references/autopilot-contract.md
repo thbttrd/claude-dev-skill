@@ -29,7 +29,7 @@ Autopilot is active when `specs/autopilot.json` exists with `"active": true`, or
 ## 2. Rules while active
 
 1. **Never call `AskUserQuestion`.** Wherever this skill would ask, take the option marked _(Recommended)_; if none is marked, take the first option. Journal the choice: `ledger log --kind decision --summary "<question> → <option taken>"`.
-2. **Warnings never stop the run.** A verifier verdict `PASS_WITH_WARNINGS` → file every warning with `ledger backlog add` (severity `warning`, the verifier's report as `--report`) and continue. Self-review checklist items that fail and are not fixed in place → `ledger backlog add` likewise.
+2. **Warnings never stop the run.** A verifier verdict `PASS_WITH_WARNINGS` → file every warning with `ledger backlog add --title "…" --severity warning --kind <bug|test-gap|refactor|…> --story US-NNN [--op Op-X] --report <path>` (§3 table) and continue. Self-review checklist items that fail and are not fixed in place → the same full form likewise.
 3. **Hard stops.** Write `stop_reason` into `specs/autopilot.json`, journal `--kind stop`, print the reason, and end the invocation with `<promise>AUTOPILOT_STOP_<reason></promise>`:
    - `verifier_fail` — any verifier verdict `FAIL`;
    - `op_blocked` — an Operation still `blocked` after 2 retries;

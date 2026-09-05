@@ -253,7 +253,7 @@ Fix and re-run. Then update `state.json`:
 
 Fix failures before proceeding. This is the default RED gate; `/test-setup-verification` is an opt-in deep audit on top of it.
 
-Journal the self-review: `node "$LEDGER" log --kind gate --gate self-review --verdict <PASS|PASS_WITH_WARNINGS> --story US-NNN --op Op-X --stage test-setup --summary "<n>/4 checks"` (contract §3, §5). Any unchecked item not fixed → `ledger backlog add`.
+Journal the self-review: `node "$LEDGER" log --kind gate --gate self-review --verdict <PASS|PASS_WITH_WARNINGS> --story US-NNN --op Op-X --stage test-setup --summary "<n>/4 checks"` (contract §3, §5). Any unchecked item not fixed → `ledger backlog add --title "<unchecked item>" --severity warning --kind <bug|test-gap|refactor> --story US-NNN --op Op-X`.
 
 Output a short summary:
 

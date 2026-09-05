@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [3.3.0] — 2026-09-05
+
+### Added
+
+- Story-end Gate 1 runs the `lazy-simplifier` agent and Gate 2 the `story-reviewer` agent (both from the `autopilot` plugin); a gate already flipped by the /autopilot conductor is skipped. Full `backlog add` form in the per-op self-review.
+
 ## [3.2.1] — 2026-08-31
 
 ### Fixed
