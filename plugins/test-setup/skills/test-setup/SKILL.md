@@ -1,6 +1,6 @@
 ---
 name: test-setup
-version: 3.2.1
+version: 3.2.2
 description: >
   Per-Operation RED-phase scaffolder. For ONE Operation of ONE story (US-NNN
   Op-X) at a time, writes the BDD step definitions and unit/integration tests

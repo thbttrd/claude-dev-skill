@@ -11,6 +11,7 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 ### Added
 
 - Autopilot: PLAN_COMPLETE sentinel.
+- Per-story self-review: full `backlog add` form (title/severity/kind/story).
 
 ## [2.3.1] — 2026-08-31
 
