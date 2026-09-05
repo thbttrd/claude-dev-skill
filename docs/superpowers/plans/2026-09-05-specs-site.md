@@ -946,7 +946,7 @@ test("parseArgs: defaults, bare --host, --out default, unknown flag", () => {
   assert.deepEqual([o.host, o.port, o.out], ["127.0.0.1", "4321", resolve("x/specs/.site")]);
   assert.equal(parseArgs(["dev", "--host"]).host, "0.0.0.0");
   assert.equal(parseArgs(["dev", "--host", "10.0.0.5", "--port", "5000"]).port, "5000");
-  assert.deepEqual(astroArgs(parseArgs(["build", "--specs", "s", "--out", "/tmp/o"])), ["build", "--outDir", "/tmp/o"]);
+  assert.deepEqual(astroArgs(parseArgs(["build", "--specs", "s", "--out", "/tmp/o"])), ["build"]);
   assert.throws(() => parseArgs(["serve"]), /usage/);
   assert.throws(() => parseArgs(["dev", "--nope"]), /unknown argument --nope/);
 });
@@ -964,7 +964,7 @@ test("build against the fixture emits a static site", () => {
 ```js
 #!/usr/bin/env node
 // specs-site dev|build --specs DIR — runs the bundled Astro site against a project's specs/.
-import { existsSync } from "node:fs";
+import { cpSync, existsSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -990,8 +990,11 @@ export function parseArgs(argv) {
   return o;
 }
 
+// `build` always writes the site's own dist/ and is copied to --out afterwards:
+// Astro moves prerendered assets with rename(), which fails with EXDEV when
+// --out is on another filesystem (a tmpfs /tmp, a mounted specs dir).
 export function astroArgs(o) {
-  return o.cmd === "dev" ? ["dev", "--host", o.host, "--port", o.port] : ["build", "--outDir", o.out];
+  return o.cmd === "dev" ? ["dev", "--host", o.host, "--port", o.port] : ["build"];
 }
 
 // First run installs the site's deps from the committed lockfile.
@@ -1021,6 +1024,11 @@ export function main(argv) {
     stdio: "inherit",
     env: { ...process.env, SPECS_DIR: o.specs },
   });
+  if (r.status === 0 && o.cmd === "build") {
+    rmSync(o.out, { recursive: true, force: true });
+    cpSync(join(SITE, "dist"), o.out, { recursive: true });
+    console.error(`specs-site: built → ${o.out}`);
+  }
   return r.status ?? 1;
 }
 

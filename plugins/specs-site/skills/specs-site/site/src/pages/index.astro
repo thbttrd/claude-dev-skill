@@ -1,6 +1,108 @@
 ---
 import Base from "../layouts/Base.astro";
-import { readStories } from "../lib/specs.mjs";
-const { data } = readStories();
+import Chip from "../components/Chip.astro";
+import { PHASES, gateVerdicts, opProgress, readAutopilot, readBacklog, readJournal, readState, readStories, storyDir } from "../lib/specs.mjs";
+
+const stories = readStories();
+const backlog = readBacklog();
+const ap = readAutopilot();
+const journal = readJournal();
+const errors = [stories.error, backlog.error, ap.error].filter(Boolean);
+
+const cards = stories.data.stories.map((s) => {
+  const st = readState(storyDir(s));
+  return { s, ops: opProgress(st.data), gates: [...gateVerdicts(journal, s.id)], stateError: st.error };
+});
+const byPhase = Object.fromEntries(PHASES.map((p) => [p, cards.filter((c) => c.s.phase === p)]));
+const unknownPhase = cards.filter((c) => !PHASES.includes(c.s.phase));
+const open = backlog.data.items.filter((i) => i.status === "open" || i.status === "in-progress");
+const bySeverity = ["error", "warning", "info"].map((sev) => [sev, open.filter((i) => i.severity === sev).length]);
+const lastVerified = stories.data.stories
+  .filter((s) => s.phase === "verified")
+  .sort((a, b) => String(a.verification?.verified_at ?? "").localeCompare(String(b.verification?.verified_at ?? "")))
+  .at(-1);
+const recent = journal.slice(-20).reverse();
+const run = ap.data;
+const cur = run?.active ? run.current : null;
 ---
-<Base title="Dashboard"><h1>{data.project.name}</h1><p class="muted">{data.stories.length} stories</p></Base>
+<Base title="Dashboard">
+  <h1>{stories.data.project?.name ?? "specs"} <span class="muted small">{stories.data.project?.description}</span></h1>
+  {errors.map((e) => <p class="error">{e}</p>)}
+
+  <section class="grid">
+    <div class="card">
+      <h2 style="margin-top:0">Now running</h2>
+      {run?.active ? (
+        <p>
+          <Chip value="active" kind="green" /> <code>{run.run_id}</code><br />
+          {cur ? (
+            <>
+              <a href={`/stories/${cur.story}`}>{cur.story}</a> · <strong>{cur.stage}</strong>{cur.op ? ` ${cur.op}` : ""} · attempt {cur.attempt}
+              <span class="muted small"> since {cur.started_at}</span>
+            </>
+          ) : (
+            <span class="muted">between stages</span>
+          )}
+          <br /><span class="small muted">target {run.target} · until {run.until} · {run.stop_policy}</span>
+        </p>
+      ) : (
+        <p class="muted">No active run{run?.stop_reason ? ` — last run ${run.run_id} ended: ${run.stop_reason}` : ""}.</p>
+      )}
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">Open backlog</h2>
+      <p>{bySeverity.map(([sev, n]) => <><Chip value={`${n} ${sev}`} kind={sev} /> </>)}</p>
+      <a href="/backlog">All items →</a>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">Last verified</h2>
+      {lastVerified ? (
+        <p><a href={`/stories/${lastVerified.id}`}>{lastVerified.id} — {lastVerified.title}</a><br /><span class="muted small">{lastVerified.verification?.verified_at}</span></p>
+      ) : (
+        <p class="muted">none yet</p>
+      )}
+    </div>
+  </section>
+
+  <h2>Stories by phase</h2>
+  <div class="table-wrap">
+    <table class="kanban">
+      <thead><tr>{PHASES.map((p) => <th>{p} <span class="muted">{byPhase[p].length}</span></th>)}</tr></thead>
+      <tbody>
+        <tr>
+          {PHASES.map((p) => (
+            <td>
+              {byPhase[p].map(({ s, ops, gates, stateError }) => (
+                <div class="card" style="margin-bottom:.5rem">
+                  <a href={`/stories/${s.id}`}><strong>{s.id}</strong></a> <Chip value={s.rigor} kind="info" /><br />{s.title}
+                  {ops.length > 0 && <div class="bar" title={ops.map((o) => `${o.id} ${o.phase}`).join(", ")}>{ops.map((o) => <i class={o.phase} />)}</div>}
+                  <div>{gates.map(([g, v]) => <Chip value={`${g} ${v.verdict}`} kind={v.verdict} />)}</div>
+                  {stateError && <p class="error small">{stateError}</p>}
+                </div>
+              ))}
+            </td>
+          ))}
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {unknownPhase.length > 0 && <p class="error">Unknown phase: {unknownPhase.map((c) => `${c.s.id}=${c.s.phase}`).join(", ")}</p>}
+
+  <h2>Last 20 journal events <a class="small" href="/journal">all →</a></h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>ts</th><th>story</th><th>op</th><th>stage</th><th>kind</th><th>summary</th></tr></thead>
+      <tbody>
+        {recent.map((e) => (
+          <tr>
+            <td class="small">{e.ts}</td>
+            <td>{e.story && <a href={`/stories/${e.story}`}>{e.story}</a>}</td>
+            <td>{e.op}</td><td>{e.stage}</td>
+            <td><Chip value={e.kind} kind={e.kind === "invalid" ? "fail" : (e.verdict ?? "pending")} /></td>
+            <td>{e.summary}{e.backlog_id && <> <a href={`/backlog/${e.backlog_id}`}>{e.backlog_id}</a></>}{e.sha && <> <code>{e.sha}</code></>}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</Base>

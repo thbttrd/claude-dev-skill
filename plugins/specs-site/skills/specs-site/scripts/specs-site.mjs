@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // specs-site dev|build --specs DIR — runs the bundled Astro site against a project's specs/.
-import { existsSync, readFileSync } from "node:fs";
+import { cpSync, existsSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -26,8 +26,11 @@ export function parseArgs(argv) {
   return o;
 }
 
+// `build` always writes the site's own dist/ and is copied to --out afterwards:
+// Astro moves prerendered assets with rename(), which fails with EXDEV when
+// --out is on another filesystem (a tmpfs /tmp, a mounted specs dir).
 export function astroArgs(o) {
-  return o.cmd === "dev" ? ["dev", "--host", o.host, "--port", o.port] : ["build", "--outDir", o.out];
+  return o.cmd === "dev" ? ["dev", "--host", o.host, "--port", o.port] : ["build"];
 }
 
 const astroBin = (site) => {
@@ -62,6 +65,11 @@ export function main(argv) {
     stdio: "inherit",
     env: { ...process.env, SPECS_DIR: o.specs },
   });
+  if (r.status === 0 && o.cmd === "build") {
+    rmSync(o.out, { recursive: true, force: true });
+    cpSync(join(SITE, "dist"), o.out, { recursive: true });
+    console.error(`specs-site: built → ${o.out}`);
+  }
   return r.status ?? 1;
 }
 

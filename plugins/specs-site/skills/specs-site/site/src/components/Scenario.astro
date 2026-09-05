@@ -1,0 +1,25 @@
+---
+interface Props { s: any; status: string }
+const { s, status } = Astro.props;
+const isBg = s.kind === "background";
+---
+<article class={`scenario ${isBg ? "" : status}`} data-scenario={s.name}>
+  <div>
+    {s.tags.length > 0 && <span class="tags">{s.tags.join(" ")} </span>}
+    <strong>{s.keyword}:</strong> {s.name} {!isBg && <span class={`chip chip-${status}`}>{status}</span>}
+  </div>
+  {s.description && <p class="muted small">{s.description}</p>}
+  {s.steps.map((st) => (
+    <div class="step">
+      <span class="kw">{st.keyword}</span> {st.text}
+      {st.table && <table class="small"><tbody>{st.table.map((r) => <tr>{r.map((c) => <td>{c}</td>)}</tr>)}</tbody></table>}
+      {st.docString != null && <pre>{st.docString}</pre>}
+    </div>
+  ))}
+  {s.examples.map((e) => (
+    <div class="small">
+      <em>Examples{e.name ? `: ${e.name}` : ""}</em>
+      <table><thead><tr>{e.header.map((h) => <th>{h}</th>)}</tr></thead><tbody>{e.rows.map((r) => <tr>{r.map((c) => <td>{c}</td>)}</tr>)}</tbody></table>
+    </div>
+  ))}
+</article>

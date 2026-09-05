@@ -1,0 +1,6 @@
+---
+interface Props { value: string | number | null | undefined; kind?: string }
+const { value, kind } = Astro.props;
+const cls = String(kind ?? value ?? "pending").replace(/[^A-Za-z0-9_-]/g, "_");
+---
+{value != null && <span class={`chip chip-${cls}`}>{value}</span>}

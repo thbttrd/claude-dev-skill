@@ -1,0 +1,8 @@
+---
+import { getEntry, render } from "astro:content";
+interface Props { id: string; missing?: string }
+const { id, missing = `No ${id}.md` } = Astro.props;
+const entry = await getEntry("docs", id);
+const Content = entry ? (await render(entry)).Content : null;
+---
+{Content ? <div class="prose"><Content /></div> : missing ? <p class="muted">{missing}</p> : null}
