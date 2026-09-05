@@ -30,6 +30,8 @@ The design is a conductor and a script. `skills/autopilot/scripts/autopilot.mjs`
 
 Resume by re-running the same command: a new `run_id` opens and the stage machine picks up from the trackers.
 
+**Run state.** `specs/autopilot.json` is per-machine run state: `start` adds it to `.git/info/exclude`, so it never appears in `git status` and is never committed. It also records `base_sha` — HEAD when a run first picked up each story — which the simplify and code-review gates diff against; a resume carries it forward.
+
 ## Stage machine
 
 Resolved from `stories.json.phase` + `state.json` on every step — never from a cursor, so an interrupted run resumes exactly where it stopped.
@@ -44,7 +46,7 @@ repo-initialization                       US-000 only, on a repo with no package
 for each Op:
   test-setup Op-X
   spec-implementation Op-X                GREEN + REFACTOR
-  spec-implementation-verification Op-X   full-rigor stories only → verification/green-audit-Op-X.md
+  spec-implementation-verification Op-X   full-rigor stories only, skipped for confirm-only Ops → verification/green-audit-Op-X.md
 simplify                                  lazy-simplifier agent
 code-review                               story-reviewer agent
 spec-implementation                       story-end: flips the story to green
