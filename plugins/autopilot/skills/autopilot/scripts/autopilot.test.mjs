@@ -9,7 +9,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -662,20 +662,24 @@ test("start writes autopilot.json and journals the start (plus decisions for --f
   const now = new Date("2026-09-05T10:00:00.000Z");
 
   const ap = await start(specs, { target: "US-000" }, { ledger, now });
-  assert.deepEqual(ap, {
+  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: dirname(specs), encoding: "utf8" }).trim();
+  const { warnings, ...onDisk } = ap;
+  assert.deepEqual(warnings, []);
+  assert.deepEqual(onDisk, {
     active: true,
     run_id: `run-${now.toISOString()}`,
     target: "US-000",
     until: "US-000",
     stop_policy: DEFAULT_POLICY,
     skip_arch_check: false,
+    base_sha: { "US-000": head },
     current: null,
     last_next: null,
     started_at: now.toISOString(),
     stopped_at: null,
     stop_reason: null,
   });
-  assert.deepEqual(readAutopilot(specs), ap);
+  assert.deepEqual(readAutopilot(specs), onDisk);
 
   const journal1 = ledger.readJournal(specs);
   const startEntry = journal1.find((e) => e.kind === "action" && e.run_id === ap.run_id);
@@ -1120,4 +1124,64 @@ test("report dedupes duplicate gate and stop lines, keeps git order and marks un
   assert.equal(dead.unreachable, true);
   assert.match(dead.summary, /\(unreachable\)$/);
   assert.match(rep.text, /deadbee chore: amended away \(unreachable\)/);
+});
+
+test("start excludes specs/autopilot.json via .git/info/exclude exactly once and carries base_sha across runs", async () => {
+  const { specs, root } = fixtureProject();
+  const now = new Date("2026-09-05T10:00:00.000Z");
+  const excludePath = join(root, ".git", "info", "exclude");
+  const countExclude = () => readFileSync(excludePath, "utf8").split("\n").filter((l) => l === "specs/autopilot.json").length;
+
+  const ap1 = await start(specs, { target: "US-000" }, { ledger, now });
+  const head1 = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  assert.equal(ap1.base_sha["US-000"], head1);
+  assert.equal(countExclude(), 1);
+  const status = execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" });
+  assert.equal(status.includes("autopilot.json"), false, status);
+
+  await stop(specs, { reason: "user_stop" }, { ledger, now });
+  writeFileSync(join(root, "later.txt"), "x\n");
+  commitPaths(root, "feat(US-000): later", ["later.txt", "specs/journal.jsonl"]);
+
+  const ap2 = await start(specs, { target: "US-000" }, { ledger, now: new Date("2026-09-05T11:00:00.000Z") });
+  assert.equal(ap2.base_sha["US-000"], head1, "base_sha must not move on resume");
+  assert.equal(countExclude(), 1);
+  const excludeActions = ledger.readJournal(specs).filter((e) => e.kind === "action" && /info\/exclude/.test(e.summary));
+  assert.equal(excludeActions.length, 1);
+});
+
+test("start returns preflight warnings alongside the run file", async () => {
+  const { specs } = fixtureProject();
+  const now = new Date("2026-09-05T10:00:00.000Z");
+  const ap = await start(specs, { target: "US-000", skip_arch_check: true }, { ledger, now });
+  assert.ok(ap.warnings.some((w) => /skip-arch-check/.test(w)), JSON.stringify(ap.warnings));
+  assert.equal("warnings" in readAutopilot(specs), false);
+});
+
+test("stageEnd records base_sha for the next story when the chain moves on", async () => {
+  const { specs, root } = fixtureProject();
+  const now = new Date("2026-09-05T10:00:00.000Z");
+  await start(specs, { target: "US-000", until: "US-002", stop_policy: "hard-failures" }, { ledger, now });
+  await stageStart(
+    specs,
+    { story: "US-000", stage: "verification-and-validation", agent: "general-purpose" },
+    { ledger, now },
+  );
+  setStory(specs, "US-000", { phase: "verified" });
+  const result = await stageEnd(specs, { outcome: "sentinel" }, { ledger, now });
+  assert.equal(result.action, "continue");
+  assert.equal(result.next.story, "US-001");
+  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  assert.deepEqual(readAutopilot(specs).base_sha, { "US-000": head, "US-001": head });
+});
+
+test("preflight warns when the target's STORY.md is a migrated TODO stub", () => {
+  const { specs, root } = fixtureProject();
+  const dir = storyDir(specs, "US-000");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "STORY.md"), "# US-000\n\n> As a **TODO — not formalised in v1**,\n");
+  commitPaths(root, "chore: stub STORY.md", ["specs"]);
+  const pf = preflight(specs, { target: "US-000" });
+  assert.equal(pf.ok, true, JSON.stringify(pf));
+  assert.ok(pf.warnings.some((w) => /TODO/.test(w)), pf.warnings.join("\n"));
 });

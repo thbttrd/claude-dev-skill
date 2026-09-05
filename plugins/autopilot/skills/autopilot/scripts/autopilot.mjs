@@ -3,7 +3,9 @@
 // Node >= 20, stdlib only. Delegates journal/backlog/regress bookkeeping to
 // the sibling dev-ledger plugin's ledger.mjs (located, never vendored).
 import {
+  appendFileSync,
   existsSync,
+  mkdirSync,
   readFileSync,
   readdirSync,
   realpathSync,
@@ -233,6 +235,12 @@ export function preflight(specs, opts = {}) {
   if (opts.skip_arch_check)
     warnings.push("--skip-arch-check used: skipping the /research-and-architecture check");
   if (opts.force) warnings.push("--force used: taking over any active run");
+  const storyMd = story ? join(storyDir(specs, target) ?? "", "STORY.md") : null;
+  if (storyMd && existsSync(storyMd) && /\bTODO\b/.test(readFileSync(storyMd, "utf8"))) {
+    warnings.push(
+      `${target}: STORY.md still carries TODO markers (migrated stub) — the spec/plan audits will run against it; run /spec-writing ${target} to formalise it first`,
+    );
+  }
 
   return { ok: true, target, until, stop_policy, warnings };
 }
@@ -589,6 +597,35 @@ function stageArgs(story, op) {
 
 const todayStr = (now) => now.toISOString().slice(0, 10);
 
+function gitOut(root, args) {
+  const r = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+  return r.status === 0 ? r.stdout.trim() : null;
+}
+
+// specs/autopilot.json is per-machine run state. Keep it out of `git status`
+// through the repo-local exclude file, not the tracked .gitignore — editing
+// .gitignore would dirty the tree start() just checked was clean.
+function excludeAutopilotJson(root) {
+  const rel = gitOut(root, ["rev-parse", "--git-path", "info/exclude"]);
+  if (!rel) return false;
+  const p = resolve(root, rel);
+  const text = existsSync(p) ? readFileSync(p, "utf8") : "";
+  if (text.split("\n").includes("specs/autopilot.json")) return false;
+  mkdirSync(dirname(p), { recursive: true });
+  appendFileSync(p, `${text && !text.endsWith("\n") ? "\n" : ""}specs/autopilot.json\n`);
+  return true;
+}
+
+// The story's diff base for the simplify / code-review gates: HEAD when a run
+// first picks the story up, recorded once and carried across resumes so a
+// later run never moves the base past the story's own commits.
+function recordBaseSha(specs, ap, story) {
+  ap.base_sha ??= {};
+  if (ap.base_sha[story]) return;
+  const sha = gitOut(dirname(specs), ["rev-parse", "HEAD"]);
+  if (sha) ap.base_sha[story] = sha;
+}
+
 // The invest-assessor agent only emits a verdict word (PASS / RE-TIER tier);
 // unlike the skill-driven stages, which write their own tracker state,
 // autopilot has to turn that verdict into the stories.json write itself.
@@ -624,12 +661,14 @@ export async function start(specs, opts, deps = {}) {
     until: pf.until,
     stop_policy: pf.stop_policy,
     skip_arch_check: Boolean(opts.skip_arch_check),
+    base_sha: { ...(prevAp?.base_sha ?? {}) },
     current: null,
     last_next: null,
     started_at: now.toISOString(),
     stopped_at: null,
     stop_reason: null,
   };
+  recordBaseSha(specs, ap, pf.target);
   writeJson(autopilotPath(specs), ap);
 
   ledger.log(
@@ -675,7 +714,22 @@ export async function start(specs, opts, deps = {}) {
     );
   }
 
-  return ap;
+  if (excludeAutopilotJson(dirname(specs))) {
+    ledger.log(
+      specs,
+      {
+        kind: "action",
+        summary: "added specs/autopilot.json to .git/info/exclude (local run state, never committed)",
+        run_id: ap.run_id,
+        story: ap.target,
+        op: null,
+        stage: "autopilot",
+      },
+      now,
+    );
+  }
+
+  return { ...ap, warnings: pf.warnings };
 }
 
 export async function stageStart(specs, opts, deps = {}) {
@@ -845,6 +899,7 @@ export async function stageEnd(specs, opts, deps = {}) {
     }
   }
 
+  if (!next.done && !next.stop && next.story !== current.story) recordBaseSha(specs, ap, next.story);
   writeJson(autopilotPath(specs), ap);
   return { action: "continue", next };
 }
