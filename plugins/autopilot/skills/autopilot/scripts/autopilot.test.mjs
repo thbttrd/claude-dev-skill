@@ -1185,3 +1185,18 @@ test("preflight warns when the target's STORY.md is a migrated TODO stub", () =>
   assert.equal(pf.ok, true, JSON.stringify(pf));
   assert.ok(pf.warnings.some((w) => /TODO/.test(w)), pf.warnings.join("\n"));
 });
+
+test("next: red — full rigor skips the per-Op audit for a confirm-only Op (no production diff to audit)", () => {
+  const { specs } = fixtureProject();
+  setStory(specs, "US-000", { phase: "red", rigor: "full" });
+  writeState(specs, "US-000", {
+    schema_version: 2,
+    operations: {
+      "Op-1": { operation_phase: "green", confirm_only: true },
+      "Op-2": { operation_phase: "red" },
+    },
+  });
+  const result = nextStage(specs, dryRun("US-000"));
+  assert.equal(result.stage, "spec-implementation");
+  assert.equal(result.op, "Op-2");
+});

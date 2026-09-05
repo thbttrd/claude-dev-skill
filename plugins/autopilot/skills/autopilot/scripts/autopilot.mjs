@@ -468,7 +468,9 @@ function resolveRed(specs, story, rigor) {
   if (rigor === "full") {
     const needsAudit = ops.find(
       (op) =>
-        GREEN_PHASES.has(op.operation_phase) && !PASSING_VERDICTS.has(op.green_audit?.verdict),
+        GREEN_PHASES.has(op.operation_phase) &&
+        op.confirm_only !== true && // green at base, no production diff: nothing to audit per Op
+        !PASSING_VERDICTS.has(op.green_audit?.verdict),
     );
     if (needsAudit) {
       return stageResult(story, "spec-implementation-verification", needsAudit.id, rigor);
