@@ -4,6 +4,20 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-09-05
+
+### Fixed
+
+- A single-story run whose story reaches `verified` pauses as `story_end` (was `until_reached` whenever the story equalled `--until`, i.e. always without `--until`); `until_reached` now means the chain is exhausted (dogfood run 2, P1).
+- A run-ending `stop` is journaled as `stage: autopilot` and rendered `run — stop (<reason>)`; the last stage no longer appears twice, once `ok` and once as a stop (P3).
+- `base_sha[US-NNN]` for a story worked on before this run is the parent of its first `test|feat|fix|refactor|chore(US-NNN)` commit, not HEAD — the story-end gates diff the story's code, not a specs-only span (P2).
+- `preflight` refuses a tracked `specs/autopilot.json` and prints the `git rm --cached` fix; `story-verifier` commits with an explicit path list (P8).
+
+### Changed
+
+- Conductor §5: the Agent call may return before the agent does — wait for the completion notification before `stage-end` (P6). §6 reads `BASE_SHA` from `autopilot.json` only; the `git log` fallback moved into the script.
+- Contract resync (see `dev-ledger` 1.0.4).
+
 ## [1.1.0] — 2026-09-05
 
 ### Added

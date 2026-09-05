@@ -118,8 +118,12 @@ This is what makes "resume with the same command" work: `start`'s clean-tree che
 run's bookkeeping files, so an uncommitted report or `state.json` blocks the next run.
 
 ```bash
-git add -A -- specs/ && git commit -m "chore(US-NNN): <spec-audit|plan-audit|green-audit Op-X> — <PASS|PASS_WITH_WARNINGS|FAIL>"
+git add -- "$REPORT" "specs/story-NNN-$SLUG/state.json" specs/backlog.json specs/journal.jsonl && git commit -m "chore(US-NNN): <spec-audit|plan-audit|green-audit op-x> — <PASS|PASS_WITH_WARNINGS|FAIL>"
 ```
+
+Explicit paths, never `git add -A -- specs/`: that sweeps in `specs/autopilot.json` (local run state)
+and any stray file, and the next `start` refuses a tracked run file. Header ≤ 100 characters, subject
+lowercase after the colon (commitlint).
 
 The only dirty paths under `specs/` at this point are yours and the previous stage's trailing journal
 line. The journal line this commit itself produces stays uncommitted — that is the expected state

@@ -1,6 +1,6 @@
 {
   "name": "test-setup-verification",
-  "version": "3.2.2",
+  "version": "3.2.3",
   "description": "Per-Operation verification of /test-setup output for completeness, RED-state compliance, and Test Plan traceability. Spawns a fresh agent to audit ONE Operation's BDD step definition files, unit / integration tests, and source stubs against the story's PLAN.md (Test Plan rows tagged with that Op), STORY.md, and features/*.feature. Confirms every test in that Operation is real (calls actual code, not placeholders), every test fails because implementations are empty stubs (not because of import errors), and the Operation's coverage of the Test Plan is complete. The Op-X arg is optional; with no Op-X, the skill auto-picks the most recently RED'd Operation that hasn't been audited yet from state.json. Produces a per-Op compliance report. Use after /test-setup US-NNN Op-X, before /spec-implementation US-NNN Op-X. Triggers on: \"verify the tests for Op-X\", \"audit Op-2\", \"check the RED state\", \"is Op-X RED-ready\", \"/test-setup-verification US-NNN\", \"/test-setup-verification US-NNN Op-X\".",
   "author": {
     "name": "thbttrd"

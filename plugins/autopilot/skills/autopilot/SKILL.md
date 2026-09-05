@@ -1,6 +1,6 @@
 ---
 name: autopilot
-version: 1.1.0
+version: 1.2.0
 description: 'Unattended driver for the story pipeline. /autopilot US-NNN [--until US-MMM] runs spec → plan → per-Operation RED/GREEN → story-end gates → E2E for one story or a DAG-ordered chain, one fresh subagent per stage, never asking a question: warnings become backlog items, hard failures stop the run, every step is journaled. Bundles the invest-assessor, story-verifier, lazy-simplifier and story-reviewer agents. Triggers on "/autopilot", "run the pipeline unattended", "autopilot US-003", "resume autopilot".'
 ---
 
@@ -65,7 +65,10 @@ This is the whole conductor. Execute it literally.
                compute SLUG and BASE_SHA for N.story (§6) before dispatching anything for it.
 3. node "$AP" stage-start --story <N.story> --stage <N.stage> [--op <N.op>] --agent <N.agent>
 4. OUT = dispatch ONE subagent per the §6 table (Agent tool, subagent_type = N.agent), plus NOTE if set.
-        Capture its FULL final message as OUT — sentinels are matched against that text and nothing else.
+        The Agent call may return before the agent has finished (the harness runs dispatches asynchronously
+        and delivers the final message as a completion notification, sometimes minutes later). Do not run
+        stage-end, next, or anything else for this run until that notification has arrived; then capture
+        the agent's FULL final message as OUT — sentinels are matched against that text and nothing else.
 5. Classify OUT (matchSentinel semantics — AUTOPILOT_STOP wins, then the stage's sentinel):
      OUT contains AUTOPILOT_STOP_<reason>   → R = node "$AP" stage-end --outcome stop --reason <reason>
      OUT contains N.sentinel                → R = node "$AP" stage-end --outcome sentinel [--verdict "<verdict>"]
@@ -101,14 +104,10 @@ Per-story values, computed once when `N.story` changes:
 ```bash
 STORY=US-NNN
 SLUG=$(jq -r --arg s "$STORY" '.stories[]|select(.id==$s).slug' specs/stories.json)
-BASE_SHA=$(jq -r --arg s "$STORY" '.base_sha[$s] // empty' specs/autopilot.json)
-if [ -z "$BASE_SHA" ]; then   # story first picked up by a run older than autopilot 1.1.0
-  FIRST=$(git log --reverse --grep "^test($STORY)" --grep "^feat($STORY)" --grep "^chore($STORY)" --format=%h | head -1)
-  BASE_SHA=$( [ -n "$FIRST" ] && git rev-parse "$FIRST^" 2>/dev/null || echo "HEAD~0" )
-fi
+BASE_SHA=$(jq -r --arg s "$STORY" '.base_sha[$s]' specs/autopilot.json)
 ```
 
-`SLUG` builds the report paths (`specs/story-NNN-$SLUG/verification/…`). `BASE_SHA` is the commit the story's diff starts after: `start` records HEAD into `autopilot.json.base_sha[US-NNN]` the first time a run picks the story up and carries it across resumes, so the simplify and code-review gates diff exactly the run's work. The `git log` fallback is for stories first driven before that field existed; it accepts `chore(US-NNN)` because on a migrated repo the `state.json` rebuild commit is the true start of the story's work. When it still ends at `HEAD~0`, say so in the prompt so the agent files an info item instead of measuring an empty diff. These two lookups are the only tracker reads the conductor makes.
+`SLUG` builds the report paths (`specs/story-NNN-$SLUG/verification/…`). `BASE_SHA` is the commit the story's diff starts after: `start` (or `stage-end`, when a chain moves to the next story) records it the first time a run picks the story up and carries it across resumes. It is HEAD for a story with no commits yet, and the parent of the story's first `test|feat|fix|refactor|chore(US-NNN)` commit for a story worked on before this run (a migrated repo, a pre-1.1.0 run) — so the simplify and code-review gates always diff the story's own work, never a specs-only span. These two lookups are the only tracker reads the conductor makes.
 
 | `N.agent`         | `subagent_type`   | Prompt                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ----------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -132,7 +131,7 @@ Nothing else goes in a prompt. Each agent's own definition carries its method; e
 
 `node "$AP" report` prints the run: stages run, Ops GREEN, gates with their verdicts, the `BL-` ids created, the commits. (`stop` prints the same report as JSON, with the text in `.text`; run `report` after it for the human form.) Print it verbatim — it is the handover.
 
-Resume with **the same command**. `start` opens a new `run_id` and `next` picks up from the trackers, so a story that stopped at `code-review` resumes at `code-review`, not at `spec-writing`. Nothing has to be told where it was. `specs/autopilot.json` is local run state: `start` adds it to `.git/info/exclude` on first use, so it never shows in `git status` and is never committed.
+Resume with **the same command**. `start` opens a new `run_id` and `next` picks up from the trackers, so a story that stopped at `code-review` resumes at `code-review`, not at `spec-writing`. Nothing has to be told where it was. `specs/autopilot.json` is local run state: `start` adds it to `.git/info/exclude` on first use, so it never shows in `git status` and is never committed. `start` refuses when `specs/autopilot.json` is tracked; a verifier or a human who swept it in with `git add -A -- specs/` un-tracks it with `git rm --cached specs/autopilot.json` and a commit. Commit spec leftovers with an explicit path list, never `git add -A -- specs/`.
 
 ## 8. Stop reasons
 
@@ -149,8 +148,8 @@ Contract §2 defines the first six; the rest are the conductor's own.
 | `stage_no_sentinel`  | `STOP`    | A stage returned neither its sentinel nor a stop sentinel, twice.             |
 | `stage_no_progress`  | `STOP`    | A stage ended `ok` but `next` resolved to the same stage again — a loop.      |
 | `preflight_failed`   | `STOP`    | `start` refused. No run was created, so no journal entry and no `autopilot.json`. |
-| `story_end`          | `PAUSED`  | The story reached `verified` under `hard-failures+story-end`.                 |
-| `until_reached`      | `PAUSED`  | `--until` is done, or no eligible story remains.                              |
+| `story_end`          | `PAUSED`  | The story reached `verified` under `hard-failures+story-end` — also when it was the last story of the run. |
+| `until_reached`      | `PAUSED`  | Under `hard-failures`: `--until` is done, or no eligible story remains.       |
 | `user_stop`          | `STOP`    | `--stop`.                                                                     |
 
 `PAUSED` reasons end the invocation with `<promise>AUTOPILOT_PAUSED_<reason></promise>` and are clean finishes — re-run the same command to continue. `STOP` reasons end with `<promise>AUTOPILOT_STOP_<reason></promise>` and want a human before the next run.

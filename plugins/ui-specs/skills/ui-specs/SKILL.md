@@ -1,6 +1,6 @@
 ---
 name: ui-specs
-version: 2.1.2
+version: 2.1.3
 description: Produces a project's design system + per-story UI mockups and screen specs. The design system (`specs/DESIGN.md` — Google-Stitch / VoltAgent 9-section format) is project-wide and re-runnable; the mockups and screen specs are per-story under `specs/story-NNN-slug/{mockups,ui}/`. Drives the design system through three branches the user picks from — copy a brand DESIGN.md from the VoltAgent awesome-design-md catalog (`npx getdesign@latest add <brand>`), start from one and tweak it, or build from scratch via realtimecolors.com aesthetic discovery. For each UI story, proposes 2-3 HTML mockup variants side-by-side (rendered + screenshotted via Playwright MCP), the user picks one, then iterates to acceptance. Use this skill whenever the user wants to define a design system, write UI specs, generate mockups, pick brand colors/fonts, draw screen layouts, or says "design system", "DESIGN.md", "ui specs", "mockups", "wireframes", "/ui-specs". Auto-invoked by `/spec-writing US-NNN` whenever a story has a user-facing screen. Triggers also when the user wants to tweak the project-wide DESIGN.md, swap brand inspiration, or redo the screens for an existing story.
 ---
 

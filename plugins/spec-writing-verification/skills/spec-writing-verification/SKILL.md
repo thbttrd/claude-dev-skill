@@ -1,6 +1,6 @@
 ---
 name: spec-writing-verification
-version: 2.3.1
+version: 2.3.2
 description: >
   Per-story verification of the output of /spec-writing for completeness, coherence,
   INVEST compliance, and template fidelity. Spawns a fresh agent to audit

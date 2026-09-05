@@ -67,7 +67,7 @@ Every stage runs in a fresh subagent that returns a sentinel (`SPEC_COMPLETE_US-
 
 ## Stop policy and stop reasons
 
-`hard-failures+story-end` (default) pauses at each story's end so the user can look before the chain continues; `hard-failures` only stops when something is wrong. Warnings never stop a run under either policy — they become backlog items.
+`hard-failures+story-end` (default) pauses at each story's end (`story_end` — also for the last story of the run) so the user can look before the chain continues; `until_reached` is the chain being exhausted under `hard-failures`; `hard-failures` only stops when something is wrong. Warnings never stop a run under either policy — they become backlog items.
 
 | Reason               | Ends with                                | Meaning                                                                                    |
 | -------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------ |
