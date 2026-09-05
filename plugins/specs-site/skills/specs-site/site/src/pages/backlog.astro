@@ -1,0 +1,37 @@
+---
+import Base from "../layouts/Base.astro";
+import Chip from "../components/Chip.astro";
+import Filters from "../components/Filters.astro";
+import { readBacklog } from "../lib/specs.mjs";
+const { data, error } = readBacklog();
+const items = data.items.slice().reverse();
+const uniq = (f) => [...new Set(items.map(f).filter(Boolean))].sort();
+const fields = [
+  { name: "status", label: "status", values: uniq((i) => i.status) },
+  { name: "severity", label: "severity", values: uniq((i) => i.severity) },
+  { name: "kind", label: "kind", values: uniq((i) => i.kind) },
+  { name: "story", label: "story", values: uniq((i) => i.source?.story) },
+];
+const statusKind = (s) => (s === "done" ? "green" : s === "wontfix" ? "pending" : s === "in-progress" ? "info" : "warn");
+---
+<Base title="Backlog">
+  <h1>Backlog <span class="muted small">{items.filter((i) => i.status === "open").length} open / {items.length}</span></h1>
+  {error && <p class="error">{error}</p>}
+  <Filters fields={fields} target="backlog" />
+  <div class="table-wrap"><table id="backlog">
+    <thead><tr><th>Id</th><th>Status</th><th>Severity</th><th>Kind</th><th>Story</th><th>Op</th><th>Stage / gate</th><th>Title</th><th>Created</th></tr></thead>
+    <tbody>{items.map((i) => (
+      <tr data-status={i.status} data-severity={i.severity} data-kind={i.kind} data-story={i.source?.story ?? ""}>
+        <td><a href={`/backlog/${i.id}`}>{i.id}</a></td>
+        <td><Chip value={i.status} kind={statusKind(i.status)} /></td>
+        <td><Chip value={i.severity} /></td>
+        <td>{i.kind}</td>
+        <td>{i.source?.story && <a href={`/stories/${i.source.story}`}>{i.source.story}</a>}</td>
+        <td>{i.source?.op}</td>
+        <td class="small muted">{[i.source?.stage, i.source?.gate].filter(Boolean).join(" / ")}</td>
+        <td>{i.title}</td>
+        <td class="small">{i.created_at}</td>
+      </tr>
+    ))}</tbody>
+  </table></div>
+</Base>

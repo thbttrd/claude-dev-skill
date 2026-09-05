@@ -1,0 +1,17 @@
+---
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import Base from "../layouts/Base.astro";
+import Markdown from "../components/Markdown.astro";
+import { SPECS_DIR, designTokens } from "../lib/specs.mjs";
+const p = join(SPECS_DIR, "DESIGN.md");
+const tokens = existsSync(p) ? designTokens(readFileSync(p, "utf8")) : [];
+---
+<Base title="Design">
+  <h1>Design</h1>
+  {tokens.length > 0 && <><h2>Tokens</h2><div class="table-wrap"><table>
+    <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Usage</th></tr></thead>
+    <tbody>{tokens.map((t) => <tr><td><code>{t.token}</code></td><td><i class="swatch" style={`background:${t.light}`}></i> <code>{t.light}</code></td><td><i class="swatch" style={`background:${t.dark}`}></i> <code>{t.dark}</code></td><td>{t.usage}</td></tr>)}</tbody>
+  </table></div></>}
+  <Markdown id="DESIGN" missing="No specs/DESIGN.md — run /ui-specs" />
+</Base>

@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { setTimeout as sleep } from "node:timers/promises";
 import { astroArgs, parseArgs } from "./specs-site.mjs";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
@@ -42,4 +43,47 @@ test("build against the fixture emits the dashboard and the story page", () => {
   assert.match(story, /assets\/story-000-foundation\/mockups\/home\.html/);
   assert.doesNotMatch(story, /LEGACY MARKER/);
   assert.ok(existsSync(join(out, "stories", "US-001", "index.html")));
+  assert.match(html(out, "architecture"), /ADR-001/);
+  assert.match(html(out, "architecture"), /assets\/architecture\.png/);
+  assert.match(html(out, "design"), /<code>--background<\/code>[\s\S]*background:#f8fafc/);
+  const journal = html(out, "journal");
+  assert.match(journal, /data-kind="finding"[\s\S]*?BL-001/);
+  assert.match(journal, /chip-fail">invalid/);
+  assert.match(html(out, "backlog"), /data-status="open"[\s\S]*?BL-001/);
+  const item = html(out, "backlog/BL-001");
+  assert.match(item, /\/backlog BL-001/);
+  assert.match(item, /Source report/);
+  assert.ok(existsSync(join(out, "assets", "architecture.png")));
+  assert.ok(existsSync(join(out, "assets", "story-000-foundation", "mockups", "home.html")));
+  assert.ok(!existsSync(join(out, "assets", "legacy")));
+  const leaked = readdirSync(out, { recursive: true }).filter((f) => String(f).endsWith(".html") && readFileSync(join(out, String(f)), "utf8").includes("LEGACY MARKER"));
+  assert.deepEqual(leaked, []);
+});
+
+test("dev server reflects a state.json edit on the next request", { timeout: 120_000 }, async () => {
+  const specs = join(mkdtempSync(join(tmpdir(), "specs-site-dev-")), "specs");
+  cpSync(FIXTURE, specs, { recursive: true });
+  const port = String(4400 + Math.floor(Math.random() * 500));
+  const child = spawn(process.execPath, [CLI, "dev", "--specs", specs, "--port", port], { stdio: "ignore", detached: true });
+  const url = (p) => `http://127.0.0.1:${port}${p}`;
+  try {
+    let page = null;
+    for (let i = 0; i < 60 && page === null; i++) {
+      await sleep(1000);
+      page = await fetch(url("/stories/US-000")).then((r) => (r.ok ? r.text() : null)).catch(() => null);
+    }
+    assert.ok(page, "dev server did not come up");
+    assert.match(page, /class="scenario red"[^>]*data-scenario="Remembering a visitor"/);
+    const statePath = join(specs, "story-000-foundation", "state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.operations["Op-2"].operation_phase = "green";
+    state.test_plan_rows["T-02"].passing = true;
+    writeFileSync(statePath, JSON.stringify(state, null, 2));
+    await sleep(500);
+    const after = await fetch(url("/stories/US-000")).then((r) => r.text());
+    assert.match(after, /class="scenario green"[^>]*data-scenario="Remembering a visitor"/);
+    assert.equal((await fetch(url("/assets/story-000-foundation/mockups/home.html"))).headers.get("content-type"), "text/html; charset=utf-8");
+  } finally {
+    try { process.kill(-child.pid, "SIGTERM"); } catch {}
+  }
 });

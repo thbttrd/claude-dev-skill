@@ -1,0 +1,32 @@
+---
+import Base from "../layouts/Base.astro";
+import Chip from "../components/Chip.astro";
+import Filters from "../components/Filters.astro";
+import { readJournal } from "../lib/specs.mjs";
+const journal = readJournal().slice().reverse();
+const uniq = (k) => [...new Set(journal.map((e) => e[k]).filter(Boolean))].sort();
+const fields = [
+  { name: "story", label: "story", values: uniq("story") },
+  { name: "op", label: "op", values: uniq("op") },
+  { name: "stage", label: "stage", values: uniq("stage") },
+  { name: "kind", label: "kind", values: uniq("kind") },
+  { name: "day", label: "day", values: [...new Set(journal.map((e) => (e.ts ?? "").slice(0, 10)).filter(Boolean))].sort().reverse() },
+];
+---
+<Base title="Journal">
+  <h1>Journal <span class="muted small">{journal.length} entries</span></h1>
+  <Filters fields={fields} target="journal" />
+  <div class="table-wrap"><table id="journal">
+    <thead><tr><th>ts</th><th>story</th><th>op</th><th>stage</th><th>agent</th><th>kind</th><th>summary</th><th>refs</th></tr></thead>
+    <tbody>{journal.map((e) => (
+      <tr data-story={e.story ?? ""} data-op={e.op ?? ""} data-stage={e.stage ?? ""} data-kind={e.kind ?? ""} data-day={(e.ts ?? "").slice(0, 10)} class={e.kind === "invalid" ? "error" : ""}>
+        <td class="small">{e.ts ?? `line ${e.line}`}</td>
+        <td>{e.story && <a href={`/stories/${e.story}`}>{e.story}</a>}</td>
+        <td>{e.op}</td><td>{e.stage}</td><td class="small muted">{e.agent}</td>
+        <td><Chip value={e.kind} kind={e.kind === "invalid" ? "fail" : (e.verdict ?? "pending")} />{e.gate && <> <Chip value={`${e.gate} ${e.verdict}`} kind={e.verdict} /></>}</td>
+        <td>{e.summary}{e.raw && <pre class="small">{e.raw}</pre>}</td>
+        <td class="small">{e.sha && <code>{e.sha}</code>} {e.backlog_id && <a href={`/backlog/${e.backlog_id}`}>{e.backlog_id}</a>} {e.report && <a href={e.story ? `/stories/${e.story}#verification` : "#"}>{e.report.split("/").at(-1)}</a>} {(e.refs ?? []).map((r) => <code>{r} </code>)} {e.run_id && <span class="muted">{e.run_id}</span>}</td>
+      </tr>
+    ))}</tbody>
+  </table></div>
+</Base>

@@ -33,6 +33,22 @@ jobs:
       - name: autopilot unit tests
         run: node --test plugins/autopilot/skills/autopilot/scripts/autopilot.test.mjs
 
+  specs-site:
+    name: specs-site tests (unit + build + dev smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: plugins/specs-site/skills/specs-site/site/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: plugins/specs-site/skills/specs-site/site
+      - run: npm test
+        working-directory: plugins/specs-site/skills/specs-site/site
+      - run: node --test plugins/specs-site/skills/specs-site/scripts/specs-site.test.mjs
+
   changelog-bump-guard:
     name: every plugin change has a CHANGELOG entry
     runs-on: ubuntu-latest
