@@ -88,12 +88,12 @@ for name in "${PIPELINE_PLUGINS[@]}"; do
   grep -q "autopilot-contract.md" "$ROOT/plugins/$name/skills/$name/SKILL.md" || fail "$name: SKILL.md does not reference references/autopilot-contract.md"
 done
 
-# Every copy of the contract anywhere under plugins/, on or off the roster, must match canonical.
+# 6. Every copy of the contract anywhere under plugins/, on or off the roster, must match canonical.
 while IFS= read -r copy; do
   [ "$(sha256sum "$copy" | cut -d' ' -f1)" = "$canon_sum" ] || fail "$copy: differs from canonical (run scripts/sync-contract.sh)"
 done < <(find "$ROOT/plugins" -path '*/references/autopilot-contract.md')
 
-# 6. Bundled agents: frontmatter name matches file name, description present
+# 7. Bundled agents: frontmatter name matches file name, description present
 for agent in "$ROOT"/plugins/*/agents/*.md; do
   [ -f "$agent" ] || continue
   aname="$(basename "$agent" .md)"
