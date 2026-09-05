@@ -20,6 +20,7 @@
 - **`repo-initialization` does not gain a `specs:site` npm script** (spec §5.1/§9). The plugin script is not on the project's PATH, and `/specs-site` is the entry point. The `specs/.site/` gitignore line already ships (2.2.x). `repo-initialization` gets the contract patch bump only.
 - **Run-2 fixes ride in this plan** (Tasks 1–3) rather than a separate Plan 3b: P1/P3 change what the journal's `stop` line says and P2 what `base_sha` means — the site renders both, so they land first.
 - **P2 rule:** when `base_sha[story]` is absent at first pickup, the base is the parent of the first commit whose subject matches `^(test|feat|fix|refactor|chore)\(US-NNN\)`; HEAD only when no such commit exists. No `state.json` read — prior story commits are the only evidence that work predates this run.
+- **Astro 7 daemonizes `astro dev` when it detects an AI-agent environment** (found while executing Task 7: kills left the server running and the next start refused with "Dev server already running"). The CLI embraces it: `dev` passes `--force` (replace the running server, one per plugin checkout), `stop` / `status` pass through to `astro dev stop|status`; in a terminal the server stays in the foreground and the CLI forwards `SIGINT`/`SIGTERM`/`SIGHUP`. `/specs-site` therefore needs no `run_in_background`; `--stop` ends it. The dev smoke cleans up both ways and asserts no Astro process is left.
 - **P3 rule:** `stage-end --outcome sentinel` clears `ap.current` when `next` is `done` or `stop`; `stop()` already falls back to `stage: "autopilot"` / `story: target`, which `report` renders as `run — stop (<reason>)`. A stop while a stage is running keeps that stage's attribution.
 
 ## Global Constraints
@@ -1771,7 +1772,7 @@ test("dev server reflects a state.json edit on the next request", { timeout: 120
     assert.match(after, /class="scenario green"[^>]*data-scenario="Remembering a visitor"/);
     assert.equal((await fetch(url("/assets/story-000-foundation/mockups/home.html"))).headers.get("content-type"), "text/html; charset=utf-8");
   } finally {
-    try { process.kill(-child.pid, "SIGTERM"); } catch {}
+    try { process.kill(-child.pid, "SIGKILL"); } catch {} // SIGTERM leaves astro running (observed)
   }
 });
 ```

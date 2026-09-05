@@ -20,6 +20,7 @@ test("parseArgs: defaults, bare --host, --out default, unknown flag", () => {
   assert.equal(parseArgs(["dev", "--host"]).host, "0.0.0.0");
   assert.equal(parseArgs(["dev", "--host", "10.0.0.5", "--port", "5000"]).port, "5000");
   assert.deepEqual(astroArgs(parseArgs(["build", "--specs", "s", "--out", "/tmp/o"])), ["build"]);
+  assert.deepEqual(astroArgs(parseArgs(["stop"])), ["dev", "stop"]);
   assert.throws(() => parseArgs(["serve"]), /usage/);
   assert.throws(() => parseArgs(["dev", "--nope"]), /unknown argument --nope/);
 });
@@ -84,6 +85,16 @@ test("dev server reflects a state.json edit on the next request", { timeout: 120
     assert.match(after, /class="scenario green"[^>]*data-scenario="Remembering a visitor"/);
     assert.equal((await fetch(url("/assets/story-000-foundation/mockups/home.html"))).headers.get("content-type"), "text/html; charset=utf-8");
   } finally {
-    try { process.kill(-child.pid, "SIGTERM"); } catch {}
+    // Foreground (a human terminal, CI): the CLI forwards SIGTERM to its Astro child.
+    // Daemon (Astro detected an AI agent): `specs-site stop` reads Astro's lock file.
+    const exited = new Promise((r) => child.on("exit", r));
+    child.kill("SIGTERM");
+    await Promise.race([exited, sleep(5000)]);
+    execFileSync(process.execPath, [CLI, "stop"], { stdio: "ignore" });
+    try { process.kill(-child.pid, "SIGKILL"); } catch {}
   }
+  // pgrep through a shell would match the shell's own command line; call it directly (exit 1 = no match).
+  const leftovers = () => { try { return execFileSync("pgrep", ["-u", String(process.getuid()), "-f", `astro.mjs dev --force --host 127.0.0.1 --port ${port}`], { encoding: "utf8" }).trim(); } catch { return ""; } };
+  for (let i = 0; i < 10 && leftovers(); i++) await sleep(500);
+  assert.equal(leftovers(), "", "no astro dev process left behind");
 });

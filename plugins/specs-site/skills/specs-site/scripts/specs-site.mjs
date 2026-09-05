@@ -3,14 +3,14 @@
 import { cpSync, existsSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 
 const SITE = resolve(dirname(fileURLToPath(import.meta.url)), "..", "site");
-const USAGE = "usage: specs-site dev|build [--specs DIR] [--host [ADDR]] [--port N] [--out DIR]";
+const USAGE = "usage: specs-site dev|build|stop|status [--specs DIR] [--host [ADDR]] [--port N] [--out DIR]";
 
 export function parseArgs(argv) {
   const [cmd, ...rest] = argv;
-  if (!["dev", "build"].includes(cmd)) throw new Error(USAGE);
+  if (!["dev", "build", "stop", "status"].includes(cmd)) throw new Error(USAGE);
   const o = { cmd, specs: "specs", host: "127.0.0.1", port: "4321", out: null };
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
@@ -29,8 +29,15 @@ export function parseArgs(argv) {
 // `build` always writes the site's own dist/ and is copied to --out afterwards:
 // Astro moves prerendered assets with rename(), which fails with EXDEV when
 // --out is on another filesystem (a tmpfs /tmp, a mounted specs dir).
+// Astro 7 keeps one dev server per project (a lock file). `--force` replaces a
+// running one, so `specs-site dev` always serves the specs dir it was given.
+// In a human terminal the server stays in the foreground (the CLI forwards
+// SIGINT/SIGTERM to it); under an AI agent Astro daemonizes it and the CLI
+// returns once it is up — `specs-site stop` / `status` then manage it.
 export function astroArgs(o) {
-  return o.cmd === "dev" ? ["dev", "--host", o.host, "--port", o.port] : ["build"];
+  if (o.cmd === "dev") return ["dev", "--force", "--host", o.host, "--port", o.port];
+  if (o.cmd === "build") return ["build"];
+  return ["dev", o.cmd];
 }
 
 const astroBin = (site) => {
@@ -54,23 +61,25 @@ export function main(argv) {
     console.error(err.message);
     return 2;
   }
-  if (!existsSync(join(o.specs, "stories.json"))) {
+  if (o.cmd !== "stop" && o.cmd !== "status" && !existsSync(join(o.specs, "stories.json"))) {
     console.error(`no stories.json under ${o.specs} — pass --specs /path/to/project/specs`);
     return 1;
   }
   ensureDeps();
-  if (o.cmd === "dev") console.error(`specs-site: ${o.specs} → http://${o.host}:${o.port}/`);
-  const r = spawnSync(process.execPath, [astroBin(SITE), ...astroArgs(o)], {
-    cwd: SITE,
-    stdio: "inherit",
-    env: { ...process.env, SPECS_DIR: o.specs },
-  });
-  if (r.status === 0 && o.cmd === "build") {
+  const bin = astroBin(SITE);
+  const env = { ...process.env, SPECS_DIR: o.specs };
+  if (o.cmd !== "dev") {
+    const r = spawnSync(process.execPath, [bin, ...astroArgs(o)], { cwd: SITE, stdio: "inherit", env });
+    if (r.status !== 0 || o.cmd !== "build") return r.status ?? 1;
     rmSync(o.out, { recursive: true, force: true });
     cpSync(join(SITE, "dist"), o.out, { recursive: true });
     console.error(`specs-site: built → ${o.out}`);
+    return 0;
   }
-  return r.status ?? 1;
+  console.error(`specs-site: ${o.specs} → http://${o.host}:${o.port}/  (stop: specs-site stop, or kill pid ${process.pid})`);
+  const child = spawn(process.execPath, [bin, ...astroArgs(o)], { cwd: SITE, stdio: "inherit", env });
+  for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => child.kill(sig));
+  return new Promise((done) => child.on("exit", (code, signal) => done(code ?? (signal ? 1 : 0))));
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exit(main(process.argv.slice(2)));
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exit(await main(process.argv.slice(2)));

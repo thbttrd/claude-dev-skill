@@ -27,7 +27,7 @@ Parse errors (bad JSON, a broken `.feature`, an invalid journal line) render in 
 ## Usage
 
 ```
-/specs-site [--specs DIR] [--build] [--host [ADDR]] [--port N]
+/specs-site [--specs DIR] [--build | --stop | --status] [--host [ADDR]] [--port N]
 ```
 
 or the CLI directly:
@@ -35,7 +35,10 @@ or the CLI directly:
 ```
 node skills/specs-site/scripts/specs-site.mjs dev   --specs /path/to/project/specs     # http://127.0.0.1:4321/
 node skills/specs-site/scripts/specs-site.mjs build --specs /path/to/project/specs     # → /path/to/project/specs/.site/
+node skills/specs-site/scripts/specs-site.mjs stop                                     # stop the dev server (also: status)
 ```
+
+`dev` stays in the foreground in a terminal (Ctrl-C stops it). Inside an AI agent such as Claude Code, Astro 7 daemonizes the dev server and the command returns once it is up; `stop` / `status` manage it through Astro's lock file. Starting `dev` again replaces the running server (`--force`), so the site always shows the specs dir you asked for — one server per checkout of this plugin.
 
 The first run installs the site's dependencies (`npm ci` from the committed lockfile). Node ≥ 22.12.
 
