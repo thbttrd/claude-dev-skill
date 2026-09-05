@@ -464,6 +464,21 @@ test("next: red without state.json → stop spec_contradiction", () => {
   assert.match(result.detail, /state\.json/);
 });
 
+test("next: red story whose state.json has no operations map → stop spec_contradiction", () => {
+  const { specs } = fixtureProject();
+  setStory(specs, "US-001", { phase: "red" });
+  writeState(specs, "US-001", {
+    story_id: "US-001",
+    phase: "red",
+    checkpoints: [],
+    history: [],
+  });
+  const result = nextStage(specs, dryRun("US-001"));
+  assert.equal(result.stop, true);
+  assert.equal(result.reason, "spec_contradiction");
+  assert.match(result.detail, /\/test-setup/);
+});
+
 test("next: green → verification-and-validation", () => {
   const { specs } = fixtureProject();
   setStory(specs, "US-001", { phase: "green" });

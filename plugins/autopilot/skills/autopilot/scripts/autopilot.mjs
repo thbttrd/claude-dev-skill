@@ -438,10 +438,16 @@ function resolveRed(specs, story, rigor) {
       detail: `${story} is phase red but has no state.json`,
     };
   }
-  const ops = sortOpIds(Object.keys(st.operations ?? {})).map((id) => ({
-    id,
-    ...st.operations[id],
-  }));
+  const opIds = st.operations && typeof st.operations === "object" ? Object.keys(st.operations) : [];
+  if (opIds.length === 0) {
+    return {
+      stop: true,
+      reason: "spec_contradiction",
+      detail:
+        "state.json has no operations map (legacy shape) — run /test-setup US-NNN to (re)create it from PLAN.md, or /migrate-specs",
+    };
+  }
+  const ops = sortOpIds(opIds).map((id) => ({ id, ...st.operations[id] }));
 
   if (rigor === "full") {
     const needsAudit = ops.find(
