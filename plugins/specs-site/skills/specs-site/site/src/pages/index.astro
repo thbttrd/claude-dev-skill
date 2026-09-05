@@ -15,6 +15,7 @@ const cards = stories.data.stories.map((s) => {
 });
 const byPhase = Object.fromEntries(PHASES.map((p) => [p, cards.filter((c) => c.s.phase === p)]));
 const unknownPhase = cards.filter((c) => !PHASES.includes(c.s.phase));
+const shownPhases = PHASES.filter((p) => byPhase[p].length > 0); // empty columns only push the busy ones off-screen
 const open = backlog.data.items.filter((i) => i.status === "open" || i.status === "in-progress");
 const bySeverity = ["error", "warning", "info"].map((sev) => [sev, open.filter((i) => i.severity === sev).length]);
 const lastVerified = stories.data.stories
@@ -64,13 +65,13 @@ const cur = run?.active ? run.current : null;
     </div>
   </section>
 
-  <h2>Stories by phase</h2>
+  <h2>Stories by phase <span class="muted small">{PHASES.map((p) => `${p} ${byPhase[p].length}`).join(" · ")}</span></h2>
   <div class="table-wrap">
     <table class="kanban">
-      <thead><tr>{PHASES.map((p) => <th>{p} <span class="muted">{byPhase[p].length}</span></th>)}</tr></thead>
+      <thead><tr>{shownPhases.map((p) => <th>{p} <span class="muted">{byPhase[p].length}</span></th>)}</tr></thead>
       <tbody>
         <tr>
-          {PHASES.map((p) => (
+          {shownPhases.map((p) => (
             <td>
               {byPhase[p].map(({ s, ops, gates, stateError }) => (
                 <div class="card" style="margin-bottom:.5rem">
@@ -95,7 +96,7 @@ const cur = run?.active ? run.current : null;
       <tbody>
         {recent.map((e) => (
           <tr>
-            <td class="small">{e.ts}</td>
+            <td class="ts small">{e.ts}</td>
             <td>{e.story && <a href={`/stories/${e.story}`}>{e.story}</a>}</td>
             <td>{e.op}</td><td>{e.stage}</td>
             <td><Chip value={e.kind} kind={e.kind === "invalid" ? "fail" : (e.verdict ?? "pending")} /></td>
