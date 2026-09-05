@@ -106,6 +106,12 @@
       "version": "2.3.2"
     },
     {
+      "name": "specs-site",
+      "source": "./plugins/specs-site",
+      "description": "Renders a project specs/ directory as a local Astro site — dashboard, per-story pages (story, features, plan, state, verification, backlog), architecture, design, journal and backlog — as a pure function of specs/**. /specs-site starts astro dev on 127.0.0.1 with live data; --build exports to specs/.site/. Triggers on \"/specs-site\", \"show me the specs site\", \"open the dashboard\", \"build the specs site\".",
+      "version": "1.0.0"
+    },
+    {
       "name": "test-setup",
       "source": "./plugins/test-setup",
       "description": "Per-Operation RED-phase scaffolder. For ONE Operation of ONE story (US-NNN Op-X) at a time, writes the BDD step definitions and unit/integration tests prescribed by that Operation's row(s) in PLAN.md (REASONS canvas Test Plan), plus the minimal source stubs the new tests need to compile. Tests are real — they call actual API endpoints, service methods, and functions — but those implementations are empty stubs, so tests fail at assertion time, not because of missing imports. Operates after /plan-writing US-NNN, before /spec-implementation US-NNN Op-X. The Op-X arg is optional; with no Op-X, the skill auto-picks the next pending Operation from state.json. Triggers on: \"set up tests for US-NNN\", \"RED Op-2 of US-001\", \"scaffold the next failing test\", \"/test-setup US-NNN\", \"/test-setup US-NNN Op-X\".",

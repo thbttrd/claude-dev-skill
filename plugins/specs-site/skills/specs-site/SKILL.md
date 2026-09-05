@@ -1,0 +1,9 @@
+---
+name: specs-site
+version: 1.0.0
+description: 'Renders a project specs/ directory as a local Astro site — dashboard, per-story pages (story, features, plan, state, verification, backlog), architecture, design, journal and backlog — as a pure function of specs/**. /specs-site starts astro dev on 127.0.0.1 with live data; --build exports to specs/.site/. Triggers on "/specs-site", "show me the specs site", "open the dashboard", "build the specs site".'
+---
+
+# specs-site
+
+TODO — write the skill body here.

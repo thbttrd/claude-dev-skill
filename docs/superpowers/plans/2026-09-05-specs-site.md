@@ -465,7 +465,7 @@ story-000-foundation/state.json     schema_version 2, phase_local executing, cur
                                     test_plan_rows T-01 {type BDD, op Op-1, scenario "Greeting a visitor", written true, passing true}, T-02 {type BDD, op Op-2, scenario "Remembering a visitor", written true, passing false}, T-03 {type manual, op Op-2, scenario "Operator checks the log", written false, passing false},
                                     quality_gates {simplified false, reviewed false, verified false}, decisions [{at, op Op-1, summary "…"}], summary {operations_total 2, operations_green 1, tests_written 3}
 story-000-foundation/features/F-001-greeting.feature   `@US-000 @F-001` Feature with description, Background (1 step), Rule "Visitors are greeted" containing Scenario "Greeting a visitor" (Given/When/Then + a data table) and Scenario Outline "Greeting by name" with Examples (2 rows), plus top-level Scenario "Remembering a visitor" and Scenario "Operator checks the log"
-story-000-foundation/features/broken.feature           `Feature: Broken\n  Scenario: x\n    Given a step\n  Examples:\n    | a |` (Examples outside an outline → parser error)
+story-000-foundation/features/broken.feature           `Feature: Broken\n  Scenario: x\n    Given a table\n      | a | b |\n      | 1 |\n` (inconsistent cell count → parser error at 5:7; note `Examples` after a plain `Scenario` and a bare line after `Feature:` are both valid Gherkin)
 story-000-foundation/verification/qa-report.md, green-audit-Op-1.md   short markdown
 story-000-foundation/verification/screenshots/home.png                the same 1×1 PNG
 story-000-foundation/ui/UI-F-001-home.md                              short markdown
@@ -575,8 +575,8 @@ Feature: Greeting
 });
 
 test("parseFeature: a syntax error is returned, not thrown", () => {
-  const f = g.parseFeature("Feature: Broken\n  Scenario: x\n    Given a step\n  Examples:\n    | a |\n", "broken.feature");
-  assert.match(f.error, /\(4:3\)/);
+  const f = g.parseFeature("Feature: Broken\n  Scenario: x\n    Given a table\n      | a | b |\n      | 1 |\n", "broken.feature");
+  assert.match(f.error, /\(5:7\): inconsistent cell count/);
   assert.equal(f.name, undefined);
 });
 
