@@ -1237,3 +1237,33 @@ test("P3: stage-end that finishes the run clears current, so stop journals the r
   assert.match(rep.text, /\n  run — stop \(story_end\)\n/);
   assert.doesNotMatch(rep.text, /verification-and-validation — stop/);
 });
+
+test("P2: base_sha is the parent of the story's first commit when the story was worked on before this run", async () => {
+  const { root, specs } = fixtureProject();
+  const init = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  writeFileSync(join(root, "a.txt"), "red\n");
+  commitPaths(root, "test(US-000): Op-1 RED", ["a.txt"]);
+  writeFileSync(join(root, "b.txt"), "green\n");
+  commitPaths(root, "feat(US-000): Op-1", ["b.txt"]);
+  setStory(specs, "US-000", { phase: "red", invest: INVEST_ALL_TRUE });
+  writeState(specs, "US-000", { story_id: "US-000", schema_version: 2, operations: { "Op-1": { operation_phase: "green" }, "Op-2": { operation_phase: "red" } } });
+  commitPaths(root, "chore: trackers", ["specs"]);
+  const ap = await start(specs, { target: "US-000" }, { ledger, now: new Date() });
+  assert.equal(ap.base_sha["US-000"], init);
+});
+
+test("P2: base_sha stays HEAD when no commit of the story exists yet", async () => {
+  const { root, specs } = fixtureProject();
+  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  const ap = await start(specs, { target: "US-000" }, { ledger, now: new Date() });
+  assert.equal(ap.base_sha["US-000"], head);
+});
+
+test("P8: preflight refuses when specs/autopilot.json is tracked", () => {
+  const { root, specs } = fixtureProject();
+  writeJson(join(specs, "autopilot.json"), { active: false });
+  commitPaths(root, "oops: tracked run state", ["specs/autopilot.json"]);
+  const r = preflight(specs, { target: "US-000" });
+  assert.equal(r.ok, false);
+  assert.ok(r.errors.some((e) => e.startsWith("specs/autopilot.json is tracked")), r.errors.join("\n"));
+});
