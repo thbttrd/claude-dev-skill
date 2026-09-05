@@ -25,7 +25,7 @@
       "name": "dev-ledger",
       "source": "./plugins/dev-ledger",
       "description": "Journal + backlog + regression CLI for story-based projects (specs/journal.jsonl, specs/backlog.json, BL-NNN ids, ledger regress).",
-      "version": "1.0.1"
+      "version": "1.0.2"
     },
     {
       "name": "high-level-scoping",

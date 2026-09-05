@@ -29,6 +29,7 @@ import {
   backlogList,
   backlogResolve,
   backlogWontfix,
+  formatBacklog,
   failuresFromVitest,
   failuresFromCucumber,
   failuresFromLines,
@@ -377,6 +378,9 @@ test("backlog list filters; resolve and wontfix update status and journal an act
   assert.equal(actions.length, 2);
   assert.equal(actions[0].backlog_id, "BL-001");
 });
+
+test("formatBacklog([]) prints a single '(no backlog items)' line", () =>
+  assert.equal(formatBacklog([]), "(no backlog items)\n"));
 
 test("failuresFromVitest lists failed assertions as root-relative ids, sorted", () => {
   const fx = (n) =>
