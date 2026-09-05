@@ -1107,9 +1107,13 @@ test("report dedupes duplicate gate and stop lines, keeps git order and marks un
   const gate = { kind: "gate", gate: "self-review", verdict: "PASS", summary: "4/4", run_id: ap.run_id, story: "US-000", op: "Op-7", stage: "spec-implementation" };
   ledger.log(specs, gate, now);
   ledger.log(specs, { ...gate, verdict: "PASS_WITH_WARNINGS", summary: "3/4" }, now);
-  ledger.log(specs, { kind: "commit", sha: "deadbee", summary: "chore: amended away", run_id: ap.run_id, story: "US-000" }, now);
   writeFileSync(join(root, "note.txt"), "x\n");
   const real = commitPaths(root, "feat(US-000): real", ["note.txt"]);
+  // A journaled sha that an --amend left dangling: the object still exists, no branch reaches it.
+  writeFileSync(join(root, "orphan.txt"), "y\n");
+  const orphan = commitPaths(root, "chore: amended away", ["orphan.txt"]);
+  execFileSync("git", ["reset", "-q", "--hard", real], { cwd: root, stdio: "pipe" });
+  ledger.log(specs, { kind: "commit", sha: orphan, summary: "chore: amended away", run_id: ap.run_id, story: "US-000" }, now);
 
   await stop(specs, { reason: "verifier_fail", summary: "C1" }, { ledger, now: new Date() });
   await stop(specs, { reason: "verifier_fail" }, { ledger, now: new Date() }); // a second stop with the same reason journals nothing
@@ -1120,10 +1124,10 @@ test("report dedupes duplicate gate and stop lines, keeps git order and marks un
   assert.equal(rep.stages.filter((s) => s.outcome === "stop").length, 1);
   assert.match(rep.text, /run — stop \(verifier_fail\)/);
   assert.equal(rep.commits[0].sha, real);
-  const dead = rep.commits.find((c) => c.sha === "deadbee");
+  const dead = rep.commits.find((c) => c.sha === orphan);
   assert.equal(dead.unreachable, true);
   assert.match(dead.summary, /\(unreachable\)$/);
-  assert.match(rep.text, /deadbee chore: amended away \(unreachable\)/);
+  assert.ok(rep.text.includes(`${orphan} chore: amended away (unreachable)`), rep.text);
 });
 
 test("start excludes specs/autopilot.json via .git/info/exclude exactly once and carries base_sha across runs", async () => {

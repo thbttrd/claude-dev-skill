@@ -1040,10 +1040,12 @@ export async function report(specs, opts, deps = {}) {
   }
 
   // git's own order first (newest first, as `git log` prints); journaled
-  // shas git no longer reaches (an --amend after journaling) come last, marked.
+  // shas HEAD no longer reaches (an --amend after journaling) come last,
+  // marked. `rev-parse --verify` is not enough: a dangling pre-amend commit
+  // still exists in the object store until gc — ancestry of HEAD is the test.
   const root = dirname(specs);
   const reachable = (sha) =>
-    spawnSync("git", ["rev-parse", "--verify", "--quiet", `${sha}^{commit}`], { cwd: root, stdio: "ignore" }).status === 0;
+    spawnSync("git", ["merge-base", "--is-ancestor", sha, "HEAD"], { cwd: root, stdio: "ignore" }).status === 0;
   const sameSha = (a, b) => a.startsWith(b) || b.startsWith(a);
   const commits = [...gitCommits];
   for (const c of journaledCommits) {
