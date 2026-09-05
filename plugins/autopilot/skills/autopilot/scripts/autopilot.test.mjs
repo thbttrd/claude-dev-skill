@@ -61,6 +61,12 @@ export function writeState(specs, id, state) {
   writeFileSync(join(dir, "state.json"), JSON.stringify(state, null, 2) + "\n");
 }
 
+export function commitPaths(root, msg, paths) {
+  execFileSync("git", ["add", "--", ...paths], { cwd: root, stdio: "pipe" });
+  execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", msg], { cwd: root, stdio: "pipe" });
+  return execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+}
+
 test("locateLedger falls back to the in-repo sibling and honours the override", () => {
   // The override must exist to win (see the "authoritative" fix-round test
   // below for the nonexistent-override case) — use a real, but arbitrary,
@@ -1048,4 +1054,70 @@ test("CLI: start → stage-start → stage-end → stop round-trips through main
   const ap = readAutopilot(specs);
   assert.equal(ap.active, false);
   assert.equal(ap.stop_reason, "test_done");
+});
+
+test("stop before any stage journals story=target, stage=autopilot; report renders it as 'run — stop (<reason>)'", async () => {
+  const { specs } = fixtureProject();
+  const now = new Date("2026-09-05T10:00:00.000Z");
+  const ap = await start(specs, { target: "US-000" }, { ledger, now });
+  const rep = await stop(specs, { reason: "spec_contradiction", summary: "no operations map" }, { ledger, now });
+  const entry = ledger.readJournal(specs).find((e) => e.kind === "stop" && e.run_id === ap.run_id);
+  assert.equal(entry.story, "US-000");
+  assert.equal(entry.stage, "autopilot");
+  assert.equal(rep.stages[0].reason, "spec_contradiction");
+  assert.match(rep.text, /run — stop \(spec_contradiction\)/);
+  assert.doesNotMatch(rep.text, /null null/);
+});
+
+test("stop skips its journal line when the stage agent already recorded the same stop_reason (contract §2.3)", async () => {
+  const { specs } = fixtureProject();
+  const now = new Date("2026-09-05T10:00:00.000Z");
+  const ap = await start(specs, { target: "US-000" }, { ledger, now });
+  await stageStart(
+    specs,
+    { story: "US-000", stage: "spec-writing-verification", agent: "story-verifier" },
+    { ledger, now },
+  );
+  // What story-verifier does on FAIL: stop_reason into autopilot.json (active untouched) + one journal stop line.
+  writeJson(join(specs, "autopilot.json"), { ...readAutopilot(specs), stop_reason: "verifier_fail" });
+  ledger.log(
+    specs,
+    { kind: "stop", summary: "verifier_fail: scenario X contradicts rule R2", run_id: ap.run_id, story: "US-000", stage: "spec-writing-verification" },
+    now,
+  );
+
+  const result = await stageEnd(specs, { outcome: "stop", reason: "verifier_fail" }, { ledger, now });
+  assert.deepEqual(result, { action: "stop", reason: "verifier_fail" });
+  const after = readAutopilot(specs);
+  assert.equal(after.active, false);
+  assert.equal(after.stop_reason, "verifier_fail");
+  const stops = ledger.readJournal(specs).filter((e) => e.kind === "stop" && e.run_id === ap.run_id);
+  assert.equal(stops.length, 1);
+  assert.match(stops[0].summary, /contradicts rule R2/);
+});
+
+test("report dedupes duplicate gate and stop lines, keeps git order and marks unreachable journaled shas", async () => {
+  const { specs, root } = fixtureProject();
+  const now = new Date(Date.now() - 5000); // the run started 5 s ago: a commit made now is inside --since
+  const ap = await start(specs, { target: "US-000" }, { ledger, now });
+  const gate = { kind: "gate", gate: "self-review", verdict: "PASS", summary: "4/4", run_id: ap.run_id, story: "US-000", op: "Op-7", stage: "spec-implementation" };
+  ledger.log(specs, gate, now);
+  ledger.log(specs, { ...gate, verdict: "PASS_WITH_WARNINGS", summary: "3/4" }, now);
+  ledger.log(specs, { kind: "commit", sha: "deadbee", summary: "chore: amended away", run_id: ap.run_id, story: "US-000" }, now);
+  writeFileSync(join(root, "note.txt"), "x\n");
+  const real = commitPaths(root, "feat(US-000): real", ["note.txt"]);
+
+  await stop(specs, { reason: "verifier_fail", summary: "C1" }, { ledger, now: new Date() });
+  await stop(specs, { reason: "verifier_fail" }, { ledger, now: new Date() }); // a second stop with the same reason journals nothing
+
+  const rep = await report(specs, { run_id: ap.run_id }, { ledger });
+  assert.equal(rep.gates.length, 1);
+  assert.equal(rep.gates[0].verdict, "PASS_WITH_WARNINGS", "last verdict wins");
+  assert.equal(rep.stages.filter((s) => s.outcome === "stop").length, 1);
+  assert.match(rep.text, /run — stop \(verifier_fail\)/);
+  assert.equal(rep.commits[0].sha, real);
+  const dead = rep.commits.find((c) => c.sha === "deadbee");
+  assert.equal(dead.unreachable, true);
+  assert.match(dead.summary, /\(unreachable\)$/);
+  assert.match(rep.text, /deadbee chore: amended away \(unreachable\)/);
 });

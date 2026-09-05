@@ -853,6 +853,10 @@ export async function stop(specs, opts, deps = {}) {
   const ledger = deps.ledger ?? (await defaultLedger(opts.ledger));
   const now = deps.now ?? new Date();
   const ap = readAutopilot(specs) ?? {};
+  // A stage agent that hard-stops per contract §2.3 has already written
+  // stop_reason and journaled the stop; the conductor's stage-end must not
+  // record the same stop a second time.
+  const alreadyJournaled = opts.reason != null && ap.stop_reason === opts.reason;
 
   if (ap.active === true) {
     ap.active = false;
@@ -861,18 +865,20 @@ export async function stop(specs, opts, deps = {}) {
     writeJson(autopilotPath(specs), ap);
   }
 
-  ledger.log(
-    specs,
-    {
-      kind: "stop",
-      summary: opts.summary ? `${opts.reason}: ${opts.summary}` : String(opts.reason),
-      run_id: ap.run_id ?? null,
-      story: ap.current?.story ?? null,
-      op: ap.current?.op ?? null,
-      stage: ap.current?.stage ?? null,
-    },
-    now,
-  );
+  if (!alreadyJournaled) {
+    ledger.log(
+      specs,
+      {
+        kind: "stop",
+        summary: opts.summary ? `${opts.reason}: ${opts.summary}` : String(opts.reason),
+        run_id: ap.run_id ?? null,
+        story: ap.current?.story ?? ap.target ?? null,
+        op: ap.current?.op ?? null,
+        stage: ap.current?.stage ?? "autopilot",
+      },
+      now,
+    );
+  }
 
   return report(specs, { run_id: ap.run_id ?? null }, { ledger, now });
 }
@@ -885,7 +891,11 @@ function renderReportText({ run_id, target, until, stop_reason, stages, gates, b
       "",
       block(
         "stages",
-        stages.map((s) => `  ${stageArgs(s.story, s.op)} ${s.stage} — ${s.outcome}`),
+        stages.map((s) =>
+          s.outcome === "stop"
+            ? `  ${s.stage == null || s.stage === "autopilot" ? "run" : `${stageArgs(s.story, s.op)} ${s.stage}`} — stop (${s.reason})`
+            : `  ${stageArgs(s.story, s.op)} ${s.stage} — ok`,
+        ),
       ),
       "",
       block(
@@ -926,18 +936,27 @@ export async function report(specs, opts, deps = {}) {
   const ap = readAutopilot(specs);
   const matchesRun = ap?.run_id === run_id;
 
-  const stages = entries
-    .filter((e) => e.kind === "stage_end" || e.kind === "stop")
-    .map((e) => ({
-      stage: e.stage,
-      story: e.story,
-      op: e.op,
-      outcome: e.kind === "stage_end" ? "ok" : "stop",
-    }));
+  const stopReason = (e) => (e.summary ?? "").split(":")[0].trim() || "?";
+  const seenStages = new Set();
+  const stages = [];
+  for (const e of entries) {
+    if (e.kind !== "stage_end" && e.kind !== "stop") continue;
+    const s = { stage: e.stage, story: e.story, op: e.op, outcome: e.kind === "stage_end" ? "ok" : "stop" };
+    if (e.kind === "stop") s.reason = stopReason(e);
+    const key = [s.story, s.op, s.stage, s.outcome].join("|");
+    if (seenStages.has(key)) continue; // the same stage journaled twice (two agents, or agent + conductor) is one line
+    seenStages.add(key);
+    stages.push(s);
+  }
 
-  const gates = entries
-    .filter((e) => e.kind === "gate")
-    .map((e) => ({ gate: e.gate, verdict: e.verdict, story: e.story, op: e.op, report: e.report ?? null }));
+  // One line per gate: the last verdict wins, first appearance keeps its place.
+  const gateByKey = new Map();
+  for (const e of entries.filter((e) => e.kind === "gate")) {
+    gateByKey.set([e.story, e.op, e.gate].join("|"), {
+      gate: e.gate, verdict: e.verdict, story: e.story, op: e.op, report: e.report ?? null,
+    });
+  }
+  const gates = [...gateByKey.values()];
 
   const backlog_ids = entries.filter((e) => e.kind === "finding" && e.backlog_id).map((e) => e.backlog_id);
 
@@ -963,12 +982,16 @@ export async function report(specs, opts, deps = {}) {
     }
   }
 
-  const seen = new Set();
-  const commits = [];
-  for (const c of [...journaledCommits, ...gitCommits]) {
-    if (!c.sha || seen.has(c.sha)) continue;
-    seen.add(c.sha);
-    commits.push(c);
+  // git's own order first (newest first, as `git log` prints); journaled
+  // shas git no longer reaches (an --amend after journaling) come last, marked.
+  const root = dirname(specs);
+  const reachable = (sha) =>
+    spawnSync("git", ["rev-parse", "--verify", "--quiet", `${sha}^{commit}`], { cwd: root, stdio: "ignore" }).status === 0;
+  const sameSha = (a, b) => a.startsWith(b) || b.startsWith(a);
+  const commits = [...gitCommits];
+  for (const c of journaledCommits) {
+    if (!c.sha || commits.some((k) => sameSha(k.sha, c.sha))) continue;
+    commits.push(reachable(c.sha) ? c : { ...c, summary: `${c.summary} (unreachable)`, unreachable: true });
   }
 
   const result = {
