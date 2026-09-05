@@ -1,6 +1,6 @@
 ---
 name: plan-writing-verification
-version: 2.2.1
+version: 2.3.0
 description: >
   Per-story verification of the output of /plan-writing for completeness,
   REASONS-canvas compliance, TDD prescription, Test Plan traceability, and
@@ -54,6 +54,8 @@ The verification runs in a **fresh agent** so the review has no context bias fro
 ## Execution
 
 **Spawn a fresh Opus agent** with the audit prompt below.
+
+Under `/autopilot` this skill's audit is performed by the bundled `story-verifier` agent, which reads this file and executes the Agent Prompt itself (a subagent cannot spawn agents).
 
 ### Agent Prompt
 
@@ -211,11 +213,13 @@ FAIL = critical issues that must be fixed before /test-setup
 
 ### After the Agent Returns
 
-1. Present the report to the user.
-2. Journal the verdict: `node "$LEDGER" log --kind gate --gate plan-verification --verdict <PASS|PASS_WITH_WARNINGS|FAIL> --report <report path> --story US-NNN --summary "<one line>"`.
+1. Persist the report to `specs/story-NNN-slug/verification/plan-audit.md` (create the directory), then present its summary.
+2. Journal the verdict: `node "$LEDGER" log --kind gate --gate plan-verification --verdict <PASS|PASS_WITH_WARNINGS|FAIL> --report specs/story-NNN-slug/verification/plan-audit.md --story US-NNN --summary "<one line>"`.
 3. **FAIL**: list critical issues. Outside autopilot ask whether to fix now (loops back into `/plan-writing US-NNN` — re-runs are allowed while the story's phase is `planned`). Under autopilot: hard stop `verifier_fail` (contract §2).
-4. **PASS_WITH_WARNINGS**: file every warning — `node "$LEDGER" backlog add --title "<warning>" --severity warning --kind <spec-gap|test-gap|refactor|doc|bug> --gate plan-verification --report <report path> --story US-NNN` — print the ids, then proceed as PASS. Outside autopilot you may instead offer to address them now.
+4. **PASS_WITH_WARNINGS**: file every warning — `node "$LEDGER" backlog add --title "<warning>" --severity warning --kind <spec-gap|test-gap|refactor|doc|bug> --gate plan-verification --report specs/story-NNN-slug/verification/plan-audit.md --story US-NNN` — print the ids, then proceed as PASS. Outside autopilot you may instead offer to address them now.
 5. **PASS**: confirm readiness and suggest running `/test-setup US-NNN`.
+
+Under autopilot, skip the question and emit `<promise>PLAN_AUDIT_COMPLETE_US-NNN</promise>`.
 
 ## What This Skill Does NOT Do
 

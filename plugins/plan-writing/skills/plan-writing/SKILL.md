@@ -1,6 +1,6 @@
 ---
 name: plan-writing
-version: 2.3.1
+version: 2.4.0
 description: >
   Plans the implementation of one **user story** at a time (US-NNN) — not a
   release, not a wave. Reads the story's STORY.md + features + the project-wide
@@ -212,6 +212,8 @@ Regenerate `specs/STORIES.md` so the kanban shows the new phase.
      - "Run the deep audit — /plan-writing-verification US-NNN" — opt-in fresh-agent audit; recommended for `US-000` and other full-rigor, high-stakes stories, skippable otherwise
      - "Adjust the plan" — describe changes; loop back
      - "Plan another story" — pick a new story
+
+Under autopilot (contract §2), skip the question and emit `<promise>PLAN_COMPLETE_US-NNN</promise>`.
 
 ---
 
