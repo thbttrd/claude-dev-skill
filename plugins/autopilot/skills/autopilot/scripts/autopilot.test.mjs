@@ -48,8 +48,12 @@ export function writeState(specs, id, state) {
 }
 
 test("locateLedger falls back to the in-repo sibling and honours the override", () => {
-  const bogus = "/nonexistent/path/to/ledger.mjs";
-  assert.equal(locateLedger(bogus), resolve(bogus));
+  // The override must exist to win (see the "authoritative" fix-round test
+  // below for the nonexistent-override case) — use a real, but arbitrary,
+  // file so this only proves precedence, not existence-checking.
+  const overridePath = join(mkdtempSync(join(tmpdir(), "autopilot-override-")), "ledger.mjs");
+  writeFileSync(overridePath, "");
+  assert.equal(locateLedger(overridePath), resolve(overridePath));
 
   const prevHome = process.env.HOME;
   const emptyHome = mkdtempSync(join(tmpdir(), "autopilot-home-"));
@@ -194,4 +198,35 @@ test("CLI: preflight prints JSON and exits 1 on failure", () => {
   const out = JSON.parse(r.stdout);
   assert.equal(out.ok, false);
   assert.ok(out.errors.some((e) => e === "unknown story US-999"));
+});
+
+test("CLI: preflight still returns its JSON contract when dev-ledger cannot be found", () => {
+  const { specs } = fixtureProject();
+  const script = fileURLToPath(new URL("./autopilot.mjs", import.meta.url));
+  const emptyHome = mkdtempSync(join(tmpdir(), "autopilot-home-"));
+  // $LEDGER is authoritative once set (locateLedger stops searching), and a
+  // nonexistent override reads as "not installed" rather than falling back
+  // to the in-repo sibling — this is how we force the "no ledger" branch
+  // deterministically even though a real sibling always exists in this repo.
+  const r = spawnSync(process.execPath, [script, "preflight", "US-000", "--specs", specs], {
+    encoding: "utf8",
+    env: { ...process.env, HOME: emptyHome, LEDGER: "/nonexistent/ledger.mjs" },
+  });
+  assert.equal(r.status, 1, r.stderr);
+  assert.equal(r.stderr, "");
+  const out = JSON.parse(r.stdout);
+  assert.equal(out.ok, false);
+  assert.ok(out.errors.some((e) => /dev-ledger not installed/.test(e)));
+});
+
+test("preflight names the new path (not the old, not a v1 arrow) when a tracked file is renamed", () => {
+  const { root, specs } = fixtureProject();
+  execFileSync("git", ["mv", "specs/PROJECT.md", "specs/PROJECT2.md"], { cwd: root });
+
+  const result = preflight(specs, { target: "US-000" });
+  assert.equal(result.ok, false);
+  const err = result.errors.find((e) => e.startsWith("working tree not clean:"));
+  assert.ok(err, `expected a working-tree-not-clean error, got ${JSON.stringify(result.errors)}`);
+  assert.ok(err.includes("specs/PROJECT2.md"));
+  assert.ok(!err.includes(" -> "));
 });

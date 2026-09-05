@@ -17,8 +17,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 // ---- Locate + load the dev-ledger CLI --------------------------------------
 
+// An explicit override (arg or $LEDGER) is authoritative: if set, we check
+// only that path and never fall back to auto-discovery — a typo'd override
+// must read as "not installed", not silently resolve to a different ledger.
 export function locateLedger(override = process.env.LEDGER) {
-  if (override) return resolve(override);
+  if (override) return existsSync(override) ? resolve(override) : null;
   const home = process.env.HOME || homedir();
   const r = spawnSync(
     "find",
@@ -106,6 +109,21 @@ const RUN_OWNED_FILES = new Set([
 
 const storyNum = (id) => parseInt(String(id).slice(3), 10);
 
+// Paths reported dirty by `git status --porcelain -z`. A rename/copy entry
+// is a 2-token pair ("XY newpath", "oldpath" with no status prefix) — we
+// report the new path and consume the old-path token so it isn't
+// mis-parsed as its own (status-less) entry.
+function porcelainPaths(stdout) {
+  const tokens = stdout.split("\0").filter(Boolean);
+  const paths = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const status = tokens[i].slice(0, 2);
+    paths.push(tokens[i].slice(3));
+    if (status[0] === "R" || status[0] === "C") i++; // skip the paired old path
+  }
+  return paths;
+}
+
 export function preflight(specs, opts = {}) {
   const errors = [];
   const target = opts.target;
@@ -177,24 +195,19 @@ export function preflight(specs, opts = {}) {
   }
 
   const root = dirname(specs);
-  const git = spawnSync("git", ["status", "--porcelain"], {
+  // -z: NUL-separated, no C-style path quoting, and renames come through as
+  // an unambiguous "XY newpath\0oldpath\0" pair — plain --porcelain's
+  // "oldpath -> newpath" line and quoted paths both break a slice(3) parse.
+  const git = spawnSync("git", ["status", "--porcelain", "-z"], {
     cwd: root,
     encoding: "utf8",
   });
   if (git.error || git.status !== 0) {
     errors.push("not a git repository");
   } else {
-    const dirty = git.stdout
-      .split("\n")
-      .filter(Boolean)
-      .filter((line) => !RUN_OWNED_FILES.has(line.slice(3).trim()));
+    const dirty = porcelainPaths(git.stdout).filter((p) => !RUN_OWNED_FILES.has(p));
     if (dirty.length) {
-      errors.push(
-        `working tree not clean: ${dirty
-          .slice(0, 3)
-          .map((line) => line.slice(3).trim())
-          .join(", ")}`,
-      );
+      errors.push(`working tree not clean: ${dirty.slice(0, 3).join(", ")}`);
     }
   }
 
@@ -226,35 +239,59 @@ export function preflight(specs, opts = {}) {
 
 // ---- CLI ---------------------------------------------------------------------
 
-export async function main(argv) {
-  const ledgerPath = locateLedger();
-  if (!ledgerPath) {
-    process.stderr.write(
-      "autopilot: dev-ledger not installed: /plugin install dev-ledger@claude-dev-skill\n",
-    );
-    return 1;
+// Local copies of ledger.mjs's parseArgs/findSpecsDir: `preflight` must print
+// its JSON contract (including "dev-ledger not installed" as one collected
+// error) even when the ledger can't be found, so argv/specs resolution can't
+// depend on having loaded it first. Subcommands that actually need the
+// ledger module (journal/backlog/regress, added by later tasks) load it
+// themselves and are free to hard-require it.
+function parseArgs(argv) {
+  const opts = { _: [] };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (!a.startsWith("--")) {
+      opts._.push(a);
+      continue;
+    }
+    const key = a.slice(2);
+    const next = argv[i + 1];
+    opts[key] = next === undefined || next.startsWith("--") ? true : argv[++i];
   }
-  const ledger = await loadLedger(ledgerPath);
-  const opts = ledger.parseArgs(argv);
+  return opts;
+}
+
+function findSpecsDir(start = process.cwd(), override = process.env.LEDGER_SPECS) {
+  if (override) return resolve(override);
+  let dir = resolve(start);
+  for (;;) {
+    if (existsSync(join(dir, "specs", "stories.json"))) return join(dir, "specs");
+    const parent = dirname(dir);
+    if (parent === dir) throw new Error(`no specs/stories.json found above ${start}`);
+    dir = parent;
+  }
+}
+
+export async function main(argv) {
+  const opts = parseArgs(argv);
   const [cmd, arg1] = opts._;
-  const getSpecs = () =>
-    ledger.findSpecsDir(process.cwd(), opts.specs ?? process.env.LEDGER_SPECS);
 
   switch (cmd) {
     case "preflight": {
-      const result = preflight(getSpecs(), {
+      const specs = findSpecsDir(process.cwd(), opts.specs ?? process.env.LEDGER_SPECS);
+      const result = preflight(specs, {
         target: arg1,
         until: opts.until,
         stop_policy: opts["stop-policy"],
         skip_arch_check: Boolean(opts["skip-arch-check"]),
         force: Boolean(opts.force),
+        ledger: opts.ledger,
       });
       process.stdout.write(JSON.stringify(result, null, 2) + "\n");
       return result.ok ? 0 : 1;
     }
     default:
       process.stderr.write(
-        "usage: autopilot preflight US-NNN [--specs dir] [--until US-MMM] [--stop-policy p] [--skip-arch-check] [--force]\n",
+        "usage: autopilot preflight US-NNN [--specs dir] [--until US-MMM] [--stop-policy p] [--skip-arch-check] [--force] [--ledger path]\n",
       );
       return 2;
   }
