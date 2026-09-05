@@ -509,7 +509,9 @@ export function nextEligibleStory(stories, afterId, untilId) {
 }
 
 function resolveVerified(specs, ap, story, stories) {
-  if (story === ap.until) return { done: true, reason: "until_reached", story };
+  // A story that just reached `verified` under a story-end policy pauses as
+  // story_end even when it is also --until: until_reached is reserved for the
+  // chain being exhausted (dogfood run 2, P1).
   const storyEndPolicy = String(ap.stop_policy ?? "").includes("story-end");
   if (
     storyEndPolicy &&
@@ -518,6 +520,7 @@ function resolveVerified(specs, ap, story, stories) {
   ) {
     return { done: true, reason: "story_end", story };
   }
+  if (story === ap.until) return { done: true, reason: "until_reached", story };
   const next = nextEligibleStory(stories, story, ap.until);
   return next ? resolveForStory(specs, ap, next) : { done: true, reason: "until_reached", story };
 }
@@ -902,6 +905,9 @@ export async function stageEnd(specs, opts, deps = {}) {
   }
 
   if (!next.done && !next.stop && next.story !== current.story) recordBaseSha(specs, ap, next.story);
+  // The run is over: nothing is running any more, so a following `stop`
+  // belongs to the run, not to the stage that happened to finish last (P3).
+  if (next.done || next.stop) ap.current = null;
   writeJson(autopilotPath(specs), ap);
   return { action: "continue", next };
 }
