@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [3.0.0] — 2026-09-05
+
+### Changed
+
+- **Breaking:** Phase 0 INVEST gate is produced by the bundled `invest-assessor` agent (from the `autopilot` plugin). Outside autopilot the user confirms the agent's table; under autopilot the verdict is final. Requires `autopilot` ≥ 1.0.0 to be installed for the gate; without it the skill prints the install command.
+
 ## [2.2.1] — 2026-08-31
 
 ### Fixed

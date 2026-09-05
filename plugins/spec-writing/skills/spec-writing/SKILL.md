@@ -1,7 +1,7 @@
 ---
 name: spec-writing
-version: 2.2.1
-description: Story-based spec-writing skill that produces, for one user story at a time, a `STORY.md` (INVEST-shaped User Story + Acceptance Criteria + Rules) plus one or more Cucumber-compatible `.feature` files with full Gherkin scenarios. Runs an INVEST gate (Phase 0) before any spec generation, scaled by the story's rigor tier (light stories get a single-batch confirmation and chain straight into /plan-writing compact mode; full stories get the full interactive gate). Ends with a mandatory self-review checklist walk. Output lives at `specs/story-NNN-slug/`. Use this skill whenever the user wants to spec a specific story, define behaviour for a feature, capture acceptance criteria, or says things like "spec story US-001", "/spec-writing US-NNN", "let's spec out the auth story", "write the Gherkin for this feature". Also trigger when the user wants to update or refine an existing story's spec, add new rules, or audit acceptance-criteria coverage.
+version: 3.0.0
+description: Story-based spec-writing skill that produces, for one user story at a time, a `STORY.md` (INVEST-shaped User Story + Acceptance Criteria + Rules) plus one or more Cucumber-compatible `.feature` files with full Gherkin scenarios. Runs an INVEST gate (Phase 0) via the bundled `invest-assessor` agent (from the `autopilot` plugin) before any spec generation, scaled by the story's rigor tier (light stories get a single-batch confirmation seeded by the agent's table and chain straight into /plan-writing compact mode; full stories confirm the agent's table interactively letter by letter). Ends with a mandatory self-review checklist walk. Output lives at `specs/story-NNN-slug/`. Use this skill whenever the user wants to spec a specific story, define behaviour for a feature, capture acceptance criteria, or says things like "spec story US-001", "/spec-writing US-NNN", "let's spec out the auth story", "write the Gherkin for this feature". Also trigger when the user wants to update or refine an existing story's spec, add new rules, or audit acceptance-criteria coverage.
 ---
 
 # Spec Writing Skill (story-based)
@@ -36,13 +36,38 @@ The story id chosen here is the only story this invocation modifies.
 
 ## Phase 0 — INVEST Gate (mandatory)
 
-Before any discovery or generation, run the INVEST checklist for the chosen story.
+Before any discovery or generation, gate the chosen story against INVEST. The six-letter assessment is produced by the bundled `invest-assessor` agent (from the `autopilot` plugin) — this skill does not guess the table unaided. Run these four steps in order.
 
-**Light stories (`rigor: "light"`)** get a single-batch gate: run the auto-checks for all six letters yourself, then present the results in ONE `AskUserQuestion` (preview: the filled six-letter table with a one-line note each) asking the user to confirm or flag letters to rework. Only letters the user flags get the full interactive treatment below. If the auto-checks reveal the story is bigger than its tier (more than ~3 expected Operations, a new entity, a new module), say so and offer to re-tier it to `full` — write the new tier back to `stories[i].rigor`.
+### Step 1 — Already assessed?
 
-**Under autopilot (contract §2):** run the six auto-checks yourself for any tier and take the result as final — every letter ✅ → continue (`node "$LEDGER" log --kind gate --gate invest --verdict PASS --summary "6/6 letters pass"`); a letter ❌ that a re-tier fixes (`S` with ≤ 3 Ops → `light`, > 3 → `full`) → write `stories[i].rigor`, `node "$LEDGER" log --kind decision --summary "re-tiered to <tier>: <reason>"`, continue; any other ❌ → `node "$LEDGER" log --kind gate --gate invest --verdict FAIL --summary "<letter> failed: <reason>"` and hard stop `split_required` (for `S`/`I`) or `spec_contradiction` (for `N`/`V`/`E`/`T`). `/autopilot` (Plan 2) replaces the auto-checks with the `invest-assessor` agent; the verdict handling stays as written here.
+Read `stories[i].invest` from `specs/stories.json`. If all six letters (`i`, `n`, `v`, `e`, `s`, `t`) are `true` and `checked_at` is set, the `autopilot` conductor's `invest` stage already ran the agent before invoking this skill. Fill `STORY.md`'s INVEST table straight from those flags — each row's note reads "assessed by invest-assessor (autopilot invest stage)" — and skip straight to Phase 1. Journal nothing: the gate's ledger entry already exists, written by the conductor.
 
-**Outside autopilot, full stories** run the gate interactively — every check is asked via `AskUserQuestion` so the user is the source of truth, not the model.
+### Step 2 — Otherwise, run the agent
+
+Dispatch it directly:
+
+```
+Agent({ subagent_type: "invest-assessor", prompt: "Assess US-NNN. End with the INVEST_VERDICT: line." })
+```
+
+Parse the response: the six-row INVEST table, the `### Draft scenarios` block, and the final `INVEST_VERDICT: PASS | RE-TIER light | RE-TIER full | SPLIT | FAIL <letter>: <reason>` line (plus `### Proposed split` after `SPLIT`).
+
+**If the Agent tool refuses `subagent_type: "invest-assessor"`** (unknown agent — `autopilot` is not installed): print `Install autopilot: /plugin install autopilot@claude-dev-skill`. Outside autopilot, fall back to the manual six-question walk in Step 4 below (run each row's Question yourself with no agent pre-fill). Under autopilot, hard stop `tooling_not_ready` (contract §2) instead — an unattended run must not guess at INVEST.
+
+### Step 3 — Under autopilot (no conductor — `AUTOPILOT=1` legacy loop), the verdict is final
+
+This step only applies when this skill is invoked directly under `AUTOPILOT=1` without the `autopilot` conductor driving the run (Step 1 already covers the conductor-driven case). Take the agent's `INVEST_VERDICT` line as final for any tier — no re-check, no `AskUserQuestion`:
+
+- `PASS` → write `STORY.md`'s table from the agent's six rows, `node "$LEDGER" log --kind gate --gate invest --verdict PASS --summary "6/6 letters pass"`, continue to Phase 1.
+- `RE-TIER light` / `RE-TIER full` → write `stories[i].rigor` to the named tier, `node "$LEDGER" log --kind decision --summary "re-tiered to <tier>: <reason>"`, continue.
+- `SPLIT` → `node "$LEDGER" log --kind gate --gate invest --verdict FAIL --summary "S/I failed: split required"` and hard stop `split_required`.
+- `FAIL <letter>: <reason>` → `node "$LEDGER" log --kind gate --gate invest --verdict FAIL --summary "<letter> failed: <reason>"` and hard stop `spec_contradiction`.
+
+### Step 4 — Outside autopilot, the agent's table seeds the gate
+
+**Light stories (`rigor: "light"`)** get a single-batch gate: present the agent's six-row table (with its per-letter notes) in ONE `AskUserQuestion` (preview: the table as the agent returned it) asking the user to confirm or flag letters to rework. Only letters the user flags get the full interactive treatment below. If the agent's `S` note says the story is bigger than its tier (estimate > 3 Operations, a new entity, a new module), say so and offer to re-tier it to `full` — write the new tier back to `stories[i].rigor`.
+
+**Full stories** run the gate interactively, same as before, but **pre-filled**: walk every letter via `AskUserQuestion` with the agent's ✅/❌ status and note shown as the current state, so the user confirms or corrects it instead of filling in blind. If Step 2's fallback fired (no agent available), there is no pre-fill — ask each question from scratch.
 
 For each letter, present the current state, ask the user to confirm or correct, and record the result in both `STORY.md`'s INVEST table and `specs/stories.json`'s `stories[i].invest`.
 
@@ -54,6 +79,8 @@ For each letter, present the current state, ask the user to confirm or correct, 
 | **E**stimable   | "Are the AC concrete enough that you could roughly size the work?"                                                | ≥ 2 AC; no AC contains "etc." / "and so on" / "various"; each AC is observable.     | Ask for tighter AC.                                                                                                                                                                                                                     |
 | **S**mall       | "Will this fit in a single agent loop (rough thumb: ≤ ~6 operations of work)?"                                    | Heuristic on AC count + complexity. The skill estimates and lets the user override. | Offer to split into N stories. If accepted, generate the new story stubs in `specs/stories.json` (advancing the next free `US-NNN` ids) and update the current story's `depends_on_story_ids` to point at the splits where appropriate. |
 | **T**estable    | "Can each AC be turned into at least one Gherkin scenario? Want me to draft one for each?"                        | Walk AC list; draft a Gherkin skeleton for each.                                    | Block until each AC has a draftable scenario.                                                                                                                                                                                           |
+
+If the agent returned `INVEST_VERDICT: SPLIT` (or the `S`/`I` row is flagged in the manual walk), present its `### Proposed split` block to the user and offer, via `AskUserQuestion`, to create the stub stories now — generate the new story stubs in `specs/stories.json` (advancing the next free `US-NNN` ids) and update the current story's `depends_on_story_ids` to point at the splits where appropriate.
 
 If a story fails any letter and the user does not want to fix it now, **stop the skill** with an explanatory note. Do NOT silently bypass INVEST.
 
@@ -236,6 +263,7 @@ Walked in Phase 3 Step 1 — every item must pass before the story is declared s
 - [ ] Header includes phase, foundation flag, dependencies, mockup links (if UI), specification date
 - [ ] User Story has all three parts (As a / I want / So that), all concrete
 - [ ] INVEST table is fully filled in with `✅` or `❌` + a note per letter; matches `stories[i].invest` in `stories.json`
+- [ ] INVEST table came from the invest-assessor agent (or the conductor's invest stage), not from an unaided guess
 - [ ] Acceptance Criteria has at least 2 entries, each observable
 - [ ] Rules has at least one Rule, each with a sad-path note
 - [ ] Feature file map lists every `.feature` file in `./features/`
