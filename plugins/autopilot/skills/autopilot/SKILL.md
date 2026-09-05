@@ -69,6 +69,8 @@ This is the whole conductor. Execute it literally.
 5. Classify OUT (matchSentinel semantics — AUTOPILOT_STOP wins, then the stage's sentinel):
      OUT contains AUTOPILOT_STOP_<reason>   → R = node "$AP" stage-end --outcome stop --reason <reason>
      OUT contains N.sentinel                → R = node "$AP" stage-end --outcome sentinel [--verdict "<verdict>"]
+                                               (for the `invest` stage, N.sentinel is a regex, not a literal string: match the
+                                               `INVEST_VERDICT:` line and take the text after the colon as the verdict)
      neither                                → R = node "$AP" stage-end --outcome no_sentinel --tail "<last 400 chars of OUT>"
 6. R.action == "continue" → N = R.next ; NOTE = "" ; goto 2      # next is already in R — do not call `next` again
    R.action == "retry"    → NOTE = "Previous attempt ended without its sentinel; its last output was: <last 400 chars of OUT>"
@@ -76,6 +78,8 @@ This is the whole conductor. Execute it literally.
    R.action == "stop"     → node "$AP" report
                             end with <promise>AUTOPILOT_STOP_<R.reason></promise>   # already stopped by the script
 ```
+
+Before passing the tail or the verdict text to `stage-end`, sanitise it: strip every character outside `[A-Za-z0-9 ._:/,()-]` and truncate to 400 characters — because that text is interpolated into a shell string, and the tail only ever becomes a journal summary anyway.
 
 Two jump targets are load-bearing. `continue` re-enters at **step 2**, not step 3: `R.next` carries the same three shapes as `next`, and under `--stop-policy hard-failures` it can already be the first stage of the *following* story — dispatching it with the previous story's `SLUG` and `BASE_SHA` would write the audit report into the wrong directory. `retry` re-enters at **step 3** with the same `N` and byte-identical `stage-start` arguments: that is how the script knows this is attempt 2 of the same stage rather than a fresh one. Never call `next` for a retry.
 

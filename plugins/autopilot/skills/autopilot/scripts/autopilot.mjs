@@ -401,9 +401,17 @@ function resolveScoped(story, s, rigor) {
   return stageResult(story, allTrue ? "spec-writing" : "invest", null, rigor);
 }
 
+// A verification report existing isn't enough — story-verifier writes the
+// report file before it handles a FAIL, so a FAILed audit must re-resolve to
+// the audit stage on resume rather than being treated as passed.
+function auditPassed(p) {
+  if (!p || !existsSync(p)) return false;
+  return !/^## Overall Verdict:\s*FAIL/m.test(readFileSync(p, "utf8"));
+}
+
 function resolveSpecced(story, dir, rigor) {
   const auditPath = dir && join(dir, "verification", "spec-audit.md");
-  if (!auditPath || !existsSync(auditPath)) {
+  if (!auditPassed(auditPath)) {
     return stageResult(story, "spec-writing-verification", null, rigor);
   }
   return stageResult(story, "plan-writing", null, rigor);
@@ -411,7 +419,7 @@ function resolveSpecced(story, dir, rigor) {
 
 function resolvePlanned(specs, story, dir, rigor) {
   const auditPath = dir && join(dir, "verification", "plan-audit.md");
-  if (!auditPath || !existsSync(auditPath)) {
+  if (!auditPassed(auditPath)) {
     return stageResult(story, "plan-writing-verification", null, rigor);
   }
   const root = dirname(specs);
@@ -703,6 +711,9 @@ export async function stageStart(specs, opts, deps = {}) {
 }
 
 export async function stageEnd(specs, opts, deps = {}) {
+  if (!["sentinel", "no_sentinel", "stop"].includes(opts.outcome)) {
+    throw new Error(`stage-end: --outcome must be sentinel|no_sentinel|stop, got ${opts.outcome}`);
+  }
   const ledger = deps.ledger ?? (await defaultLedger(opts.ledger));
   const now = deps.now ?? new Date();
   const ap = withAutopilot(specs);
@@ -773,6 +784,11 @@ export async function stageEnd(specs, opts, deps = {}) {
     } else if (verdict?.startsWith("RE-TIER")) {
       const tier = verdict.split(" ")[1];
       applyInvestPass(specs, story, now, tier);
+      ledger.log(
+        specs,
+        { kind: "gate", gate: "invest", verdict: "PASS", summary: `gate invest PASS (re-tiered to ${tier})`, run_id: ap.run_id, story, op, stage },
+        now,
+      );
       ledger.log(
         specs,
         {
@@ -891,8 +907,21 @@ function renderReportText({ run_id, target, until, stop_reason, stages, gates, b
 }
 
 export async function report(specs, opts, deps = {}) {
-  const ledger = deps.ledger ?? (await defaultLedger(opts.ledger));
   const { run_id } = opts;
+  if (run_id == null) {
+    return {
+      run_id: null,
+      target: null,
+      until: null,
+      stop_reason: null,
+      stages: [],
+      gates: [],
+      backlog_ids: [],
+      commits: [],
+      text: "autopilot report: no autopilot run on record\n",
+    };
+  }
+  const ledger = deps.ledger ?? (await defaultLedger(opts.ledger));
   const entries = ledger.readJournal(specs).filter((e) => e.run_id === run_id);
   const ap = readAutopilot(specs);
   const matchesRun = ap?.run_id === run_id;

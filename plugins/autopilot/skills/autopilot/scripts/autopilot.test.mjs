@@ -299,6 +299,24 @@ test("next: specced → spec-writing-verification until spec-audit.md exists, th
   assert.equal(after.sentinel, "PLAN_COMPLETE_US-000");
 });
 
+test("next: specced with a FAIL spec-audit.md re-runs spec-writing-verification", () => {
+  const { specs } = fixtureProject();
+  setStory(specs, "US-000", { phase: "specced" });
+  const ap = dryRun("US-000");
+
+  const dir = storyDir(specs, "US-000");
+  mkdirSync(join(dir, "verification"), { recursive: true });
+  const auditPath = join(dir, "verification", "spec-audit.md");
+
+  writeFileSync(auditPath, "## Overall Verdict: FAIL\n\nsome reason\n");
+  const stillAuditing = nextStage(specs, ap);
+  assert.equal(stillAuditing.stage, "spec-writing-verification");
+
+  writeFileSync(auditPath, "## Overall Verdict: PASS WITH WARNINGS\n");
+  const advanced = nextStage(specs, ap);
+  assert.equal(advanced.stage, "plan-writing");
+});
+
 test("next: planned → plan-writing-verification, then repo-initialization for US-000 on an empty repo, then test-setup Op-1", () => {
   const { root, specs } = fixtureProject();
   setStory(specs, "US-000", { phase: "planned" });
@@ -356,6 +374,24 @@ test("next: planned story whose PLAN.md has no Operations → stop spec_contradi
     reason: "spec_contradiction",
     detail: "PLAN.md lists no Operations (no '### Operation N' heading) and no state.json exists",
   });
+});
+
+test("next: planned with a FAIL plan-audit.md re-runs plan-writing-verification", () => {
+  const { root, specs } = fixtureProject();
+  writeFileSync(join(root, "package.json"), "{}\n");
+  setStory(specs, "US-001", { phase: "planned" });
+  const dir = storyDir(specs, "US-001");
+  mkdirSync(join(dir, "verification"), { recursive: true });
+  const auditPath = join(dir, "verification", "plan-audit.md");
+  writeFileSync(join(dir, "PLAN.md"), "### Operation 1 — only\n");
+
+  writeFileSync(auditPath, "## Overall Verdict: FAIL\n\nsome reason\n");
+  const stillAuditing = nextStage(specs, dryRun("US-001"));
+  assert.equal(stillAuditing.stage, "plan-writing-verification");
+
+  writeFileSync(auditPath, "## Overall Verdict: PASS WITH WARNINGS\n");
+  const advanced = nextStage(specs, dryRun("US-001"));
+  assert.equal(advanced.stage, "test-setup");
 });
 
 test("next: red — cursor rules", () => {
@@ -744,6 +780,29 @@ test("stageEnd sentinel with no tracker progress → stop stage_no_progress", as
   assert.equal(ap.stop_reason, "stage_no_progress");
 });
 
+test("stageEnd rejects a missing or misspelled --outcome", async () => {
+  const { specs } = fixtureProject();
+  const now = new Date("2026-09-05T10:00:00.000Z");
+  await start(specs, { target: "US-000" }, { ledger, now });
+  await stageStart(
+    specs,
+    { story: "US-000", stage: "spec-writing", agent: "general-purpose" },
+    { ledger, now },
+  );
+
+  await assert.rejects(
+    () => stageEnd(specs, { outcome: undefined }, { ledger, now }),
+    /--outcome must be/,
+  );
+  await assert.rejects(
+    () => stageEnd(specs, { outcome: "no-sentinel" }, { ledger, now }),
+    /--outcome must be/,
+  );
+
+  const journalEntry = ledger.readJournal(specs).find((e) => e.kind === "stage_end");
+  assert.equal(journalEntry, undefined);
+});
+
 test("stageEnd no_sentinel retries once then stops with stage_no_sentinel", async () => {
   const { specs } = fixtureProject();
   const now = new Date("2026-09-05T10:00:00.000Z");
@@ -818,6 +877,8 @@ test("stageEnd invest verdicts: PASS writes invest flags; RE-TIER also rewrites 
     assert.equal(story.rigor, "light");
     const decision = ledger.readJournal(specs).find((e) => e.kind === "decision");
     assert.match(decision.summary, /re-tiered to light by invest-assessor/);
+    const gate = ledger.readJournal(specs).find((e) => e.kind === "gate" && e.gate === "invest");
+    assert.equal(gate.verdict, "PASS");
   }
 
   // SPLIT
@@ -928,6 +989,24 @@ test("report aggregates this run's stages, gates, backlog ids and commits", asyn
   assert.ok(Array.isArray(rep.commits));
   assert.ok(rep.text.includes("BL-001"));
   assert.ok(rep.text.includes(ap.run_id));
+});
+
+test("report with no run returns an empty report, not every null-run_id journal line", async () => {
+  const { specs } = fixtureProject();
+  const now = new Date();
+  ledger.log(
+    specs,
+    { kind: "stage_end", summary: "leftover legacy line", run_id: null, story: "US-000", stage: "invest" },
+    now,
+  );
+
+  const rep = await report(specs, {}, { ledger, now });
+  assert.equal(rep.run_id, null);
+  assert.deepEqual(rep.stages, []);
+  assert.deepEqual(rep.gates, []);
+  assert.deepEqual(rep.backlog_ids, []);
+  assert.deepEqual(rep.commits, []);
+  assert.match(rep.text, /no autopilot run on record/);
 });
 
 test("CLI: start → stage-start → stage-end → stop round-trips through main", () => {

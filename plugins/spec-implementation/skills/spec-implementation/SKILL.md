@@ -395,7 +395,7 @@ Gate 1: lazy-simplifier agent. Gate 2: story-reviewer agent. Gate 3: inline.
 
 ### When to skip a quality gate
 
-Never. All three gates are mandatory for every story.
+Never — except a gate the `/autopilot` conductor already flipped in `state.json.quality_gates` (see Gate 1 / Gate 2), which ran, just not from inside this skill.
 
 ### `--force`
 
@@ -408,4 +408,4 @@ Never. All three gates are mandatory for every story.
 - It does not write tests (`/test-setup` does that).
 - It does not flip `phase` to `verified` (`/verification-and-validation` does that).
 - It does not loop over multiple Operations in a single per-op invocation — one invocation, one Op (or one story-end gates pass).
-- It does not skip the story-end gates — they are mandatory for every story.
+- It does not skip the story-end gates — they are mandatory for every story, except a gate the `/autopilot` conductor already flipped in `state.json.quality_gates`, which ran, just not from inside this skill.
