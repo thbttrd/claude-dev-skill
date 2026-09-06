@@ -20,6 +20,7 @@ const watchSpecs = {
 
 export default defineConfig({
   output: "static",
+  markdown: { syntaxHighlight: { type: "shiki", excludeLangs: ["mermaid"] } },
   server: { host: "127.0.0.1", port: 4321 },
   devToolbar: { enabled: false },
   integrations: [watchSpecs],

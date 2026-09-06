@@ -6,3 +6,18 @@ const entry = await getEntry("docs", id);
 const Content = entry ? (await render(entry)).Content : null;
 ---
 {Content ? <div class="prose"><Content /></div> : missing ? <p class="muted">{missing}</p> : null}
+<script>
+  // ```mermaid fences reach the browser as <pre><code class="language-mermaid"> (excluded from shiki in astro.config.mjs).
+  import mermaid from "mermaid";
+  const blocks = document.querySelectorAll("pre > code.language-mermaid");
+  if (blocks.length) {
+    mermaid.initialize({ startOnLoad: false, theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default" });
+    for (const code of blocks) {
+      const el = document.createElement("pre");
+      el.className = "mermaid";
+      el.textContent = code.textContent;
+      code.parentElement.replaceWith(el);
+    }
+    mermaid.run();
+  }
+</script>

@@ -4,7 +4,7 @@ import Base from "../../layouts/Base.astro";
 import Chip from "../../components/Chip.astro";
 import Markdown from "../../components/Markdown.astro";
 import Feature from "../../components/Feature.astro";
-import { gateVerdicts, listFiles, opProgress, readBacklog, readJournal, readState, readStories, storyDir } from "../../lib/specs.mjs";
+import { gateVerdicts, journalId, listFiles, opProgress, readBacklog, readJournal, readState, readStories, storyDir } from "../../lib/specs.mjs";
 import { readFeatures } from "../../lib/gherkin.mjs";
 
 export function getStaticPaths() {
@@ -64,7 +64,7 @@ const tabs = ["story", "features", "plan", "state", "verification", "ui", "backl
     {state.data?.decisions?.length > 0 && <><h3>Decisions</h3><ul>{state.data.decisions.map((d) => <li><span class="muted small">{d.at} {d.op}</span> {d.summary}</li>)}</ul></>}
     {state.data?.errors?.length > 0 && <><h3>Errors</h3><ul>{state.data.errors.map((e) => <li class="error">{e.operation}: {e.message} <span class="small">{e.details}</span></li>)}</ul></>}
     <h3>Journal ({journal.length}) <a class="small" href={`/journal#${id}`}>filter →</a></h3>
-    <div class="table-wrap"><table><tbody>{journal.slice(-30).reverse().map((e) => <tr><td class="ts small">{e.ts}</td><td>{e.op}</td><td>{e.stage}</td><td><Chip value={e.kind} kind={e.verdict ?? "pending"} /></td><td>{e.summary}</td></tr>)}</tbody></table></div>
+    <div class="table-wrap"><table><tbody>{journal.slice(-30).reverse().map((e) => <tr><td class="small"><a href={`/journal#${journalId(e)}`}><code>{journalId(e)}</code></a></td><td class="ts small">{e.ts}</td><td>{e.op}</td><td>{e.stage}</td><td><Chip value={e.kind} kind={e.verdict ?? "pending"} /></td><td>{e.summary}</td></tr>)}</tbody></table></div>
   </section>
 
   <section id="verification"><h2>Verification</h2>

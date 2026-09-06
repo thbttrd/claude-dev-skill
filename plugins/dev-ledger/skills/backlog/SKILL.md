@@ -1,6 +1,6 @@
 ---
 name: backlog
-version: 1.0.4
+version: 1.0.5
 description: 'Lists open backlog items (BL-NNN) filed by the pipeline''s verifiers and gates, or implements one by id with a minimal RED → GREEN → REFACTOR cycle and resolves it. Triggers on "/backlog", "/backlog BL-012", "implement BL-012", "what''s in the backlog", "close BL-012 as wontfix".'
 ---
 
