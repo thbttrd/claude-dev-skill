@@ -1,7 +1,7 @@
 ---
 name: dev-ledger
-version: 1.0.4
-description: 'Journal + backlog + regression CLI for story-based projects. `/dev-ledger` prints the project journal (specs/journal.jsonl merged with git log); `/dev-ledger US-008` filters one story. Other pipeline skills call the bundled `scripts/ledger.mjs` to record decisions, gate results and findings, to file backlog items (BL-NNN), and to compute a regression baseline. Triggers on "show the journal", "what happened on US-008", "what did autopilot decide", "/dev-ledger".'
+version: 1.0.5
+description: 'Journal + backlog + regression CLI for story-based projects. `/dev-ledger` prints the project journal (specs/journal.jsonl merged with git log); `/dev-ledger US-008` filters one story. Other pipeline skills call the bundled `scripts/ledger.mjs` to record decisions, gate results and findings, to file backlog items (BL-NNN), and to compute a regression baseline. Triggers on "show the journal", "what happened on US-008", "what did autopilot decide", "tell me more about jl-042", "/dev-ledger".'
 ---
 
 # dev-ledger
@@ -26,6 +26,8 @@ node "$LEDGER" backlog  wontfix BL-NNN --reason "…"
 node "$LEDGER" failures --runner vitest|cucumber|lines [--report-file p]      # stdin → sorted failing test ids
 node "$LEDGER" regress  --base <sha> --cmd "<shell>" --runner vitest|cucumber|lines [--report-file p] [--json]   # exit 1 on regressions
 ```
+
+`jl-NNN` (the id `/specs-site` shows next to a journal entry) is line `NNN` of `specs/journal.jsonl`: `sed -n 'NNNp' specs/journal.jsonl`.
 
 `--specs <dir>` (or `LEDGER_SPECS`) overrides the `specs/` lookup, which otherwise walks up from the cwd to the directory holding `specs/stories.json`.
 

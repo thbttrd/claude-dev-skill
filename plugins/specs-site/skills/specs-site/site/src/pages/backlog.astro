@@ -19,9 +19,9 @@ const statusKind = (s) => (s === "done" ? "green" : s === "wontfix" ? "pending" 
   {error && <p class="error">{error}</p>}
   <Filters fields={fields} target="backlog" />
   <div class="table-wrap"><table id="backlog">
-    <thead><tr><th>Id</th><th>Status</th><th>Severity</th><th>Kind</th><th>Story</th><th>Op</th><th>Stage / gate</th><th>Title</th><th>Created</th></tr></thead>
+    <thead><tr><th>Id</th><th>Status</th><th>Severity</th><th>Kind</th><th>Story</th><th>Op</th><th>Stage / gate</th><th>Title</th><th>Created</th><th>Resolved</th></tr></thead>
     <tbody>{items.map((i) => (
-      <tr data-status={i.status} data-severity={i.severity} data-kind={i.kind} data-story={i.source?.story ?? ""}>
+      <tr class={["done", "wontfix"].includes(i.status) ? "closed" : ""} data-status={i.status} data-severity={i.severity} data-kind={i.kind} data-story={i.source?.story ?? ""}>
         <td><a href={`/backlog/${i.id}`}>{i.id}</a></td>
         <td><Chip value={i.status} kind={statusKind(i.status)} /></td>
         <td><Chip value={i.severity} /></td>
@@ -29,8 +29,9 @@ const statusKind = (s) => (s === "done" ? "green" : s === "wontfix" ? "pending" 
         <td>{i.source?.story && <a href={`/stories/${i.source.story}`}>{i.source.story}</a>}</td>
         <td>{i.source?.op}</td>
         <td class="small muted">{[i.source?.stage, i.source?.gate].filter(Boolean).join(" / ")}</td>
-        <td>{i.title}</td>
+        <td class="title">{i.title}</td>
         <td class="small">{i.created_at}</td>
+        <td class="small">{i.resolved_at && <>{i.resolved_at} {i.resolved_sha && <code>{i.resolved_sha}</code>}<br /><span class="muted">{i.resolution}</span></>}</td>
       </tr>
     ))}</tbody>
   </table></div>

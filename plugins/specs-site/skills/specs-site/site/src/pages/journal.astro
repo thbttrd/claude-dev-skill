@@ -2,7 +2,7 @@
 import Base from "../layouts/Base.astro";
 import Chip from "../components/Chip.astro";
 import Filters from "../components/Filters.astro";
-import { readJournal } from "../lib/specs.mjs";
+import { journalId, readJournal } from "../lib/specs.mjs";
 const journal = readJournal().slice().reverse();
 const uniq = (k) => [...new Set(journal.map((e) => e[k]).filter(Boolean))].sort();
 const fields = [
@@ -17,9 +17,10 @@ const fields = [
   <h1>Journal <span class="muted small">{journal.length} entries</span></h1>
   <Filters fields={fields} target="journal" />
   <div class="table-wrap"><table id="journal">
-    <thead><tr><th>ts</th><th>story</th><th>op</th><th>stage</th><th>agent</th><th>kind</th><th>summary</th><th>refs</th></tr></thead>
+    <thead><tr><th>id</th><th>ts</th><th>story</th><th>op</th><th>stage</th><th>agent</th><th>kind</th><th>summary</th><th>refs</th></tr></thead>
     <tbody>{journal.map((e) => (
-      <tr data-story={e.story ?? ""} data-op={e.op ?? ""} data-stage={e.stage ?? ""} data-kind={e.kind ?? ""} data-day={(e.ts ?? "").slice(0, 10)} class={e.kind === "invalid" ? "error" : ""}>
+      <tr data-story={e.story ?? ""} data-op={e.op ?? ""} data-stage={e.stage ?? ""} data-kind={e.kind ?? ""} data-day={(e.ts ?? "").slice(0, 10)} class={e.kind === "invalid" ? "error" : ""} id={journalId(e)}>
+        <td class="small"><a href={`#${journalId(e)}`}><code>{journalId(e)}</code></a></td>
         <td class="ts small">{e.ts ?? `line ${e.line}`}</td>
         <td>{e.story && <a href={`/stories/${e.story}`}>{e.story}</a>}</td>
         <td>{e.op}</td><td>{e.stage}</td><td class="small muted">{e.agent}</td>

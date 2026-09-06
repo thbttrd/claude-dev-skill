@@ -4,6 +4,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [1.0.5] — 2026-09-06
+
+### Added
+
+- Document the `jl-NNN` id `/specs-site` ≥ 1.1 shows next to a journal entry: line NNN of `specs/journal.jsonl` (`sed -n 'NNNp'`); trigger on "tell me more about jl-042". 
+
 ## [1.0.4] — 2026-09-05
 
 ### Changed

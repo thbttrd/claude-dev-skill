@@ -32,6 +32,9 @@ export function parseJsonl(text) {
   return entries;
 }
 
+// jl-NNN = line NNN of specs/journal.jsonl (append-only, so the id is stable).
+export const journalId = (e) => `jl-${String(e.line).padStart(3, "0")}`;
+
 export function readJournal() {
   const p = join(SPECS_DIR, "journal.jsonl");
   return existsSync(p) ? parseJsonl(readFileSync(p, "utf8")) : [];

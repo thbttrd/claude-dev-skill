@@ -46,11 +46,15 @@ test("build against the fixture emits the dashboard and the story page", () => {
   assert.ok(existsSync(join(out, "stories", "US-001", "index.html")));
   assert.match(html(out, "architecture"), /ADR-001/);
   assert.match(html(out, "architecture"), /assets\/architecture\.png/);
+  assert.match(html(out, "architecture"), /<code class="language-mermaid">graph TD/); // left to the client-side mermaid script, not shiki
+  assert.match(html(out, "architecture"), /<script type="module" src="\/_astro\//);
   assert.match(html(out, "design"), /<code>--background<\/code>[\s\S]*background:#f8fafc/);
   const journal = html(out, "journal");
   assert.match(journal, /data-kind="finding"[\s\S]*?BL-001/);
+  assert.match(journal, /<tr[^>]* id="jl-001">[\s\S]*?<code>jl-001<\/code>/);
   assert.match(journal, /chip-fail">invalid/);
   assert.match(html(out, "backlog"), /data-status="open"[\s\S]*?BL-001/);
+  assert.match(html(out, "backlog"), /<tr class="closed" data-status="done"[\s\S]*?BL-002[\s\S]*?<td class="title">/);
   const item = html(out, "backlog/BL-001");
   assert.match(item, /\/backlog BL-001/);
   assert.match(item, /Source report/);
