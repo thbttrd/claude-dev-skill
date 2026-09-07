@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [1.3.2] — 2026-09-07
+
+### Fixed
+
+- A Test Plan row that is `passing: true` while its test is skipped or pending (env-gated lane, `'skipped'` step, `describe.skipIf`) and carries no `gated_run` is a FAIL for that row — a skip never audits as green.
+
 ## [1.3.1] — 2026-09-05
 
 ### Changed

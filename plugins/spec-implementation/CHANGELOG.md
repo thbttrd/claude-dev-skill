@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [3.4.2] — 2026-09-07
+
+### Fixed
+
+- Phase 4 flips `test_plan_rows[T-N].passing` only when the reporter shows the test **executed and passed**: a self-skipping test (env-gated lane, `'skipped'` step, `describe.skipIf`, cucumber pending/skipped) stays `passing: false` with `gated: "<VAR or reason>"`, and the skill either runs the gated lane now (`gated_run`) or files a `test-gap` backlog item. Fifth self-review checkbox; `references/state-schema.md` documents the `gated` / `gated_run` fields. Dogfood finfetch-web-v2 US-000: four gated rows recorded passing on a skip hid real-bucket failures (BL-013/021/054/055).
+
 ## [3.4.1] — 2026-09-05
 
 ### Changed

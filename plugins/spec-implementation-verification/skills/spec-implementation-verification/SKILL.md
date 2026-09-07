@@ -1,6 +1,6 @@
 ---
 name: spec-implementation-verification
-version: 1.3.1
+version: 1.3.2
 description: >
   Per-Operation verification of /spec-implementation output for GREEN-state
   compliance, no over-implementation, architecture alignment, and zero
