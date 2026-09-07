@@ -6,6 +6,12 @@ The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/
 
 ## [Unreleased]
 
+## [3.3.2] — 2026-09-07
+
+### Changed
+
+- `references/state-schema.md`: the `passing` transition reads *executed and passed*; a skipped test stays `false` with `gated: "<ENV_VAR>"` until a dated `gated_run` with the gate set flips it (kept in sync with spec-implementation 3.4.2).
+
 ## [3.3.1] — 2026-09-05
 
 ### Changed

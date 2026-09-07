@@ -1,6 +1,6 @@
 ---
 name: spec-implementation-verification
-version: 1.3.1
+version: 1.3.2
 description: >
   Per-Operation verification of /spec-implementation output for GREEN-state
   compliance, no over-implementation, architecture alignment, and zero
@@ -183,7 +183,7 @@ its tests cover. For each Safeguard the Test Plan ties to Op-X:
 
 Cross-check every Test Plan row tagged Op-X:
 - [ ] Row's file exists
-- [ ] Row's test passes (state.json.test_plan_rows[T-N].passing = true)
+- [ ] Row's test passes (state.json.test_plan_rows[T-N].passing = true) AND the reporter shows it executed — a `passing: true` on a row whose test is skipped/pending (env-gated lane, `'skipped'` step, `describe.skipIf`) without a `gated_run` is a FAIL for that row
 - [ ] Row's `Asserts` description matches what the test now exercises after GREEN
 
 ## Step 7: state.json (Op-X)

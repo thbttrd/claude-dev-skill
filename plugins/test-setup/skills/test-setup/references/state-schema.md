@@ -184,7 +184,9 @@ operations[Op-X] companion-field transitions (kept for backwards compat):
 
 test_plan_rows transitions:
   written: false → true             (set by /test-setup)
-  passing: false → true             (set by /spec-implementation when test goes green)
+  passing: false → true             (set by /spec-implementation when the test EXECUTED and passed — a skipped
+                                     test stays false and carries gated: "<ENV_VAR>"; gated_run records the
+                                     dated run with the gate set that finally flipped it)
 ```
 
 The per-story `phase_local` and the project-level `phase` advance together at handoffs, but `phase` is sticky across the entire interleaved per-op cycle:
