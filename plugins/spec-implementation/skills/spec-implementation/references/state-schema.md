@@ -196,7 +196,7 @@ mv specs/story-NNN-slug/state.json.tmp specs/story-NNN-slug/state.json
 
 **Update frequency (`/spec-implementation` per-op mode):**
 
-- After GREEN commit → `Op-X.operation_phase = "green"`, `Op-X.implementation_status = "green"`, `summary.operations_green++`, `implementation.operations_green++`, `implementation.last_commit = <sha>`, `implementation.ops_completed.append("Op-X")`. Mark `test_plan_rows[T-N].passing = true` for every row with `op = Op-X`.
+- After GREEN commit → `Op-X.operation_phase = "green"`, `Op-X.implementation_status = "green"`, `summary.operations_green++`, `implementation.operations_green++`, `implementation.last_commit = <sha>`, `implementation.ops_completed.append("Op-X")`. Mark `test_plan_rows[T-N].passing = true` for every row with `op = Op-X` **whose test executed and passed** (reporter, not exit code). A self-skipping test (env-gated lane, `'skipped'` step, `describe.skipIf`) stays `passing: false` with `gated: "<ENV_VAR or reason>"` until it is run with the gate set (`gated_run: "<date> — executed with the gate set"`); never record a skip as green.
 - After REFACTOR commit (optional) → `Op-X.operation_phase = "refactored"`, update `implementation.last_commit`.
 - After every error encountered → append to `errors[]`.
 - Advance `current_operation` to the next pending op.

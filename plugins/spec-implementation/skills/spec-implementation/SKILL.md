@@ -204,7 +204,7 @@ After GREEN (and optional REFACTOR):
 - `implementation.last_commit = <sha>`
 - `implementation.ops_completed.append("Op-X")`
 - `implementation.started_at = <now>` (only on the very first GREEN; do not overwrite if already set)
-- For every `test_plan_rows[T-N]` where `op = "Op-X"` and `type ≠ "manual"`: set `passing = true`.
+- For every `test_plan_rows[T-N]` where `op = "Op-X"` and `type ≠ "manual"`: set `passing = true` **only if the row's test EXECUTED and passed in this run** — read the reporter, not the exit code. A test that skipped itself (an env-gated lane such as `FINFETCH_FULL_BUCKET` / `FINFETCH_ALL_LANES`, a step returning `'skipped'`, `describe.skipIf`, `it.skip`, a cucumber `pending`/`skipped` count) is NOT passing: keep `passing = false`, set `gated = "<ENV_VAR or reason>"`, and either run the gated lane now with the variable set (then `passing = true`, `gated_run = "<date> — executed with the gate set"`) or file it: `node "$LEDGER" backlog add --title "T-N recorded on a skip: <scenario> never executed" --severity warning --kind test-gap --story US-NNN --op Op-X`. A skip that reads as green hid four real-bucket failures in finfetch-web-v2 US-000 (BL-013, BL-021, BL-054, BL-055).
 - Advance `current_operation` to the first Op whose `operation_phase ∉ {green, refactored}`, or `null` if every Op is now GREEN.
 
 ### Phase 5 — Self-Review, Report and offer next step
@@ -212,13 +212,14 @@ After GREEN (and optional REFACTOR):
 **Self-review (mandatory).** Before reporting, verify and print as a compact checked list:
 
 - [ ] Op-X's tests all pass, and the full per-story suite was re-run — earlier Ops' tests still pass
+- [ ] No `test_plan_rows` flipped to `passing: true` on a skipped/pending test — every skip is `gated` + (run with the gate set | backlog test-gap)
 - [ ] The implementation stays inside Op-X's scope — no logic justified only by a future Op
 - [ ] Every file touched sits in the module PLAN.md assigns it to; no cross-module imports
 - [ ] Lint + typecheck clean
 
 Fix failures before proceeding. This is the default GREEN gate; `/spec-implementation-verification` is an opt-in deep audit on top of it.
 
-Journal the self-review: `node "$LEDGER" log --kind gate --gate self-review --verdict <PASS|PASS_WITH_WARNINGS> --story US-NNN --op Op-X --stage spec-implementation --summary "<n>/4 checks"` (contract §3, §5). Any unchecked item not fixed → `node "$LEDGER" backlog add --title "<unchecked item>" --severity warning --kind <bug|test-gap|refactor> --story US-NNN --op Op-X`.
+Journal the self-review: `node "$LEDGER" log --kind gate --gate self-review --verdict <PASS|PASS_WITH_WARNINGS> --story US-NNN --op Op-X --stage spec-implementation --summary "<n>/5 checks"` (contract §3, §5). Any unchecked item not fixed → `node "$LEDGER" backlog add --title "<unchecked item>" --severity warning --kind <bug|test-gap|refactor> --story US-NNN --op Op-X`.
 
 ```
 US-NNN — Op-X GREEN
